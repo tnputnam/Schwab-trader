@@ -1,128 +1,97 @@
-# Schwab Trader Application
+# Schwab Trader
 
-A Python-based trading automation system for Charles Schwab that provides automated trading capabilities and a dashboard interface for monitoring and control.
-
-## Table of Contents
-1. [Application Structure](#application-structure)
-2. [Prerequisites](#prerequisites)
-3. [Installation](#installation)
-4. [Configuration](#configuration)
-5. [Usage](#usage)
-6. [Features](#features)
-7. [API Endpoints](#api-endpoints)
-8. [Error Handling](#error-handling)
-9. [Security](#security)
-
-## Application Structure
-```
-schwab_trader/
-├── dashboard/
-│   └── app.py           # Main Flask application and dashboard
-├── browser/
-│   └── interface.py     # Browser automation interface
-└── start.sh            # Application startup script
-```
-
-## Prerequisites
-- Python 3.x
-- Chrome browser
-- Charles Schwab account
-- Alpha Vantage API key
-
-## Installation
-1. Clone the repository
-2. Run the startup script:
-   ```bash
-   ./start.sh
-   ```
-   This will:
-   - Create a virtual environment
-   - Install dependencies
-   - Set up configuration
-   - Initialize the Chrome browser
-
-## Configuration
-The application requires the following environment variables:
-- `ALPHA_VANTAGE_API_KEY`: Your Alpha Vantage API key
-- `FLASK_SECRET_KEY`: Secret key for Flask session management
-
-These can be set in the `.env` file that is created during installation.
-
-## Usage
-1. Start the application using `start.sh`
-2. Access the dashboard at `http://localhost:5000`
-3. Log in to your Schwab account through the interface
-4. Use the dashboard to:
-   - Monitor portfolio
-   - Place trades
-   - View market data
-   - Manage positions
+A modern trading application built with FastAPI, featuring real-time market data, portfolio management, and trading capabilities.
 
 ## Features
-### Trading Operations
-- Portfolio management
-- Order placement and tracking
-- Position monitoring
-- Account balance tracking
-- Trade history management
 
-### Market Data
-- Real-time quotes
-- Stock fundamentals
-- Market search
-- Historical data analysis
-- Performance tracking
+- Real-time stock quotes and market data
+- Portfolio tracking and management
+- Live trading interface
+- Watchlist functionality
+- Price alerts
+- Portfolio analytics
+- Technical analysis tools
 
-### System Management
-- Chrome browser control
-- Session management
-- Error handling
-- Logging and monitoring
-- Configuration management
+## Setup
 
-## API Endpoints
-### System Control
-- `/api/system/status` - Get system status
-- `/api/system/check_login` - Check Schwab login status
-- `/api/system/start_chrome` - Start Chrome browser
-- `/api/system/stop_chrome` - Stop Chrome browser
+1. Clone the repository:
+```bash
+git clone <repository-url>
+cd schwab-trader
+```
 
-### Trading Operations
-- `/api/trading/order` - Place trading orders
-- `/api/trading/history` - Get trade history
-- `/api/trading/account` - Get account information
-- `/api/trading/positions` - Get current positions
-- `/api/trading/start` - Start trading session
+2. Create and activate virtual environment:
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
 
-### Market Data
-- `/api/market/search` - Search for market instruments
-- `/api/market/quote/<symbol>` - Get quote for symbol
-- `/api/assets/search` - Search for assets
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 
-### Portfolio Management
-- `/api/portfolio/import` - Import portfolio data
-- `/api/portfolio/export/pdf` - Export portfolio as PDF
+4. Set up environment variables:
+   - Copy `.env.example` to `.env`
+   - Add your API keys:
+     - Alpha Vantage API key
+     - NewsAPI key
 
-### User Management
-- `/api/login/status` - Check login status
-- `/api/login/start` - Start login session
+5. Start the application:
+```bash
+./start.sh
+```
 
-## Error Handling
-The application includes comprehensive error handling for:
-- Trading operations
-- Browser automation
-- API interactions
-- System operations
+## API Keys
 
-## Security
-- API key management
-- Session handling
-- Secure configuration
-- Error logging
-- Access control
+- Alpha Vantage: https://www.alphavantage.co/support/#api-key
+- NewsAPI: https://newsapi.org/register
 
-## License
-[Add your license information here]
+## Development
+
+The application uses:
+- FastAPI for the backend
+- SQLAlchemy for database management
+- WebSockets for real-time updates
+- Alpha Vantage and NewsAPI for market data
+
+## Project Structure
+
+```
+schwab-trader/
+├── main.py              # Main application entry point
+├── models.py            # Database models
+├── requirements.txt     # Python dependencies
+├── start.sh            # Startup script
+├── templates/          # HTML templates
+│   ├── base.html
+│   ├── dashboard.html
+│   ├── index.html
+│   └── trading.html
+└── static/             # Static files (CSS, JS, images)
+```
+
+## Automated Backup & Version Control
+
+The project includes automated backup and version control features:
+
+- **Auto Git Push**: Automatically commits and pushes changes every 10 minutes
+- **Project Backup**: Creates full project backups every 10 minutes
+- **Backup Cleanup**: Removes backups older than 28 days (runs weekly)
+- **Commit Management**: Maintains a clean git history by keeping only recent commits
+
+Logs for these automated processes can be found in:
+- Git auto-push: `/home/thomas/schwab_trader_backups/git_auto_push.log`
+- Project backup: `/home/thomas/schwab_trader_backups/backup.log`
 
 ## Contributing
-[Add contribution guidelines here] 
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+MIT License 
