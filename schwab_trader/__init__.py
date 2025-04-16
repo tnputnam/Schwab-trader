@@ -58,6 +58,6 @@ def create_app(config=None):
     app.register_blueprint(root)
     app.register_blueprint(news.bp)
     app.register_blueprint(strategies.bp)
-    app.register_blueprint(compare)
+    app.register_blueprint(compare.bp)
     
     return app

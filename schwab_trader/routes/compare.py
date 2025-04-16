@@ -6,7 +6,7 @@ import pandas as pd
 import os
 from werkzeug.utils import secure_filename
 
-compare = Blueprint('compare', __name__)
+bp = Blueprint('compare', __name__, url_prefix='/compare')
 
 # Allowed file extensions for portfolio imports
 ALLOWED_EXTENSIONS = {'csv', 'xlsx', 'xls'}
@@ -39,18 +39,18 @@ def parse_portfolio_file(file, filename):
     except Exception as e:
         return None, f"Error parsing file: {str(e)}"
 
-@compare.route('/compare')
+@bp.route('/')
 @login_required
 def portfolio_comparison():
     return render_template('compare.html')
 
-@compare.route('/api/compare/data')
+@bp.route('/api/data')
 @login_required
 def get_comparison_data():
     data = generate_mock_portfolio_data()
     return jsonify(data)
 
-@compare.route('/api/compare/import', methods=['POST'])
+@bp.route('/api/import', methods=['POST'])
 @login_required
 def import_portfolio():
     if 'file' not in request.files:
