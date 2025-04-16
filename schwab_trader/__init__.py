@@ -40,13 +40,13 @@ def create_app(test_config=None):
     cache.init_app(app)
     
     # Register blueprints
-    from schwab_trader.routes import root, news, strategies, compare, portfolio, auth
+    from schwab_trader.routes import root, news, strategies, compare, portfolio, bp
     app.register_blueprint(root.bp)
     app.register_blueprint(news.bp)
     app.register_blueprint(strategies.bp)
     app.register_blueprint(compare.bp)
     app.register_blueprint(portfolio.bp)
-    app.register_blueprint(auth.bp)
+    app.register_blueprint(bp)
     
     # Set up user loader
     @login_manager.user_loader
