@@ -2,36 +2,44 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_caching import Cache
+from flask_migrate import Migrate
 import logging
 from logging.handlers import RotatingFileHandler
 import os
+from schwab_trader.models import db
 
 # Initialize extensions
-db = SQLAlchemy()
-login_manager = LoginManager()
+migrate = Migrate()
 cache = Cache()
 
-def create_app(config=None):
+def create_app(test_config=None):
     app = Flask(__name__)
     
     # Default configuration
-    app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev')
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///app.db'
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['CACHE_TYPE'] = 'simple'
-    app.config['CACHE_DEFAULT_TIMEOUT'] = 300
-    app.config['LOGIN_DISABLED'] = True  # Disable login requirement for now
+    app.config.update(
+        SQLALCHEMY_DATABASE_URI='sqlite:///schwab_trader.db',
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        CACHE_TYPE='simple',
+        CACHE_DEFAULT_TIMEOUT=300
+    )
     
-    # Override with any passed config
-    if config:
-        app.config.update(config)
+    # Override with test config if provided
+    if test_config:
+        app.config.update(test_config)
     
     # Initialize extensions
     db.init_app(app)
-    login_manager.init_app(app)
+    migrate.init_app(app, db)
     cache.init_app(app)
     
+    # Create database tables
+    with app.app_context():
+        db.create_all()
+    
     # Configure login manager
+    login_manager = LoginManager()
+    login_manager.init_app(app)
+    
     @login_manager.user_loader
     def load_user(user_id):
         from schwab_trader.models import User

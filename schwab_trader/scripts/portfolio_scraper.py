@@ -1,11 +1,15 @@
 import os
 import sys
 import logging
-import json
 from datetime import datetime
-import requests
-from urllib.parse import urljoin
 import pandas as pd
+from flask import current_app
+
+# Add the project root to Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+sys.path.insert(0, project_root)
+
+from schwab_trader import create_app
 from schwab_trader.models import db, Portfolio, Position
 
 # Configure logging
@@ -19,114 +23,72 @@ logging.basicConfig(
 )
 logger = logging.getLogger('portfolio_scraper')
 
-class SchwabAPI:
-    """Interface with Schwab OpenAPI"""
-    
-    BASE_URL = "https://api.schwab.com/v1"  # Base URL for Schwab's API
-    
-    def __init__(self, client_id, client_secret):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.access_token = None
-        
-    def authenticate(self):
-        """Authenticate with Schwab API using OAuth2"""
-        try:
-            auth_url = urljoin(self.BASE_URL, "/oauth2/token")
-            response = requests.post(
-                auth_url,
-                auth=(self.client_id, self.client_secret),
-                data={"grant_type": "client_credentials"}
-            )
-            response.raise_for_status()
-            self.access_token = response.json()["access_token"]
-            logger.info("Successfully authenticated with Schwab API")
-        except Exception as e:
-            logger.error(f"Authentication failed: {str(e)}")
-            raise
-    
-    def get_positions(self):
-        """Fetch portfolio positions from Schwab API"""
-        if not self.access_token:
-            self.authenticate()
-            
-        try:
-            positions_url = urljoin(self.BASE_URL, "/accounts/positions")
-            headers = {
-                "Authorization": f"Bearer {self.access_token}",
-                "Accept": "application/json"
-            }
-            response = requests.get(positions_url, headers=headers)
-            response.raise_for_status()
-            
-            positions_data = response.json()
-            logger.info(f"Successfully retrieved {len(positions_data)} positions")
-            return positions_data
-            
-        except Exception as e:
-            logger.error(f"Failed to fetch positions: {str(e)}")
-            raise
-
-def save_portfolio_data(positions, filename='schwab_portfolio.csv'):
-    """Save portfolio data to CSV and database"""
+def process_portfolio_data(csv_file='schwab_portfolio.csv'):
+    """Process portfolio data from CSV file and save to database"""
     try:
-        # Convert positions to DataFrame
-        df = pd.DataFrame(positions)
+        # Read CSV file
+        logger.info(f"Reading portfolio data from {csv_file}")
+        df = pd.read_csv(csv_file)
         
-        # Save to CSV
-        df.to_csv(filename, index=False)
-        logger.info(f"Portfolio data saved to {filename}")
+        # Clean up column names and data
+        df.columns = [col.strip() for col in df.columns]
         
-        # Update database
+        # Create or get portfolio
         with db.session() as session:
+            portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
+            if not portfolio:
+                portfolio = Portfolio(name='Schwab Portfolio')
+                session.add(portfolio)
+                session.commit()
+            
             # Clear existing positions
-            session.query(Position).delete()
+            Position.query.filter_by(portfolio_id=portfolio.id).delete()
             
             # Add new positions
-            for pos in positions:
-                position = Position(
-                    symbol=pos['symbol'],
-                    description=pos['description'],
-                    quantity=pos['quantity'],
-                    price=pos['price'],
-                    market_value=pos['marketValue'],
-                    cost_basis=pos['costBasis'],
-                    day_change_dollar=pos['dayChange'],
-                    day_change_percent=pos['dayChangePercent'],
-                    security_type=pos['securityType']
-                )
-                session.add(position)
+            for _, row in df.iterrows():
+                try:
+                    # Clean and convert numeric values
+                    quantity = float(str(row['Quantity']).replace(',', ''))
+                    price = float(str(row['Price']).replace('$', '').replace(',', ''))
+                    market_value = float(str(row['Market Value']).replace('$', '').replace(',', ''))
+                    day_change = float(str(row['Day Change $']).replace('$', '').replace(',', ''))
+                    day_change_pct = float(str(row['Day Change %']).replace('%', ''))
+                    cost_basis = float(str(row['Cost Basis']).replace('$', '').replace(',', ''))
+                    
+                    position = Position(
+                        portfolio_id=portfolio.id,
+                        symbol=row['Symbol'],
+                        description=row['Description'],
+                        quantity=quantity,
+                        price=price,
+                        market_value=market_value,
+                        cost_basis=cost_basis,
+                        day_change_dollar=day_change,
+                        day_change_percent=day_change_pct,
+                        security_type=row['Security Type']
+                    )
+                    session.add(position)
+                except Exception as e:
+                    logger.warning(f"Error processing row for {row['Symbol']}: {str(e)}")
+                    continue
             
             session.commit()
-            logger.info("Database updated with new positions")
+            logger.info(f"Successfully imported {len(df)} positions")
             
-        return filename
     except Exception as e:
-        logger.error(f"Error saving portfolio data: {str(e)}")
+        logger.error(f"Error processing portfolio data: {str(e)}")
         raise
 
 def main():
     try:
-        # Load API credentials from environment variables
-        client_id = os.getenv('SCHWAB_CLIENT_ID')
-        client_secret = os.getenv('SCHWAB_CLIENT_SECRET')
-        
-        if not client_id or not client_secret:
-            raise ValueError("Missing Schwab API credentials. Please set SCHWAB_CLIENT_ID and SCHWAB_CLIENT_SECRET environment variables.")
-        
-        # Initialize Schwab API client
-        schwab = SchwabAPI(client_id, client_secret)
-        
-        # Fetch portfolio data
-        positions = schwab.get_positions()
-        
-        # Save data
-        filename = save_portfolio_data(positions)
-        logger.info(f"Successfully retrieved and saved portfolio data to {filename}")
+        app = create_app()
+        with app.app_context():
+            process_portfolio_data()
+            logger.info("Portfolio data import completed successfully")
             
     except Exception as e:
-        logger.error(f"Failed to retrieve portfolio: {str(e)}")
-        raise
+        logger.error(f"Failed to import portfolio: {str(e)}")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main() 
