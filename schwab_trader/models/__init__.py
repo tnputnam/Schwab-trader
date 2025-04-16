@@ -1,5 +1,9 @@
+"""Models package for Schwab Trader."""
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
+from schwab_trader.models.portfolio import Portfolio
+from schwab_trader.models.position import Position
+from schwab_trader.models.trade import Trade
 
 db = SQLAlchemy()
 
@@ -55,4 +59,6 @@ class Sector(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self):
-        return f'<Sector {self.name} ({self.percentage:.2f}%)>' 
+        return f'<Sector {self.name} ({self.percentage:.2f}%)>'
+
+__all__ = ['Portfolio', 'Position', 'Trade'] 
