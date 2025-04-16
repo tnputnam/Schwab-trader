@@ -1,0 +1,18 @@
+2025/04/16-11:32:58.155 16887 Reusing MANIFEST /home/thomas/Desktop/business/Stock Market program/chrome_profile/Default/IndexedDB/https_sws-gateway-nr.schwab.com_0.indexeddb.leveldb/MANIFEST-000001
+2025/04/16-11:32:58.155 16887 Recovering log #6
+2025/04/16-11:32:58.156 16887 Reusing old log /home/thomas/Desktop/business/Stock Market program/chrome_profile/Default/IndexedDB/https_sws-gateway-nr.schwab.com_0.indexeddb.leveldb/000006.log 
+2025/04/16-11:32:58.156 16887 Delete type=2 #5
+2025/04/16-11:32:58.412 16887 Level-0 table #11: started
+2025/04/16-11:32:58.421 16887 Level-0 table #11: 5888 bytes OK
+2025/04/16-11:32:58.436 16887 Delete type=0 #6
+2025/04/16-11:32:58.436 16887 Manual compaction at level-0 from '\x00\x07\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x08\x00\x00\x00' @ 0 : 0; will stop at (end)
+2025/04/16-11:32:59.156 16887 Level-0 table #13: started
+2025/04/16-11:32:59.165 16887 Level-0 table #13: 496 bytes OK
+2025/04/16-11:32:59.175 16887 Delete type=0 #10
+2025/04/16-11:32:59.175 16887 Manual compaction at level-0 from '\x00\x06\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x07\x00\x00\x00' @ 0 : 0; will stop at '\x00\x06\x00\x00\x05' @ 221 : 0
+2025/04/16-11:32:59.175 16887 Compacting 1@0 + 1@1 files
+2025/04/16-11:32:59.184 16887 Generated table #14@0: 48 keys, 2367 bytes
+2025/04/16-11:32:59.184 16887 Compacted 1@0 + 1@1 files => 2367 bytes
+2025/04/16-11:32:59.193 16887 compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/04/16-11:32:59.193 16887 Delete type=2 #13
+2025/04/16-11:32:59.194 16887 Manual compaction at level-0 from '\x00\x06\x00\x00\x05' @ 221 : 0 .. '\x00\x07\x00\x00\x00' @ 0 : 0; will stop at (end)

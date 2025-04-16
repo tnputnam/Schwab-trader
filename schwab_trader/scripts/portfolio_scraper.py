@@ -76,14 +76,14 @@ def extract_portfolio_data(driver):
                 # Check if table has expected columns
                 headers = table.find_elements(By.TAG_NAME, "th")
                 header_texts = [h.text.lower() for h in headers]
-                if any(col in header_texts for col in ['symbol', 'quantity', 'price', 'value']):
+                if 'symbol' in header_texts:  # Schwab positions table always has a Symbol column
                     positions_table = table
                     break
             except:
                 continue
         
         if not positions_table:
-            raise NoSuchElementException("Could not find positions table with expected columns")
+            raise NoSuchElementException("Could not find positions table with Symbol column")
         
         # Extract data from the table
         rows = positions_table.find_elements(By.TAG_NAME, "tr")
@@ -92,16 +92,28 @@ def extract_portfolio_data(driver):
         for row in rows[1:]:  # Skip header row
             try:
                 cells = row.find_elements(By.TAG_NAME, "td")
-                if len(cells) >= 7:  # Ensure we have enough columns
+                if len(cells) >= 12:  # Schwab positions table has at least 12 columns
+                    # Clean and convert numeric values
+                    quantity = cells[2].text.strip().replace(',', '')
+                    price = cells[3].text.strip().replace('$', '').replace(',', '')
+                    mkt_value = cells[5].text.strip().replace('$', '').replace(',', '')
+                    day_change_dollar = cells[6].text.strip().replace('$', '').replace(',', '')
+                    day_change_percent = cells[7].text.strip().replace('%', '')
+                    cost_basis = cells[8].text.strip().replace('$', '').replace(',', '')
+                    
                     position = {
                         'Symbol': cells[0].text.strip(),
                         'Description': cells[1].text.strip(),
-                        'Quantity': float(cells[2].text.replace(',', '')),
-                        'Last Price': cells[3].text.strip(),
-                        'Average Cost': cells[4].text.strip(),
-                        'Market Value': cells[5].text.strip(),
-                        'Day Change $': cells[6].text.strip(),
-                        'Day Change %': cells[7].text.strip() if len(cells) > 7 else '0%'
+                        'Quantity': float(quantity) if quantity else 0.0,
+                        'Price': float(price) if price else 0.0,
+                        'Price Change $': cells[4].text.strip(),
+                        'Market Value': float(mkt_value) if mkt_value else 0.0,
+                        'Day Change $': float(day_change_dollar) if day_change_dollar else 0.0,
+                        'Day Change %': float(day_change_percent) if day_change_percent else 0.0,
+                        'Cost Basis': float(cost_basis) if cost_basis else 0.0,
+                        'Gain $ (Gain/Loss $)': cells[9].text.strip(),
+                        'Gain % (Gain/Loss %)': cells[10].text.strip(),
+                        'Security Type': cells[11].text.strip()
                     }
                     data.append(position)
             except Exception as e:
