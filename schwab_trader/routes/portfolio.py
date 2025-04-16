@@ -4,7 +4,7 @@ import pandas as pd
 import os
 from datetime import datetime
 import logging
-from schwab_trader.models import db, Portfolio, Position, Sector
+from schwab_trader.models import db, Portfolio, Position
 from collections import defaultdict
 
 bp = Blueprint('portfolio', __name__, url_prefix='/portfolio')
@@ -28,12 +28,13 @@ def view():
     # Calculate sector allocation
     sector_totals = defaultdict(float)
     asset_type_totals = defaultdict(float)
+    total_value = 0
     
     for position in positions:
-        sector_totals[position.sector or 'Uncategorized'] += position.market_value
-        asset_type_totals[position.security_type or 'Other'] += position.market_value
-    
-    total_value = sum(sector_totals.values())
+        market_value = position.quantity * position.price
+        sector_totals[position.sector or 'Uncategorized'] += market_value
+        asset_type_totals[position.industry or 'Other'] += market_value
+        total_value += market_value
     
     # Convert to percentages
     sector_data = {
@@ -61,13 +62,16 @@ def get_summary():
     if not portfolio:
         return jsonify({'error': 'No portfolio found'}), 404
     
+    positions = Position.query.filter_by(portfolio_id=portfolio.id).all()
+    total_value = sum(p.quantity * p.price for p in positions)
+    day_change = sum((p.quantity * p.price) - (p.quantity * p.cost_basis) for p in positions)
+    day_change_percent = (day_change / total_value * 100) if total_value > 0 else 0
+    
     return jsonify({
-        'total_value': portfolio.total_value,
-        'cash_value': portfolio.cash_value,
-        'day_change': portfolio.day_change,
-        'day_change_percent': portfolio.day_change_percent,
-        'total_gain': portfolio.total_gain,
-        'total_gain_percent': portfolio.total_gain_percent
+        'total_value': total_value,
+        'day_change': day_change,
+        'day_change_percent': day_change_percent,
+        'last_updated': datetime.now().isoformat()
     })
 
 @bp.route('/api/positions')
@@ -80,15 +84,20 @@ def get_positions():
     positions = Position.query.filter_by(portfolio_id=portfolio.id).all()
     return jsonify([{
         'symbol': p.symbol,
-        'description': p.description,
         'quantity': p.quantity,
         'price': p.price,
-        'market_value': p.market_value,
+        'market_value': p.quantity * p.price,
         'cost_basis': p.cost_basis,
-        'day_change_dollar': p.day_change_dollar,
-        'day_change_percent': p.day_change_percent,
-        'security_type': p.security_type,
-        'sector': p.sector
+        'day_change': (p.price - p.cost_basis) * p.quantity,
+        'day_change_percent': ((p.price - p.cost_basis) / p.cost_basis * 100) if p.cost_basis > 0 else 0,
+        'sector': p.sector,
+        'industry': p.industry,
+        'pe_ratio': p.pe_ratio,
+        'market_cap': p.market_cap,
+        'dividend_yield': p.dividend_yield,
+        'eps': p.eps,
+        'beta': p.beta,
+        'volume': p.volume
     } for p in positions])
 
 @bp.route('/api/sectors')
@@ -98,12 +107,22 @@ def get_sectors():
     if not portfolio:
         return jsonify({'error': 'No portfolio found'}), 404
     
-    sectors = Sector.query.filter_by(portfolio_id=portfolio.id).all()
-    return jsonify([{
-        'name': s.name,
-        'market_value': s.market_value,
-        'percentage': s.percentage
-    } for s in sectors])
+    positions = Position.query.filter_by(portfolio_id=portfolio.id).all()
+    sector_totals = defaultdict(float)
+    total_value = 0
+    
+    for position in positions:
+        market_value = position.quantity * position.price
+        sector_totals[position.sector or 'Uncategorized'] += market_value
+        total_value += market_value
+    
+    sectors = [{
+        'name': sector,
+        'market_value': value,
+        'percentage': (value / total_value * 100) if total_value > 0 else 0
+    } for sector, value in sector_totals.items()]
+    
+    return jsonify(sectors)
 
 @bp.route('/import', methods=['POST'])
 @login_required
@@ -139,19 +158,18 @@ def import_portfolio():
         for _, row in df.iterrows():
             position = {
                 'symbol': row['Symbol'],
-                'description': row['Description'],
                 'quantity': float(row['Quantity']),
-                'last_price': float(row['Last Price'].replace('$', '').replace(',', '')),
-                'avg_cost': float(row['Average Cost'].replace('$', '').replace(',', '')),
+                'price': float(row['Last Price'].replace('$', '').replace(',', '')),
+                'cost_basis': float(row['Average Cost'].replace('$', '').replace(',', '')),
                 'market_value': float(row['Market Value'].replace('$', '').replace(',', '')),
-                'day_change_dollar': float(row['Day Change $'].replace('$', '').replace(',', '')),
+                'day_change': float(row['Day Change $'].replace('$', '').replace(',', '')),
                 'day_change_percent': float(row['Day Change %'].replace('%', ''))
             }
             portfolio_data.append(position)
         
         # Calculate portfolio totals
         total_value = sum(pos['market_value'] for pos in portfolio_data)
-        total_change = sum(pos['day_change_dollar'] for pos in portfolio_data)
+        total_change = sum(pos['day_change'] for pos in portfolio_data)
         total_change_percent = (total_change / (total_value - total_change)) * 100 if total_value > 0 else 0
         
         return jsonify({
@@ -160,7 +178,7 @@ def import_portfolio():
                 'positions': portfolio_data,
                 'summary': {
                     'total_value': total_value,
-                    'total_change_dollar': total_change,
+                    'total_change': total_change,
                     'total_change_percent': total_change_percent,
                     'last_updated': datetime.now().isoformat()
                 }

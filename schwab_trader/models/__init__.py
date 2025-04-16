@@ -1,64 +1,61 @@
-"""Models package for Schwab Trader."""
-from flask_sqlalchemy import SQLAlchemy
+"""Models for Schwab Trader."""
+from schwab_trader.database import db
 from datetime import datetime
-from schwab_trader.models.portfolio import Portfolio
-from schwab_trader.models.position import Position
-from schwab_trader.models.trade import Trade
-
-db = SQLAlchemy()
 
 class Portfolio(db.Model):
+    """Portfolio model."""
+    
     __tablename__ = 'portfolios'
     
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    total_value = db.Column(db.Float)
-    cash_value = db.Column(db.Float)
-    day_change = db.Column(db.Float)
-    day_change_percent = db.Column(db.Float)
-    total_gain = db.Column(db.Float)
-    total_gain_percent = db.Column(db.Float)
+    name = db.Column(db.String(80), nullable=False)
+    description = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
+    # Relationships
     positions = db.relationship('Position', backref='portfolio', lazy=True)
-    sectors = db.relationship('Sector', backref='portfolio', lazy=True)
+    trades = db.relationship('Trade', backref='portfolio', lazy=True)
 
 class Position(db.Model):
+    """Position model."""
+    
     __tablename__ = 'positions'
     
     id = db.Column(db.Integer, primary_key=True)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
     symbol = db.Column(db.String(10), nullable=False)
-    description = db.Column(db.String(255))
     quantity = db.Column(db.Float, nullable=False)
     price = db.Column(db.Float, nullable=False)
-    market_value = db.Column(db.Float, nullable=False)
-    cost_basis = db.Column(db.Float)
-    day_change_dollar = db.Column(db.Float)
-    day_change_percent = db.Column(db.Float)
-    security_type = db.Column(db.String(50))
+    cost_basis = db.Column(db.Float, nullable=False)
     sector = db.Column(db.String(50))
-    beta = db.Column(db.Float)
+    industry = db.Column(db.String(50))
+    pe_ratio = db.Column(db.Float)
+    market_cap = db.Column(db.Float)
     dividend_yield = db.Column(db.Float)
+    eps = db.Column(db.Float)
+    beta = db.Column(db.Float)
+    volume = db.Column(db.Integer)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    def __repr__(self):
-        return f'<Position {self.symbol} ({self.quantity} shares)>'
-
-class Sector(db.Model):
-    __tablename__ = 'sectors'
+class Trade(db.Model):
+    """Trade model."""
+    
+    __tablename__ = 'trades'
     
     id = db.Column(db.Integer, primary_key=True)
     portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
-    name = db.Column(db.String(50), nullable=False)
-    market_value = db.Column(db.Float, nullable=False)
-    percentage = db.Column(db.Float, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    symbol = db.Column(db.String(10), nullable=False)
+    quantity = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    type = db.Column(db.String(4), nullable=False)  # BUY or SELL
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    strategy = db.Column(db.String(50))  # Name of the strategy that generated the trade
+    reason = db.Column(db.String(200))  # Reason for the trade
 
-    def __repr__(self):
-        return f'<Sector {self.name} ({self.percentage:.2f}%)>'
+# Import User model
+from .user import User
 
-__all__ = ['Portfolio', 'Position', 'Trade'] 
+# Export models
+__all__ = ['Portfolio', 'Position', 'Trade', 'User'] 

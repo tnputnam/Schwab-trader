@@ -48,5 +48,11 @@ def create_app(test_config=None):
     app.register_blueprint(portfolio.bp)
     app.register_blueprint(auth.bp)
     
+    # Set up user loader
+    @login_manager.user_loader
+    def load_user(user_id):
+        from schwab_trader.models import User
+        return User.query.get(int(user_id))
+    
     logger.info('Schwab Trader startup')
     return app

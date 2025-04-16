@@ -5,6 +5,8 @@ from schwab_trader.models import User, db
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 
+__all__ = ['bp']
+
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
