@@ -20,6 +20,7 @@ def create_app(config=None):
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['CACHE_TYPE'] = 'simple'
     app.config['CACHE_DEFAULT_TIMEOUT'] = 300
+    app.config['LOGIN_DISABLED'] = True  # Disable login requirement for now
     
     # Override with any passed config
     if config:
@@ -29,6 +30,12 @@ def create_app(config=None):
     db.init_app(app)
     login_manager.init_app(app)
     cache.init_app(app)
+    
+    # Configure login manager
+    @login_manager.user_loader
+    def load_user(user_id):
+        from schwab_trader.models import User
+        return User.query.get(int(user_id))
     
     # Configure logging
     if not app.debug:
@@ -48,7 +55,7 @@ def create_app(config=None):
     
     # Register blueprints
     from schwab_trader.routes import root, news, strategies
-    app.register_blueprint(root.bp)
+    app.register_blueprint(root)
     app.register_blueprint(news.bp)
     app.register_blueprint(strategies.bp)
     
