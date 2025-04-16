@@ -7,6 +7,7 @@ import logging
 from logging.handlers import RotatingFileHandler
 import os
 from schwab_trader.models import db
+from datetime import datetime
 
 # Initialize extensions
 migrate = Migrate()
@@ -15,13 +16,12 @@ cache = Cache()
 def create_app(test_config=None):
     app = Flask(__name__)
     
-    # Default configuration
-    app.config.update(
-        SQLALCHEMY_DATABASE_URI='sqlite:///schwab_trader.db',
-        SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        CACHE_TYPE='simple',
-        CACHE_DEFAULT_TIMEOUT=300
-    )
+    # Configure the app
+    app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///instance/schwab_trader.db'
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+    app.config['CACHE_TYPE'] = 'SimpleCache'
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes
     
     # Override with test config if provided
     if test_config:
@@ -32,24 +32,16 @@ def create_app(test_config=None):
     migrate.init_app(app, db)
     cache.init_app(app)
     
-    # Create database tables
-    with app.app_context():
-        db.create_all()
-    
     # Configure login manager
     login_manager = LoginManager()
     login_manager.init_app(app)
-    
-    @login_manager.user_loader
-    def load_user(user_id):
-        from schwab_trader.models import User
-        return User.query.get(int(user_id))
+    login_manager.login_view = 'auth.login'
     
     # Configure logging
     if not app.debug:
         if not os.path.exists('logs'):
             os.mkdir('logs')
-        file_handler = RotatingFileHandler('logs/schwab_trader.log',
+        file_handler = RotatingFileHandler('logs/app_{}.log'.format(datetime.now().strftime('%Y%m%d')),
                                          maxBytes=10240,
                                          backupCount=10)
         file_handler.setFormatter(logging.Formatter(
@@ -62,11 +54,25 @@ def create_app(test_config=None):
         app.logger.info('Schwab Trader startup')
     
     # Register blueprints
-    from schwab_trader.routes import root, news, strategies, compare, portfolio
+    from schwab_trader.routes import root, news, strategies, compare, portfolio, auth
     app.register_blueprint(root)
     app.register_blueprint(news.bp)
     app.register_blueprint(strategies.bp)
     app.register_blueprint(compare.bp)
     app.register_blueprint(portfolio.bp)
+    app.register_blueprint(auth)
+    
+    # Create database tables
+    with app.app_context():
+        db.create_all()
+        
+        # Start portfolio updater
+        from schwab_trader.tasks.portfolio_updater import start_portfolio_updater
+        start_portfolio_updater(interval_minutes=5)
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        from schwab_trader.models import User
+        return User.query.get(int(user_id))
     
     return app
