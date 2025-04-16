@@ -1,0 +1,123 @@
+{% extends 'base.html' %}
+
+{% block title %}Debug Information - Schwab Trader{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1 class="mb-4">Debug Information</h1>
+        </div>
+    </div>
+
+    <!-- System Information -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">System Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tr>
+                            <th>Django Version</th>
+                            <td>{{ django_version }}</td>
+                        </tr>
+                        <tr>
+                            <th>Python Version</th>
+                            <td>{{ python_version }}</td>
+                        </tr>
+                        <tr>
+                            <th>Operating System</th>
+                            <td>{{ os_info }}</td>
+                        </tr>
+                        <tr>
+                            <th>Database Engine</th>
+                            <td>{{ database_engine }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Application Status</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tr>
+                            <th>Installed Apps</th>
+                            <td>
+                                <ul class="list-unstyled mb-0">
+                                    {% for app in installed_apps %}
+                                    <li>{{ app }}</li>
+                                    {% endfor %}
+                                </ul>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Static Files</th>
+                            <td>
+                                {% if static_files_ok %}
+                                <span class="text-success">✓ Configured correctly</span>
+                                {% else %}
+                                <span class="text-danger">✗ Issues detected</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Database Connection</th>
+                            <td>
+                                {% if db_connection_ok %}
+                                <span class="text-success">✓ Connected</span>
+                                {% else %}
+                                <span class="text-danger">✗ Connection failed</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Errors -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Errors</h5>
+                </div>
+                <div class="card-body">
+                    {% if recent_errors %}
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Type</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for error in recent_errors %}
+                                <tr>
+                                    <td>{{ error.timestamp|date:"Y-m-d H:i:s" }}</td>
+                                    <td>{{ error.type }}</td>
+                                    <td>{{ error.message }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <p class="text-muted">No recent errors</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

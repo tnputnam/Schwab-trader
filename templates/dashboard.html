@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Schwab Trader</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">Schwab Trader</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/strategies">Strategies</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/trading">Live Trading</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <!-- Portfolio Overview -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Total Portfolio Value</h5>
+                        <h2 class="card-text" id="totalValue">$0.00</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Active Strategies</h5>
+                        <h2 class="card-text" id="activeStrategies">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Open Positions</h5>
+                        <h2 class="card-text" id="openPositions">0</h2>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Today's P/L</h5>
+                        <h2 class="card-text" id="dailyPL">$0.00</h2>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Portfolio Chart -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Portfolio Performance</h5>
+                        <canvas id="portfolioChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Trades -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Recent Trades</h5>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Type</th>
+                                        <th>Quantity</th>
+                                        <th>Price</th>
+                                        <th>P/L</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentTrades">
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Current Positions</h5>
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Symbol</th>
+                                        <th>Quantity</th>
+                                        <th>Avg. Price</th>
+                                        <th>Current Price</th>
+                                        <th>P/L</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="currentPositions">
+                                    <!-- Will be populated by JavaScript -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.0/dist/chart.min.js"></script>
+    <script>
+        // Function to format currency
+        function formatCurrency(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'currency',
+                currency: 'USD'
+            }).format(value);
+        }
+
+        // Function to update dashboard data
+        async function updateDashboard() {
+            try {
+                // Fetch portfolio data
+                const portfolioResponse = await fetch('/api/portfolio');
+                const portfolioData = await portfolioResponse.json();
+                
+                // Update portfolio metrics
+                document.getElementById('totalValue').textContent = formatCurrency(portfolioData.total_value);
+                document.getElementById('openPositions').textContent = portfolioData.positions.length;
+                
+                // Update recent trades
+                const recentTradesBody = document.getElementById('recentTrades');
+                recentTradesBody.innerHTML = portfolioData.recent_trades.map(trade => `
+                    <tr>
+                        <td>${trade.symbol}</td>
+                        <td>${trade.type}</td>
+                        <td>${trade.quantity}</td>
+                        <td>${formatCurrency(trade.price)}</td>
+                        <td class="${trade.pl >= 0 ? 'text-success' : 'text-danger'}">
+                            ${formatCurrency(trade.pl)}
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Update current positions
+                const currentPositionsBody = document.getElementById('currentPositions');
+                currentPositionsBody.innerHTML = portfolioData.positions.map(position => `
+                    <tr>
+                        <td>${position.symbol}</td>
+                        <td>${position.quantity}</td>
+                        <td>${formatCurrency(position.avg_price)}</td>
+                        <td>${formatCurrency(position.current_price)}</td>
+                        <td class="${position.pl >= 0 ? 'text-success' : 'text-danger'}">
+                            ${formatCurrency(position.pl)}
+                        </td>
+                    </tr>
+                `).join('');
+
+                // Update portfolio chart
+                updatePortfolioChart(portfolioData.history);
+            } catch (error) {
+                console.error('Error updating dashboard:', error);
+            }
+        }
+
+        // Function to update portfolio chart
+        function updatePortfolioChart(history) {
+            const ctx = document.getElementById('portfolioChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: history.map(h => h.date),
+                    datasets: [{
+                        label: 'Portfolio Value',
+                        data: history.map(h => h.value),
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+
+        // Update dashboard every 5 seconds
+        updateDashboard();
+        setInterval(updateDashboard, 5000);
+    </script>
+</body>
+</html> 

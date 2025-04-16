@@ -1,0 +1,119 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard - Schwab Trader{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Portfolio Value</h5>
+                    <h2 class="card-text">${{ portfolio_summary.total_value|floatformat:2 }}</h2>
+                    <p class="text-{% if portfolio_summary.total_pnl >= 0 %}success{% else %}danger{% endif %}">
+                        P/L: ${{ portfolio_summary.total_pnl|floatformat:2 }}
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Active Strategies</h5>
+                    <h2 class="card-text">{{ strategies.count }}</h2>
+                    <p class="text-muted">Strategies running</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Open Positions</h5>
+                    <h2 class="card-text">{{ portfolio_summary.position_count }}</h2>
+                    <p class="text-muted">Active positions</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Recent Backtests</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Strategy</th>
+                                    <th>Symbol</th>
+                                    <th>Return</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for backtest in recent_backtests %}
+                                <tr>
+                                    <td>{{ backtest.strategy.name }}</td>
+                                    <td>{{ backtest.symbol }}</td>
+                                    <td class="text-{% if backtest.total_return >= 0 %}success{% else %}danger{% endif %}">
+                                        {{ backtest.total_return|floatformat:2 }}%
+                                    </td>
+                                    <td>{{ backtest.created_at|date:"M d, Y" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center">No recent backtests</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Current Positions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Quantity</th>
+                                    <th>Avg Cost</th>
+                                    <th>Current</th>
+                                    <th>P/L</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for position in portfolio %}
+                                <tr>
+                                    <td>{{ position.symbol }}</td>
+                                    <td>{{ position.quantity|floatformat:2 }}</td>
+                                    <td>${{ position.avg_cost|floatformat:2 }}</td>
+                                    <td>${{ position.current_price|floatformat:2 }}</td>
+                                    <td class="text-{% if position.unrealized_pnl >= 0 %}success{% else %}danger{% endif %}">
+                                        ${{ position.unrealized_pnl|floatformat:2 }}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No positions</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 

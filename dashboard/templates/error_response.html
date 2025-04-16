@@ -1,0 +1,33 @@
+{% if error_response %}
+<div class="error-response-container">
+    <div class="alert alert-{{ error_response.type }} alert-dismissible fade show" role="alert">
+        <div class="d-flex align-items-center">
+            {% if error_response.type == 'danger' %}
+            <i class="bi bi-x-circle-fill me-2"></i>
+            {% elif error_response.type == 'warning' %}
+            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+            {% elif error_response.type == 'info' %}
+            <i class="bi bi-info-circle-fill me-2"></i>
+            {% endif %}
+            <div>
+                <h5 class="alert-heading">{{ error_response.title }}</h5>
+                <p class="mb-0">{{ error_response.message }}</p>
+                {% if error_response.details %}
+                <div class="mt-2">
+                    <button class="btn btn-sm btn-outline-{{ error_response.type }}" type="button" 
+                            data-bs-toggle="collapse" data-bs-target="#errorDetails">
+                        Show Details
+                    </button>
+                    <div class="collapse mt-2" id="errorDetails">
+                        <div class="card card-body bg-light">
+                            <pre class="mb-0">{{ error_response.details }}</pre>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+</div>
+{% endif %} 
