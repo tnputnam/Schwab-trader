@@ -14,7 +14,8 @@ class VolatilityPatternStrategy(TradingStrategy):
                  min_volume=100000,  # Minimum daily volume
                  pattern_lookback=20,  # Days to look back for patterns
                  volume_increase_threshold=1.15,  # 15% volume increase for buy
-                 volume_decrease_threshold=0.95):  # 5% volume increase for sell
+                 volume_decrease_threshold=0.95,  # 5% volume increase for sell
+                 price_profit_target=10.0):  # $10 price increase target
         super().__init__(
             name="Top Volatile Stocks Strategy",
             description="Monitors top 15 volatile stocks for volume patterns"
@@ -25,8 +26,10 @@ class VolatilityPatternStrategy(TradingStrategy):
         self.pattern_lookback = pattern_lookback
         self.volume_increase_threshold = volume_increase_threshold
         self.volume_decrease_threshold = volume_decrease_threshold
+        self.price_profit_target = price_profit_target
         self.top_stocks = set()  # Track top 15 volatile stocks
         self.stock_volume_baselines = defaultdict(list)  # Track volume baselines
+        self.entry_prices = {}  # Track entry prices for profit target
     
     def calculate_volatility(self, prices):
         """Calculate daily volatility"""
@@ -78,6 +81,14 @@ class VolatilityPatternStrategy(TradingStrategy):
         return (volume_ratio >= self.volume_increase_threshold,
                 volume_ratio >= self.volume_decrease_threshold)
     
+    def check_price_profit(self, symbol, current_price):
+        """Check if price has increased by profit target"""
+        if symbol in self.entry_prices:
+            entry_price = self.entry_prices[symbol]
+            price_increase = current_price - entry_price
+            return price_increase >= self.price_profit_target
+        return False
+    
     def analyze_stock(self, symbol, data):
         """Analyze a stock for volatility and patterns"""
         if symbol not in self.top_stocks or not data or len(data) < self.pattern_lookback:
@@ -93,6 +104,10 @@ class VolatilityPatternStrategy(TradingStrategy):
         # Analyze volume pattern
         volume_increase, volume_decrease = self.analyze_volume_pattern(symbol, volumes)
         
+        # Check price profit target
+        current_price = prices[-1]
+        price_profit = self.check_price_profit(symbol, current_price)
+        
         # Calculate price change
         price_change = (prices[-1] - prices[0]) / prices[0]
         
@@ -101,8 +116,9 @@ class VolatilityPatternStrategy(TradingStrategy):
             'volatility': volatility,
             'volume_increase': volume_increase,
             'volume_decrease': volume_decrease,
+            'price_profit': price_profit,
             'price_change': price_change,
-            'current_price': prices[-1],
+            'current_price': current_price,
             'current_volume': volumes[-1],
             'volume_ratio': volumes[-1] / self.stock_volume_baselines[symbol]
         }
@@ -123,19 +139,24 @@ class VolatilityPatternStrategy(TradingStrategy):
             if not analysis:
                 continue
             
-            # Generate signals based on volume patterns
+            # Generate signals based on volume patterns and price profit
             if analysis['volume_increase']:
                 signals.append({
                     'symbol': symbol,
                     'action': 'BUY',
                     'reason': f"Volume increased by {((analysis['volume_ratio'] - 1) * 100):.1f}% above baseline"
                 })
-            elif analysis['volume_decrease']:
+                # Record entry price when buying
+                self.entry_prices[symbol] = analysis['current_price']
+            elif analysis['volume_decrease'] or analysis['price_profit']:
                 signals.append({
                     'symbol': symbol,
                     'action': 'SELL',
-                    'reason': f"Volume increased by {((analysis['volume_ratio'] - 1) * 100):.1f}% above baseline (sell signal)"
+                    'reason': f"Volume increased by {((analysis['volume_ratio'] - 1) * 100):.1f}% above baseline (sell signal)" if analysis['volume_decrease'] else f"Price increased by ${analysis['current_price'] - self.entry_prices[symbol]:.2f} from entry"
                 })
+                # Remove entry price when selling
+                if symbol in self.entry_prices:
+                    del self.entry_prices[symbol]
         
         self.signals.extend(signals)
         return signals
