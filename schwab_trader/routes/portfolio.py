@@ -4,6 +4,8 @@ import pandas as pd
 import os
 from datetime import datetime
 import logging
+from schwab_trader.models import db, Portfolio, Position, Sector
+from collections import defaultdict
 
 bp = Blueprint('portfolio', __name__, url_prefix='/portfolio')
 
@@ -15,10 +17,93 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 @bp.route('/')
-@login_required
-def portfolio():
-    """Display the portfolio page."""
-    return render_template('portfolio.html')
+def view():
+    """Display portfolio view."""
+    portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
+    if not portfolio:
+        return render_template('portfolio.html', error="No portfolio found")
+    
+    positions = Position.query.filter_by(portfolio_id=portfolio.id).all()
+    
+    # Calculate sector allocation
+    sector_totals = defaultdict(float)
+    asset_type_totals = defaultdict(float)
+    
+    for position in positions:
+        sector_totals[position.sector or 'Uncategorized'] += position.market_value
+        asset_type_totals[position.security_type or 'Other'] += position.market_value
+    
+    total_value = sum(sector_totals.values())
+    
+    # Convert to percentages
+    sector_data = {
+        'labels': list(sector_totals.keys()),
+        'values': [value / total_value * 100 for value in sector_totals.values()]
+    }
+    
+    asset_type_data = {
+        'labels': list(asset_type_totals.keys()),
+        'values': [value / total_value * 100 for value in asset_type_totals.values()]
+    }
+    
+    return render_template('portfolio.html',
+                         portfolio=portfolio,
+                         positions=positions,
+                         sector_labels=sector_data['labels'],
+                         sector_values=sector_data['values'],
+                         asset_type_labels=asset_type_data['labels'],
+                         asset_type_values=asset_type_data['values'])
+
+@bp.route('/api/summary')
+def get_summary():
+    """Get portfolio summary data."""
+    portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
+    if not portfolio:
+        return jsonify({'error': 'No portfolio found'}), 404
+    
+    return jsonify({
+        'total_value': portfolio.total_value,
+        'cash_value': portfolio.cash_value,
+        'day_change': portfolio.day_change,
+        'day_change_percent': portfolio.day_change_percent,
+        'total_gain': portfolio.total_gain,
+        'total_gain_percent': portfolio.total_gain_percent
+    })
+
+@bp.route('/api/positions')
+def get_positions():
+    """Get all portfolio positions."""
+    portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
+    if not portfolio:
+        return jsonify({'error': 'No portfolio found'}), 404
+    
+    positions = Position.query.filter_by(portfolio_id=portfolio.id).all()
+    return jsonify([{
+        'symbol': p.symbol,
+        'description': p.description,
+        'quantity': p.quantity,
+        'price': p.price,
+        'market_value': p.market_value,
+        'cost_basis': p.cost_basis,
+        'day_change_dollar': p.day_change_dollar,
+        'day_change_percent': p.day_change_percent,
+        'security_type': p.security_type,
+        'sector': p.sector
+    } for p in positions])
+
+@bp.route('/api/sectors')
+def get_sectors():
+    """Get sector allocation data."""
+    portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
+    if not portfolio:
+        return jsonify({'error': 'No portfolio found'}), 404
+    
+    sectors = Sector.query.filter_by(portfolio_id=portfolio.id).all()
+    return jsonify([{
+        'name': s.name,
+        'market_value': s.market_value,
+        'percentage': s.percentage
+    } for s in sectors])
 
 @bp.route('/import', methods=['POST'])
 @login_required

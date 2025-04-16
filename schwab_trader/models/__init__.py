@@ -8,10 +8,17 @@ class Portfolio(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    total_value = db.Column(db.Float)
+    cash_value = db.Column(db.Float)
+    day_change = db.Column(db.Float)
+    day_change_percent = db.Column(db.Float)
+    total_gain = db.Column(db.Float)
+    total_gain_percent = db.Column(db.Float)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     positions = db.relationship('Position', backref='portfolio', lazy=True)
+    sectors = db.relationship('Sector', backref='portfolio', lazy=True)
 
 class Position(db.Model):
     __tablename__ = 'positions'
@@ -27,8 +34,25 @@ class Position(db.Model):
     day_change_dollar = db.Column(db.Float)
     day_change_percent = db.Column(db.Float)
     security_type = db.Column(db.String(50))
+    sector = db.Column(db.String(50))
+    beta = db.Column(db.Float)
+    dividend_yield = db.Column(db.Float)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     def __repr__(self):
-        return f'<Position {self.symbol} ({self.quantity} shares)>' 
+        return f'<Position {self.symbol} ({self.quantity} shares)>'
+
+class Sector(db.Model):
+    __tablename__ = 'sectors'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+    name = db.Column(db.String(50), nullable=False)
+    market_value = db.Column(db.Float, nullable=False)
+    percentage = db.Column(db.Float, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def __repr__(self):
+        return f'<Sector {self.name} ({self.percentage:.2f}%)>' 
