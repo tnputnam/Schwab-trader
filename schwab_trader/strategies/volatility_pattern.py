@@ -13,8 +13,8 @@ class VolatilityPatternStrategy(TradingStrategy):
                  min_price=5.0,  # Minimum stock price
                  min_volume=100000,  # Minimum daily volume
                  pattern_lookback=20,  # Days to look back for patterns
-                 volume_increase_threshold=1.15,  # 15% volume increase
-                 volume_decrease_threshold=0.85):  # 15% volume decrease
+                 volume_increase_threshold=1.15,  # 15% volume increase for buy
+                 volume_decrease_threshold=0.95):  # 5% volume increase for sell
         super().__init__(
             name="Top Volatile Stocks Strategy",
             description="Monitors top 15 volatile stocks for volume patterns"
@@ -74,9 +74,9 @@ class VolatilityPatternStrategy(TradingStrategy):
         volume_ratio = current_volume / baseline
         
         # Buy when volume increases by 15% above baseline
-        # Sell when volume decreases by 15% below baseline
+        # Sell when volume increases by 5% above baseline
         return (volume_ratio >= self.volume_increase_threshold,
-                volume_ratio <= self.volume_decrease_threshold)
+                volume_ratio >= self.volume_decrease_threshold)
     
     def analyze_stock(self, symbol, data):
         """Analyze a stock for volatility and patterns"""
@@ -134,7 +134,7 @@ class VolatilityPatternStrategy(TradingStrategy):
                 signals.append({
                     'symbol': symbol,
                     'action': 'SELL',
-                    'reason': f"Volume decreased by {((1 - analysis['volume_ratio']) * 100):.1f}% below baseline"
+                    'reason': f"Volume increased by {((analysis['volume_ratio'] - 1) * 100):.1f}% above baseline (sell signal)"
                 })
         
         self.signals.extend(signals)
