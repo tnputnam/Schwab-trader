@@ -71,19 +71,6 @@ schwab-trader/
 └── static/             # Static files (CSS, JS, images)
 ```
 
-## Automated Backup & Version Control
-
-The project includes automated backup and version control features:
-
-- **Auto Git Push**: Automatically commits and pushes changes every 10 minutes
-- **Project Backup**: Creates full project backups every 10 minutes
-- **Backup Cleanup**: Removes backups older than 28 days (runs weekly)
-- **Commit Management**: Maintains a clean git history by keeping only recent commits
-
-Logs for these automated processes can be found in:
-- Git auto-push: `/home/thomas/schwab_trader_backups/git_auto_push.log`
-- Project backup: `/home/thomas/schwab_trader_backups/backup.log`
-
 ## Contributing
 
 1. Fork the repository

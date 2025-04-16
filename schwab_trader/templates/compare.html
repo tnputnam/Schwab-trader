@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio Comparison{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Portfolio Comparison</h1>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
+            <i class="bi bi-upload me-2"></i>Import Schwab Portfolio
+        </button>
+    </div>
+    
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Schwab Portfolio</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0" id="schwab-value">$0.00</h3>
+                        <span class="badge" id="schwab-change">+0.00%</span>
+                    </div>
+                    <div class="progress mb-3">
+                        <div class="progress-bar" id="schwab-progress" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Auto-Trading Portfolio</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h3 class="mb-0" id="auto-value">$0.00</h3>
+                        <span class="badge" id="auto-change">+0.00%</span>
+                    </div>
+                    <div class="progress mb-3">
+                        <div class="progress-bar" id="auto-progress" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Performance Chart</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importModalLabel">Import Schwab Portfolio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="importForm">
+                    <div class="mb-3">
+                        <label for="portfolioFile" class="form-label">Select Portfolio File</label>
+                        <input class="form-control" type="file" id="portfolioFile" accept=".csv,.xlsx,.xls">
+                    </div>
+                    <div class="mb-3">
+                        <label for="portfolioName" class="form-label">Portfolio Name</label>
+                        <input type="text" class="form-control" id="portfolioName" placeholder="My Schwab Portfolio">
+                    </div>
+                </form>
+                <div id="importProgress" class="progress d-none">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="importStatus" class="mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="importButton">Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let performanceChart;
+    
+    function updateChart(data) {
+        const ctx = document.getElementById('performanceChart').getContext('2d');
+        
+        if (performanceChart) {
+            performanceChart.destroy();
+        }
+        
+        performanceChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [
+                    {
+                        label: 'Schwab Portfolio',
+                        data: data.schwab_values,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    },
+                    {
+                        label: 'Auto-Trading Portfolio',
+                        data: data.auto_values,
+                        borderColor: 'rgb(255, 99, 132)',
+                        tension: 0.1
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
+                }
+            }
+        });
+    }
+    
+    function updatePortfolioStats(data) {
+        const schwabValue = data.schwab_values[data.schwab_values.length - 1];
+        const autoValue = data.auto_values[data.auto_values.length - 1];
+        const schwabChange = ((schwabValue - data.schwab_values[0]) / data.schwab_values[0] * 100).toFixed(2);
+        const autoChange = ((autoValue - data.auto_values[0]) / data.auto_values[0] * 100).toFixed(2);
+        
+        document.getElementById('schwab-value').textContent = `$${schwabValue.toFixed(2)}`;
+        document.getElementById('auto-value').textContent = `$${autoValue.toFixed(2)}`;
+        
+        const schwabChangeEl = document.getElementById('schwab-change');
+        const autoChangeEl = document.getElementById('auto-change');
+        
+        schwabChangeEl.textContent = `${schwabChange >= 0 ? '+' : ''}${schwabChange}%`;
+        autoChangeEl.textContent = `${autoChange >= 0 ? '+' : ''}${autoChange}%`;
+        
+        schwabChangeEl.className = `badge ${schwabChange >= 0 ? 'bg-success' : 'bg-danger'}`;
+        autoChangeEl.className = `badge ${autoChange >= 0 ? 'bg-success' : 'bg-danger'}`;
+        
+        const maxValue = Math.max(schwabValue, autoValue);
+        document.getElementById('schwab-progress').style.width = `${(schwabValue / maxValue * 100).toFixed(2)}%`;
+        document.getElementById('auto-progress').style.width = `${(autoValue / maxValue * 100).toFixed(2)}%`;
+    }
+    
+    function fetchData() {
+        fetch('/api/compare/data')
+            .then(response => response.json())
+            .then(data => {
+                updateChart(data);
+                updatePortfolioStats(data);
+            })
+            .catch(error => console.error('Error fetching data:', error));
+    }
+    
+    // Initial data fetch
+    fetchData();
+    
+    // Update data every 5 minutes
+    setInterval(fetchData, 300000);
+
+    // Import functionality
+    const importButton = document.getElementById('importButton');
+    const importForm = document.getElementById('importForm');
+    const importProgress = document.getElementById('importProgress');
+    const importStatus = document.getElementById('importStatus');
+    
+    importButton.addEventListener('click', function() {
+        const fileInput = document.getElementById('portfolioFile');
+        const portfolioName = document.getElementById('portfolioName').value;
+        
+        if (!fileInput.files.length) {
+            importStatus.innerHTML = '<div class="alert alert-danger">Please select a file to import</div>';
+            return;
+        }
+        
+        if (!portfolioName) {
+            importStatus.innerHTML = '<div class="alert alert-danger">Please enter a portfolio name</div>';
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('name', portfolioName);
+        
+        importButton.disabled = true;
+        importProgress.classList.remove('d-none');
+        importStatus.innerHTML = '';
+        
+        fetch('/api/compare/import', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                importStatus.innerHTML = '<div class="alert alert-success">Portfolio imported successfully!</div>';
+                setTimeout(() => {
+                    location.reload();
+                }, 1500);
+            } else {
+                importStatus.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            importStatus.innerHTML = '<div class="alert alert-danger">Error importing portfolio. Please try again.</div>';
+        })
+        .finally(() => {
+            importButton.disabled = false;
+            importProgress.classList.add('d-none');
+        });
+    });
+});
+</script>
+{% endblock %} 
