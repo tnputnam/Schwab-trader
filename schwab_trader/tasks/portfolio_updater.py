@@ -34,9 +34,19 @@ class AlphaVantageAPI:
         return None
         
     def get_company_info(self, symbol):
-        """Get company overview including sector."""
+        """Get company overview including sector and additional metrics."""
         params = {
             'function': 'OVERVIEW',
+            'symbol': symbol,
+            'apikey': self.api_key
+        }
+        response = requests.get(self.base_url, params=params)
+        return response.json()
+        
+    def get_income_statement(self, symbol):
+        """Get income statement data for key metrics."""
+        params = {
+            'function': 'INCOME_STATEMENT',
             'symbol': symbol,
             'apikey': self.api_key
         }
@@ -79,11 +89,25 @@ def update_portfolio_data():
                         logger.warning(f"Could not get quote for {position.symbol}")
                         continue
                         
+                    # Get company info for additional metrics
+                    company_info = api.get_company_info(position.symbol)
+                    
                     # Update position data
                     position.price = float(quote['05. price'])
                     position.market_value = position.quantity * position.price
                     position.day_change_dollar = float(quote['09. change'])
                     position.day_change_percent = float(quote['10. change percent'].replace('%', ''))
+                    
+                    # Add additional metrics if available
+                    if company_info:
+                        position.sector = company_info.get('Sector', position.sector)
+                        position.industry = company_info.get('Industry', position.industry)
+                        position.pe_ratio = float(company_info.get('PERatio', 0))
+                        position.market_cap = float(company_info.get('MarketCapitalization', 0))
+                        position.dividend_yield = float(company_info.get('DividendYield', 0))
+                        position.eps = float(company_info.get('EPS', 0))
+                        position.beta = float(company_info.get('Beta', 0))
+                        position.volume = float(quote.get('06. volume', 0))
                     
                     # Update totals
                     sector_totals[position.sector] += position.market_value
