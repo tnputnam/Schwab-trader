@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+
+{% block title %}Portfolio{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1>Portfolio</h1>
+        <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importModal">
+            <i class="fas fa-upload me-2"></i>Import Portfolio
+        </button>
+    </div>
+
+    <!-- Portfolio Summary -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5 class="card-title">Total Value</h5>
+                    <h3 class="mb-0" id="total-value">$0.00</h3>
+                </div>
+                <div class="col-md-4">
+                    <h5 class="card-title">Day Change</h5>
+                    <h3 class="mb-0" id="day-change">$0.00</h3>
+                    <span class="text-muted" id="day-change-percent">0.00%</span>
+                </div>
+                <div class="col-md-4">
+                    <h5 class="card-title">Last Updated</h5>
+                    <p class="mb-0" id="last-updated">Never</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Positions Table -->
+    <div class="card">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Description</th>
+                            <th>Quantity</th>
+                            <th>Last Price</th>
+                            <th>Avg Cost</th>
+                            <th>Market Value</th>
+                            <th>Day Change</th>
+                        </tr>
+                    </thead>
+                    <tbody id="positions-table">
+                        <tr>
+                            <td colspan="7" class="text-center">No positions loaded</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-labelledby="importModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="importModalLabel">Import Schwab Portfolio</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="portfolioFile" class="form-label">Select Portfolio File</label>
+                    <input class="form-control" type="file" id="portfolioFile" accept=".csv">
+                    <div class="form-text">
+                        Export your positions from Schwab as a CSV file and upload it here.
+                    </div>
+                </div>
+                <div id="importProgress" class="progress d-none">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="importStatus" class="mt-3"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="importButton">Import</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const importButton = document.getElementById('importButton');
+    const importProgress = document.getElementById('importProgress');
+    const importStatus = document.getElementById('importStatus');
+    const positionsTable = document.getElementById('positions-table');
+    
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(value);
+    }
+    
+    function formatPercent(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'percent',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value / 100);
+    }
+    
+    function updatePortfolio(data) {
+        // Update summary
+        document.getElementById('total-value').textContent = formatCurrency(data.summary.total_value);
+        document.getElementById('day-change').textContent = formatCurrency(data.summary.total_change_dollar);
+        document.getElementById('day-change-percent').textContent = formatPercent(data.summary.total_change_percent);
+        document.getElementById('last-updated').textContent = new Date(data.summary.last_updated).toLocaleString();
+        
+        // Update positions table
+        positionsTable.innerHTML = data.positions.map(position => `
+            <tr>
+                <td>${position.symbol}</td>
+                <td>${position.description}</td>
+                <td>${position.quantity}</td>
+                <td>${formatCurrency(position.last_price)}</td>
+                <td>${formatCurrency(position.avg_cost)}</td>
+                <td>${formatCurrency(position.market_value)}</td>
+                <td>
+                    ${formatCurrency(position.day_change_dollar)}
+                    <span class="${position.day_change_dollar >= 0 ? 'text-success' : 'text-danger'}">
+                        (${formatPercent(position.day_change_percent)})
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    }
+    
+    importButton.addEventListener('click', function() {
+        const fileInput = document.getElementById('portfolioFile');
+        const file = fileInput.files[0];
+        
+        if (!file) {
+            importStatus.innerHTML = '<div class="alert alert-danger">Please select a file to import</div>';
+            return;
+        }
+        
+        const formData = new FormData();
+        formData.append('file', file);
+        
+        importButton.disabled = true;
+        importProgress.classList.remove('d-none');
+        importStatus.innerHTML = '';
+        
+        fetch('/portfolio/import', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                updatePortfolio(data.data);
+                importStatus.innerHTML = '<div class="alert alert-success">Portfolio imported successfully!</div>';
+                setTimeout(() => {
+                    $('#importModal').modal('hide');
+                }, 1500);
+            } else {
+                importStatus.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+            }
+        })
+        .catch(error => {
+            importStatus.innerHTML = '<div class="alert alert-danger">Error importing portfolio. Please try again.</div>';
+        })
+        .finally(() => {
+            importButton.disabled = false;
+            importProgress.classList.add('d-none');
+        });
+    });
+});
+</script>
+{% endblock %} 

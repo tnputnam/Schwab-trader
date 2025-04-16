@@ -54,10 +54,11 @@ def create_app(config=None):
         app.logger.info('Schwab Trader startup')
     
     # Register blueprints
-    from schwab_trader.routes import root, news, strategies, compare
-    app.register_blueprint(root)
+    from schwab_trader.routes import root, news, strategies, compare, portfolio
+    app.register_blueprint(root.bp)
     app.register_blueprint(news.bp)
     app.register_blueprint(strategies.bp)
     app.register_blueprint(compare.bp)
+    app.register_blueprint(portfolio.bp)
     
     return app

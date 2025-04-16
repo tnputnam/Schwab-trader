@@ -1,18 +1,22 @@
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import UserMixin
+from datetime import datetime
 from schwab_trader import db
 
-class User(UserMixin, db.Model):
+class Portfolio(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128))
+    total_value = db.Column(db.Float, nullable=False)
+    total_change = db.Column(db.Float, nullable=False)
+    total_change_percent = db.Column(db.Float, nullable=False)
+    date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    positions = db.relationship('Position', backref='portfolio', lazy=True)
 
-    def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
-
-    def __repr__(self):
-        return f'<User {self.username}>' 
+class Position(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolio.id'), nullable=False)
+    symbol = db.Column(db.String(10), nullable=False)
+    description = db.Column(db.String(200))
+    quantity = db.Column(db.Float, nullable=False)
+    last_price = db.Column(db.Float, nullable=False)
+    avg_cost = db.Column(db.Float, nullable=False)
+    market_value = db.Column(db.Float, nullable=False)
+    day_change_dollar = db.Column(db.Float, nullable=False)
+    day_change_percent = db.Column(db.Float, nullable=False) 
