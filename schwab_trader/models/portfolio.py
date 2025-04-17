@@ -4,6 +4,7 @@ from schwab_trader.database import db
 class Portfolio(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(200))
     total_value = db.Column(db.Float, nullable=False, default=0.0)
     cash_value = db.Column(db.Float, nullable=False, default=0.0)
     total_gain = db.Column(db.Float, nullable=False, default=0.0)

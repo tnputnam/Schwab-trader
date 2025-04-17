@@ -1,6 +1,7 @@
 from flask import Flask, session, redirect, request, jsonify, url_for, render_template
 from requests_oauthlib import OAuth2Session
 from flask_socketio import SocketIO, emit
+from flask_migrate import Migrate
 import os
 import logging
 import base64
@@ -10,6 +11,7 @@ import yfinance as yf
 from flask_cors import CORS
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
 from schwab_trader.routes.dashboard import bp as dashboard_bp
+from schwab_trader.database import db
 from strategy_tester import StrategyTester
 from example_strategies import (
     moving_average_crossover_strategy,
@@ -24,6 +26,7 @@ import pandas as pd
 import time
 import asyncio
 from typing import List
+from types import SimpleNamespace
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -34,7 +37,14 @@ app = Flask(__name__,
     static_folder='schwab_trader/static'
 )
 CORS(app)
-app.secret_key = 'your-secret-key-here'
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_key_123')
+
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///schwab_trader.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db.init_app(app)
+migrate = Migrate(app, db)
+
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Store active WebSocket connections
@@ -94,126 +104,6 @@ async def monitor_symbols(symbols: List[str]):
             logger.error(f"Error monitoring symbols: {str(e)}")
             await asyncio.sleep(60)  # Wait before retrying
 
-# Simple test route
-@app.route('/test')
-def test():
-    logger.info("Test route accessed")
-    return "Test route working!"
-
-@app.route('/test_alpha_vantage', methods=['GET'])
-def test_alpha_vantage():
-    """Test page for Alpha Vantage API"""
-    logger.info("Accessing test_alpha_vantage route")
-    logger.info(f"Current working directory: {os.getcwd()}")
-    logger.info(f"Template folder: {app.template_folder}")
-    try:
-        return render_template('test_alpha_vantage.html')
-    except Exception as e:
-        logger.error(f"Error rendering template: {str(e)}")
-        return str(e), 500
-
-@app.route('/api/test_alpha_vantage', methods=['POST'])
-def test_alpha_vantage_api():
-    """Test Alpha Vantage API endpoint"""
-    logger.info("Accessing test_alpha_vantage_api route")
-    try:
-        data = request.get_json()
-        symbol = data.get('symbol', 'AAPL')
-        
-        logger.info(f"Testing Alpha Vantage API for symbol: {symbol}")
-        
-        # Get API key
-        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-        if not api_key:
-            return jsonify({
-                'status': 'error',
-                'message': 'Alpha Vantage API key not found in environment'
-            }), 400
-        
-        # Test different endpoints
-        endpoints = {
-            'TIME_SERIES_DAILY': f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=full&apikey={api_key}",
-            'GLOBAL_QUOTE': f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}",
-            'SYMBOL_SEARCH': f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={symbol}&apikey={api_key}"
-        }
-        
-        results = {}
-        for endpoint, url in endpoints.items():
-            try:
-                logger.info(f"Testing {endpoint} endpoint")
-                response = requests.get(url, timeout=10)
-                logger.info(f"Response status: {response.status_code}")
-                logger.info(f"Response content: {response.text[:500]}")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    results[endpoint] = {
-                        'status': 'success',
-                        'data': data
-                    }
-                else:
-                    results[endpoint] = {
-                        'status': 'error',
-                        'message': f"HTTP Error: {response.status_code}",
-                        'response': response.text
-                    }
-            except Exception as e:
-                results[endpoint] = {
-                    'status': 'error',
-                    'message': str(e)
-                }
-        
-        return jsonify({
-            'status': 'success',
-            'results': results
-        })
-        
-    except Exception as e:
-        logger.error(f"Error testing Alpha Vantage API: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-@app.route('/strategy_dashboard')
-def strategy_dashboard():
-    """Show strategy testing dashboard"""
-    logger.info("Accessing strategy dashboard")
-    if 'access_token' not in session:
-        return redirect(url_for('login'))
-    return render_template('strategy_dashboard.html')
-
-# Register blueprints
-app.register_blueprint(dashboard_bp, url_prefix='/')
-
-# Remove server name configuration to allow localhost access
-# app.config['SERVER_NAME'] = 'b148-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
-
-# Your Schwab API credentials
-CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
-CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
-
-# Use HTTPS ngrok URL
-REDIRECT_URI = "https://b148-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
-
-# Fixed URLs
-AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"
-TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
-
-# Updated scope
-SCOPES = ["api"]
-
-# Initialize Schwab OAuth client
-schwab = SchwabOAuth()
-
-# Set the configuration
-schwab.client_id = CLIENT_ID
-schwab.client_secret = CLIENT_SECRET
-schwab.redirect_uri = REDIRECT_URI
-schwab.authorization_base_url = AUTHORIZATION_BASE_URL
-schwab.token_url = TOKEN_URL
-schwab.scopes = SCOPES
-
 @app.route('/')
 def index():
     """Display the main index page"""
@@ -221,754 +111,114 @@ def index():
 
 @app.route('/login')
 def login():
-    """Start OAuth login flow"""
-    try:
-        # Clear any existing session data
-        session.clear()
-        
-        logger.debug("Starting login process")
-        oauth = OAuth2Session(
-            CLIENT_ID,
-            redirect_uri=REDIRECT_URI,
-            scope=SCOPES
-        )
-        
-        # Generate a random state for security
-        import secrets
-        state = secrets.token_urlsafe(16)
-        session['oauth_state'] = state
-        
-        auth_url, _ = oauth.authorization_url(
-            AUTHORIZATION_BASE_URL,
-            state=state
-        )
-        logger.debug(f"Generated authorization URL: {auth_url}")
-        return redirect(auth_url)
-    except Exception as e:
-        logger.error(f"Error in login: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/callback')
-def callback():
-    """Handle OAuth callback"""
-    try:
-        logger.debug("Received callback request")
-        logger.debug(f"Request args: {request.args}")
-        logger.debug(f"Request URL: {request.url}")
-        
-        # Verify state parameter
-        state = request.args.get('state')
-        if not state or state != session.get('oauth_state'):
-            logger.error("Invalid state parameter")
-            return jsonify({'error': 'Invalid state parameter'}), 400
-        
-        # Get authorization code
-        auth_code = request.args.get('code')
-        if not auth_code:
-            logger.error("No authorization code received")
-            return jsonify({'error': 'No authorization code'}), 400
-            
-        logger.debug(f"Authorization code received: {auth_code}")
-        
-        # Create new OAuth2Session instance for token exchange
-        oauth = OAuth2Session(
-            CLIENT_ID,
-            redirect_uri=REDIRECT_URI,
-            scope=SCOPES
-        )
-        
-        # Exchange code for token
-        logger.debug("Attempting to fetch token...")
-        try:
-            token = oauth.fetch_token(
-                TOKEN_URL,
-                authorization_response=request.url,
-                client_secret=CLIENT_SECRET,
-                include_client_id=True
-            )
-            logger.debug("Token fetch successful")
-            logger.debug(f"Token data: {token}")
-        except Exception as e:
-            logger.error(f"Error fetching token: {str(e)}")
-            return jsonify({'error': f'Failed to get token: {str(e)}'}), 401
-            
-        # Store token in session
-        session['access_token'] = token
-        logger.debug("Token stored in session")
-        
-        # Get account data
-        logger.debug("Fetching account data")
-        try:
-            account_data = schwab.get_accounts(token)
-            if not account_data:
-                logger.error("Failed to get account data")
-                return jsonify({'error': 'Failed to get account data'}), 500
-                
-            logger.debug(f"Account data received: {account_data}")
-            
-            # Store account data in session
-            session['account_data'] = account_data
-            logger.debug("Account data stored in session")
-            
-            # Get positions
-            logger.debug("Fetching positions")
-            positions = schwab.get_positions(token)
-            logger.debug(f"Positions received: {positions}")
-            
-            # Store positions in session
-            session['positions'] = positions
-            logger.debug(f"Positions stored in session: {positions}")
-            
-            return redirect(url_for('dashboard'))
-        except Exception as e:
-            logger.error(f"Error getting account data: {str(e)}")
-            return jsonify({'error': f'Failed to get account data: {str(e)}'}), 500
-            
-    except Exception as e:
-        logger.error(f"Error in callback: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+    """Automatically redirect to dashboard"""
+    return redirect(url_for('dashboard'))
 
 @app.route('/dashboard')
 def dashboard():
-    """Display account dashboard"""
-    logger.debug("Accessing dashboard route")
-    logger.debug(f"Session data: {dict(session)}")
-    
-    if 'access_token' not in session:
-        logger.error("No access token in session, redirecting to login")
-        return redirect(url_for('login'))
-        
-    account_data = session.get('account_data', {})
-    positions = session.get('positions', [])
-    
-    logger.debug(f"Account data: {account_data}")
-    logger.debug(f"Positions: {positions}")
-    
-    if not account_data:
-        logger.error("No account data in session, redirecting to login")
-        return redirect(url_for('login'))
-        
-    # Extract relevant account information
-    account = account_data.get('securitiesAccount', {})
-    current_balances = account.get('currentBalances', {})
-    
-    # Construct the market data URL
-    market_data_url = f"https://{app.config['SERVER_NAME']}/api/market_data"
-    
-    account_info = {
-        'account_number': account.get('accountNumber'),
-        'account_type': account.get('type'),
-        'cash_balance': current_balances.get('cashBalance', 0),
-        'cash_available': current_balances.get('cashAvailableForTrading', 0),
-        'total_value': current_balances.get('liquidationValue', 0),
-        'long_market_value': current_balances.get('longMarketValue', 0),
-        'positions': positions,
-        'market_data_url': market_data_url
-    }
-    
-    logger.debug(f"Account info being passed to template: {account_info}")
-    return render_template('dashboard.html', account=account_info)
-
-@app.route('/test_strategies', methods=['GET'])
-def test_strategies():
-    """Test different trading strategies"""
-    if 'access_token' not in session:
-        return redirect(url_for('login'))
-        
-    # Initialize strategy tester and sync with Schwab account
-    tester = StrategyTester()
-    tester.sync_with_schwab(session['access_token'])
-    
-    # Define test parameters
-    symbols = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL']
-    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    
-    # Test strategies
-    results = {}
-    strategies = {
-        'Moving Average Crossover': moving_average_crossover_strategy,
-        'RSI': rsi_strategy,
-        'Bollinger Bands': bollinger_bands_strategy,
-        'MACD': macd_strategy,
-        'Volume': volume_strategy
-    }
-    
-    for name, strategy in strategies.items():
-        results[name] = tester.backtest_strategy(strategy, symbols, start_date, end_date)
-    
-    return jsonify({
-        'status': 'success',
-        'results': results
-    })
-
-@app.route('/paper_trade', methods=['POST'])
-def paper_trade():
-    """Run paper trading with selected strategy"""
-    if 'access_token' not in session:
-        return jsonify({'error': 'Not authenticated'}), 401
-        
-    data = request.get_json()
-    if not data or 'strategy' not in data or 'symbols' not in data:
-        return jsonify({'error': 'Missing required parameters'}), 400
-        
-    # Get strategy function
-    strategy_name = data['strategy']
-    strategies = {
-        'moving_average_crossover': moving_average_crossover_strategy,
-        'rsi': rsi_strategy,
-        'bollinger_bands': bollinger_bands_strategy,
-        'macd': macd_strategy,
-        'volume': volume_strategy
-    }
-    
-    if strategy_name not in strategies:
-        return jsonify({'error': 'Invalid strategy'}), 400
-        
-    # Initialize strategy tester and sync with Schwab account
-    tester = StrategyTester()
-    tester.sync_with_schwab(session['access_token'])
-    
-    # Run paper trading
-    try:
-        results = tester.paper_trade(strategies[strategy_name], data['symbols'])
-        return jsonify({
-            'status': 'success',
-            'results': results
-        })
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/market_data')
-def get_market_data():
-    """Get real-time market data for positions"""
-    try:
-        logger.debug("Market data endpoint called")
-        logger.debug(f"Session data: {dict(session)}")
-        
-        if 'access_token' not in session:
-            logger.error("No access token in session")
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        positions = session.get('positions', [])
-        logger.debug(f"Positions from session: {positions}")
-        
-        if not positions:
-            logger.warning("No positions found in session")
-            return jsonify({'error': 'No positions found'}), 404
-            
-        market_data = {}
-        
-        for position in positions:
-            symbol = position.get('symbol')
-            logger.debug(f"Processing position for symbol: {symbol}")
-            
-            if symbol:
-                try:
-                    stock = yf.Ticker(symbol)
-                    info = stock.info
-                    logger.debug(f"YFinance info for {symbol}: {info}")
-                    
-                    # Get historical data for technical indicators
-                    hist = stock.history(period="1mo", interval="1d")
-                    logger.debug(f"Historical data shape for {symbol}: {hist.shape}")
-                    
-                    # Calculate technical indicators
-                    hist['SMA_20'] = hist['Close'].rolling(window=20).mean()
-                    hist['SMA_50'] = hist['Close'].rolling(window=50).mean()
-                    
-                    # Calculate RSI
-                    delta = hist['Close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
-                    hist['RSI'] = 100 - (100 / (1 + rs))
-                    
-                    # Calculate Bollinger Bands
-                    hist['BB_middle'] = hist['Close'].rolling(window=20).mean()
-                    hist['BB_std'] = hist['Close'].rolling(window=20).std()
-                    hist['BB_upper'] = hist['BB_middle'] + (hist['BB_std'] * 2)
-                    hist['BB_lower'] = hist['BB_middle'] - (hist['BB_std'] * 2)
-                    
-                    # Format historical data for chart
-                    chart_data = {
-                        'dates': hist.index.strftime('%Y-%m-%d').tolist(),
-                        'close': hist['Close'].tolist(),
-                        'sma_20': hist['SMA_20'].tolist(),
-                        'sma_50': hist['SMA_50'].tolist(),
-                        'bb_upper': hist['BB_upper'].tolist(),
-                        'bb_lower': hist['BB_lower'].tolist(),
-                        'rsi': hist['RSI'].tolist()
-                    }
-                    
-                    market_data[symbol] = {
-                        'current_price': info.get('regularMarketPrice', 0),
-                        'change': info.get('regularMarketChange', 0),
-                        'change_percent': info.get('regularMarketChangePercent', 0),
-                        'volume': info.get('regularMarketVolume', 0),
-                        'high': info.get('regularMarketDayHigh', 0),
-                        'low': info.get('regularMarketDayLow', 0),
-                        'bid': info.get('bid', 0),
-                        'ask': info.get('ask', 0),
-                        'bid_size': info.get('bidSize', 0),
-                        'ask_size': info.get('askSize', 0),
-                        'fifty_two_week_high': info.get('fiftyTwoWeekHigh', 0),
-                        'fifty_two_week_low': info.get('fiftyTwoWeekLow', 0),
-                        'pe_ratio': info.get('trailingPE', 0),
-                        'market_cap': info.get('marketCap', 0),
-                        'chart_data': chart_data
-                    }
-                    logger.debug(f"Market data for {symbol}: {market_data[symbol]}")
-                except Exception as e:
-                    logger.error(f"Error getting market data for {symbol}: {str(e)}")
-                    market_data[symbol] = {'error': str(e)}
-        
-        logger.debug(f"Final market data response: {market_data}")
-        return jsonify(market_data)
-    except Exception as e:
-        logger.error(f"Unexpected error in market data endpoint: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/tesla_dashboard')
-def tesla_dashboard():
-    """Show Tesla analysis dashboard without authentication"""
-    return render_template('strategy_dashboard.html')
-
-@app.route('/api/tesla_analysis')
-def tesla_analysis_api():
-    """Analyze Tesla's volume patterns and their impact on price"""
-    try:
-        # Get API key
-        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-        if not api_key:
-            raise Exception("Alpha Vantage API key not found in environment")
-        
-        # Try Alpha Vantage first
-        try:
-            logger.info("Attempting to fetch data from Alpha Vantage")
-            url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=TSLA&outputsize=full&apikey={api_key}"
-            response = requests.get(url, timeout=10)
-            
-            if response.status_code == 200:
-                data_av = response.json()
-                if 'Error Message' in data_av:
-                    raise Exception(data_av['Error Message'])
-                
-                # Convert Alpha Vantage data to DataFrame
-                time_series = data_av.get('Time Series (Daily)', {})
-                if not time_series:
-                    raise Exception("No data available from Alpha Vantage")
-                
-                # Create DataFrame with proper column names
-                df = pd.DataFrame.from_dict(time_series, orient='index')
-                df.index = pd.to_datetime(df.index)
-                df = df.sort_index()
-                
-                # Rename columns to match expected format
-                column_mapping = {
-                    '1. open': 'Open',
-                    '2. high': 'High',
-                    '3. low': 'Low',
-                    '4. close': 'Close',
-                    '5. volume': 'Volume'
-                }
-                df = df.rename(columns=column_mapping)
-                
-                # Convert to numeric values
-                for col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                
-                # Get last 30 days of data
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=30)
-                data = df[(df.index >= start_date) & (df.index <= end_date)]
-                
-                logger.info(f"Successfully retrieved {len(data)} data points from Alpha Vantage")
-                
-        except Exception as av_error:
-            logger.warning(f"Alpha Vantage failed: {str(av_error)}")
-            logger.info("Falling back to yfinance")
-            
-            # Fallback to yfinance
-            try:
-                tsla = yf.Ticker("TSLA")
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=30)
-                data = tsla.history(start=start_date, end=end_date)
-                if data.empty:
-                    raise Exception("No data available from yfinance")
-                logger.info(f"Successfully retrieved {len(data)} data points from yfinance")
-            except Exception as yf_error:
-                logger.error(f"yfinance failed: {str(yf_error)}")
-                return jsonify({'error': f"Failed to fetch data from both Alpha Vantage and yfinance: {str(yf_error)}"}), 500
-        
-        if data.empty:
-            return jsonify({'error': "No data available for analysis"}), 404
-        
-        # Calculate monthly average volume
-        monthly_avg_volume = data['Volume'].mean()
-        
-        # Identify high volume days (15% above average)
-        high_volume_mask = data['Volume'] > (monthly_avg_volume * 1.15)
-        high_volume_days = data[high_volume_mask]
-        
-        # Calculate price changes during high volume days
-        price_changes = []
-        for idx, day in high_volume_days.iterrows():
-            next_day_idx = data.index.get_loc(idx) + 1
-            if next_day_idx < len(data):
-                next_day = data.iloc[next_day_idx]
-                price_change = ((next_day['Close'] - day['Close']) / day['Close']) * 100
-                price_changes.append({
-                    'date': idx.strftime('%Y-%m-%d'),
-                    'volume': day['Volume'],
-                    'close_price': day['Close'],
-                    'price_change': price_change
-                })
-        
-        # Calculate volume-price correlation
-        volume_correlation = data['Volume'].corr(data['Close'].pct_change())
-        
-        analysis = {
-            'monthly_avg_volume': monthly_avg_volume,
-            'high_volume_days': len(high_volume_days),
-            'price_changes': price_changes,
-            'volume_correlation': volume_correlation,
-            'high_volume_days_data': high_volume_days[['Volume', 'Close']].to_dict('records')
-        }
-        
-        return jsonify({
-            'status': 'success',
-            'analysis': analysis
-        })
-    except Exception as e:
-        logger.error(f"Error in Tesla analysis: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/auto_trading')
-def auto_trading():
-    """Display the auto trading page"""
-    return render_template('auto_trading.html')
-
-@app.route('/api/start_auto_trading', methods=['POST'])
-def start_auto_trading():
-    """Start auto trading with specified strategy and budget"""
-    try:
-        if 'access_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        data = request.get_json()
-        if not data or 'strategy' not in data or 'symbols' not in data or 'budget' not in data:
-            return jsonify({'error': 'Missing required parameters'}), 400
-            
-        # Get strategy function
-        strategy_name = data['strategy']
-        strategies = {
-            'moving_average_crossover': moving_average_crossover_strategy,
-            'rsi': rsi_strategy,
-            'bollinger_bands': bollinger_bands_strategy,
-            'macd': macd_strategy,
-            'volume': volume_strategy
-        }
-        
-        if strategy_name not in strategies:
-            return jsonify({'error': 'Invalid strategy'}), 400
-            
-        # Initialize strategy tester
-        tester = StrategyTester()
-        tester.sync_with_schwab(session['access_token'])
-        
-        # Set budget
-        tester.set_budget(data['budget'])
-        
-        # Start auto trading in a separate thread
-        import threading
-        thread = threading.Thread(
-            target=tester.run_auto_trading,
-            args=(strategies[strategy_name], data['symbols'])
-        )
-        thread.daemon = True
-        thread.start()
-        
-        # Store trading state in session
-        session['trading_active'] = True
-        session['trading_strategy'] = strategy_name
-        session['trading_symbols'] = data['symbols']
-        session['trading_budget'] = data['budget']
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Auto trading started successfully'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error starting auto trading: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/stop_auto_trading', methods=['POST'])
-def stop_auto_trading():
-    """Stop auto trading"""
-    try:
-        if 'access_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        # Clear trading state from session
-        session.pop('trading_active', None)
-        session.pop('trading_strategy', None)
-        session.pop('trading_symbols', None)
-        session.pop('trading_budget', None)
-        
-        return jsonify({
-            'status': 'success',
-            'message': 'Auto trading stopped successfully'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error stopping auto trading: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/trading_status', methods=['GET'])
-def get_trading_status():
-    """Get current trading status and performance"""
-    try:
-        if 'access_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        # Initialize strategy tester
-        tester = StrategyTester()
-        tester.sync_with_schwab(session['access_token'])
-        
-        # Get current status
-        status = {
-            'active': session.get('trading_active', False),
-            'strategy': session.get('trading_strategy', None),
-            'symbols': session.get('trading_symbols', []),
-            'budget': session.get('trading_budget', 0),
-            'current_balance': tester.get_current_balance(),
-            'active_positions': tester.get_active_positions(),
-            'trade_history': tester.get_trade_history()
-        }
-        
-        return jsonify(status)
-        
-    except Exception as e:
-        logger.error(f"Error getting trading status: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/top_volatile_stocks')
-def top_volatile_stocks():
-    """Get top 10 most volatile stocks with volume analysis"""
-    try:
-        # List of major stocks to analyze
-        symbols = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD']
-        
-        results = []
-        for symbol in symbols:
-            try:
-                stock = yf.Ticker(symbol)
-                # Get 1 year of data
-                data = stock.history(period="1y", interval="1d")
-                
-                if not data.empty:
-                    # Calculate volatility (standard deviation of daily returns)
-                    daily_returns = data['Close'].pct_change()
-                    volatility = daily_returns.std() * np.sqrt(252)  # Annualized volatility
-                    
-                    # Calculate volume metrics
-                    current_volume = data['Volume'].iloc[-1]
-                    avg_volume = data['Volume'].mean()
-                    volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
-                    
-                    # Calculate recent price change
-                    price_change = ((data['Close'].iloc[-1] - data['Close'].iloc[0]) / data['Close'].iloc[0]) * 100
-                    
-                    # Calculate technical indicators
-                    # Moving Averages
-                    data['SMA_20'] = data['Close'].rolling(window=20).mean()
-                    data['SMA_50'] = data['Close'].rolling(window=50).mean()
-                    data['SMA_200'] = data['Close'].rolling(window=200).mean()
-                    
-                    # RSI
-                    delta = data['Close'].diff()
-                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                    rs = gain / loss
-                    data['RSI'] = 100 - (100 / (1 + rs))
-                    
-                    # Bollinger Bands
-                    data['BB_middle'] = data['Close'].rolling(window=20).mean()
-                    data['BB_std'] = data['Close'].rolling(window=20).std()
-                    data['BB_upper'] = data['BB_middle'] + (data['BB_std'] * 2)
-                    data['BB_lower'] = data['BB_middle'] - (data['BB_std'] * 2)
-                    
-                    # MACD
-                    exp1 = data['Close'].ewm(span=12, adjust=False).mean()
-                    exp2 = data['Close'].ewm(span=26, adjust=False).mean()
-                    data['MACD'] = exp1 - exp2
-                    data['Signal_Line'] = data['MACD'].ewm(span=9, adjust=False).mean()
-                    
-                    # Stochastic Oscillator
-                    data['Lowest_14'] = data['Low'].rolling(window=14).min()
-                    data['Highest_14'] = data['High'].rolling(window=14).max()
-                    data['%K'] = 100 * ((data['Close'] - data['Lowest_14']) / (data['Highest_14'] - data['Lowest_14']))
-                    data['%D'] = data['%K'].rolling(window=3).mean()
-                    
-                    # ADX (Average Directional Index)
-                    data['+DM'] = data['High'].diff()
-                    data['-DM'] = data['Low'].diff()
-                    data['+DM'] = data['+DM'].where(data['+DM'] > 0, 0)
-                    data['-DM'] = data['-DM'].where(data['-DM'] > 0, 0)
-                    data['TR'] = data['High'] - data['Low']
-                    data['+DI'] = 100 * (data['+DM'].rolling(window=14).mean() / data['TR'].rolling(window=14).mean())
-                    data['-DI'] = 100 * (data['-DM'].rolling(window=14).mean() / data['TR'].rolling(window=14).mean())
-                    data['ADX'] = 100 * abs((data['+DI'] - data['-DI']) / (data['+DI'] + data['-DI'])).rolling(window=14).mean()
-                    
-                    # Get current price and market cap
-                    info = stock.info
-                    current_price = info.get('regularMarketPrice', 0)
-                    market_cap = info.get('marketCap', 0)
-                    
-                    # Get news
-                    news = stock.news
-                    formatted_news = []
-                    for item in news:
-                        formatted_news.append({
-                            'title': item.get('title', ''),
-                            'link': item.get('link', ''),
-                            'publisher': item.get('publisher', ''),
-                            'published': item.get('published', ''),
-                            'summary': item.get('summary', '')
-                        })
-                    
-                    # Format historical data for chart
-                    volume_history = {
-                        'dates': data.index.strftime('%Y-%m-%d').tolist(),
-                        'volumes': data['Volume'].tolist(),
-                        'prices': data['Close'].tolist(),
-                        'sma_20': data['SMA_20'].tolist(),
-                        'sma_50': data['SMA_50'].tolist(),
-                        'sma_200': data['SMA_200'].tolist(),
-                        'bb_upper': data['BB_upper'].tolist(),
-                        'bb_lower': data['BB_lower'].tolist(),
-                        'rsi': data['RSI'].tolist(),
-                        'macd': data['MACD'].tolist(),
-                        'signal_line': data['Signal_Line'].tolist(),
-                        'stochastic_k': data['%K'].tolist(),
-                        'stochastic_d': data['%D'].tolist(),
-                        'adx': data['ADX'].tolist(),
-                        'plus_di': data['+DI'].tolist(),
-                        'minus_di': data['-DI'].tolist()
-                    }
-                    
-                    # Calculate current indicator values
-                    current_indicators = {
-                        'rsi': data['RSI'].iloc[-1],
-                        'macd': data['MACD'].iloc[-1],
-                        'signal_line': data['Signal_Line'].iloc[-1],
-                        'bb_position': (current_price - data['BB_lower'].iloc[-1]) / (data['BB_upper'].iloc[-1] - data['BB_lower'].iloc[-1]) * 100,
-                        'sma_20_position': (current_price - data['SMA_20'].iloc[-1]) / data['SMA_20'].iloc[-1] * 100,
-                        'sma_50_position': (current_price - data['SMA_50'].iloc[-1]) / data['SMA_50'].iloc[-1] * 100,
-                        'sma_200_position': (current_price - data['SMA_200'].iloc[-1]) / data['SMA_200'].iloc[-1] * 100,
-                        'stochastic_k': data['%K'].iloc[-1],
-                        'stochastic_d': data['%D'].iloc[-1],
-                        'adx': data['ADX'].iloc[-1],
-                        'plus_di': data['+DI'].iloc[-1],
-                        'minus_di': data['-DI'].iloc[-1]
-                    }
-                    
-                    results.append({
-                        'symbol': symbol,
-                        'volatility': volatility * 100,  # Convert to percentage
-                        'current_price': current_price,
-                        'price_change': price_change,
-                        'market_cap': market_cap,
-                        'current_volume': current_volume,
-                        'avg_volume': avg_volume,
-                        'volume_ratio': volume_ratio,
-                        'volume_history': volume_history,
-                        'current_indicators': current_indicators,
-                        'news': formatted_news
-                    })
-            
-            except Exception as e:
-                logger.error(f"Error analyzing {symbol}: {str(e)}")
-                continue
-        
-        # Sort by volatility (highest first)
-        results.sort(key=lambda x: x['volatility'], reverse=True)
-        
-        return jsonify({
-            'status': 'success',
-            'stocks': results[:10]  # Return top 10 most volatile
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in volatile stocks analysis: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/analyze_volatility')
-def analyze_volatility():
-    try:
-        # Get list of stocks to analyze
-        stocks = ['TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NVDA', 'AMD', 'INTC', 'QCOM']
-        results = []
-        
-        for symbol in stocks:
-            try:
-                # Get stock data
-                stock = yf.Ticker(symbol)
-                hist = stock.history(period='1mo')
-                
-                # Calculate volatility
-                returns = hist['Close'].pct_change()
-                volatility = returns.std() * (252 ** 0.5)  # Annualized volatility
-                
-                # Get current indicators
-                current_price = hist['Close'][-1]
-                current_volume = hist['Volume'][-1]
-                current_indicators = {
-                    'price': current_price,
-                    'volume': current_volume,
-                    'volatility': volatility
-                }
-                
-                # Get news
-                news = stock.news
-                formatted_news = [{
-                    'title': item['title'],
-                    'link': item['link'],
-                    'date': item['publisher']['publishedAt']
-                } for item in news[:5]]  # Get top 5 news items
-                
-                results.append({
-                    'symbol': symbol,
-                    'volatility': volatility,
-                    'current_indicators': current_indicators,
-                    'news': formatted_news
-                })
-                
-            except Exception as e:
-                logger.error(f"Error analyzing {symbol}: {str(e)}")
-                continue
-        
-        results.sort(key=lambda x: x['volatility'], reverse=True)
-        
-        return jsonify({
-            'status': 'success',
-            'stocks': results[:10]  # Return top 10 most volatile
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in analyze_volatility: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
+    """Display the dashboard page"""
+    return render_template('index.html')
 
 @app.route('/portfolio')
 def portfolio():
     """Display the portfolio page"""
-    return render_template('portfolio.html')
+    try:
+        # Create a mock portfolio for now - this should be replaced with actual data from your database
+        portfolio = {
+            'updated_at': datetime.now(),
+            'total_value': 100000.00,
+            'cash_value': 25000.00,
+            'day_change': 1500.00,
+            'day_change_percent': 1.5,
+            'total_gain': 10000.00,
+            'total_gain_percent': 10.0
+        }
+        
+        # Mock positions data
+        positions = [
+            {
+                'symbol': 'AAPL',
+                'description': 'Apple Inc.',
+                'quantity': 100,
+                'price': 150.00,
+                'market_value': 15000.00,
+                'day_change_dollar': 300.00,
+                'day_change_percent': 2.0,
+                'cost_basis': 14000.00,
+                'security_type': 'Stock',
+                'sector': 'Technology',
+                'industry': 'Consumer Electronics',
+                'pe_ratio': 25.5,
+                'market_cap': 2500000000000.00,
+                'dividend_yield': 0.65,
+                'eps': 5.89,
+                'beta': 1.2,
+                'volume': 80000000
+            },
+            {
+                'symbol': 'MSFT',
+                'description': 'Microsoft Corporation',
+                'quantity': 50,
+                'price': 300.00,
+                'market_value': 15000.00,
+                'day_change_dollar': 150.00,
+                'day_change_percent': 1.0,
+                'cost_basis': 14500.00,
+                'security_type': 'Stock',
+                'sector': 'Technology',
+                'industry': 'Software',
+                'pe_ratio': 30.2,
+                'market_cap': 2000000000000.00,
+                'dividend_yield': 0.85,
+                'eps': 9.65,
+                'beta': 0.95,
+                'volume': 25000000
+            }
+        ]
+        
+        # Calculate sector allocation
+        sector_data = {}
+        for position in positions:
+            sector = position['sector']
+            value = position['market_value']
+            sector_data[sector] = sector_data.get(sector, 0) + value
+        
+        sector_labels = list(sector_data.keys())
+        sector_values = list(sector_data.values())
+        
+        # Calculate asset type allocation
+        asset_type_data = {}
+        for position in positions:
+            asset_type = position['security_type']
+            value = position['market_value']
+            asset_type_data[asset_type] = asset_type_data.get(asset_type, 0) + value
+        
+        asset_type_labels = list(asset_type_data.keys())
+        asset_type_values = list(asset_type_data.values())
+        
+        return render_template('portfolio.html',
+                             portfolio=SimpleNamespace(**portfolio),
+                             positions=positions,
+                             sector_labels=sector_labels,
+                             sector_values=sector_values,
+                             asset_type_labels=asset_type_labels,
+                             asset_type_values=asset_type_values)
+                             
+    except Exception as e:
+        flash(f'Error loading portfolio: {str(e)}', 'danger')
+        return render_template('portfolio.html',
+                             portfolio=SimpleNamespace(updated_at=datetime.now(),
+                                                     total_value=0.00,
+                                                     cash_value=0.00,
+                                                     day_change=0.00,
+                                                     day_change_percent=0.00,
+                                                     total_gain=0.00,
+                                                     total_gain_percent=0.00),
+                             positions=[],
+                             sector_labels=[],
+                             sector_values=[],
+                             asset_type_labels=[],
+                             asset_type_values=[])
 
 @app.route('/news')
 def news():
@@ -989,256 +239,6 @@ def compare():
 def volume_analysis():
     """Display the volume analysis page"""
     return render_template('volume_analysis.html')
-
-@app.route('/dashboard/api/run_backtest', methods=['POST'])
-def run_backtest():
-    """Run backtest for specified symbols and date range"""
-    try:
-        data = request.get_json()
-        symbols = [s.strip() for s in data['symbols'].split(',')]
-        start_date = data['startDate']
-        end_date = data['endDate']
-        
-        logger.info(f"Starting backtest for symbols: {symbols}")
-        logger.info(f"Date range: {start_date} to {end_date}")
-        
-        # Initialize strategy tester
-        tester = StrategyTester()
-        
-        # Test strategies
-        results = []
-        strategies = {
-            'Moving Average Crossover': moving_average_crossover_strategy,
-            'RSI': rsi_strategy,
-            'Bollinger Bands': bollinger_bands_strategy,
-            'MACD': macd_strategy,
-            'Volume': volume_strategy
-        }
-        
-        for symbol in symbols:
-            try:
-                logger.info(f"Processing symbol: {symbol}")
-                hist = None
-                
-                # Try Alpha Vantage first
-                try:
-                    logger.info(f"Attempting to fetch data from Alpha Vantage for {symbol}")
-                    api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-                    if not api_key:
-                        raise Exception("Alpha Vantage API key not found in environment")
-                    
-                    # First try the TIME_SERIES_DAILY endpoint
-                    url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=full&apikey={api_key}"
-                    logger.info(f"Alpha Vantage URL: {url}")
-                    
-                    response = requests.get(url, timeout=10)
-                    logger.info(f"Alpha Vantage response status: {response.status_code}")
-                    
-                    if response.status_code == 200:
-                        data_av = response.json()
-                        if 'Error Message' in data_av:
-                            raise Exception(data_av['Error Message'])
-                        
-                        # Convert Alpha Vantage data to DataFrame
-                        time_series = data_av.get('Time Series (Daily)', {})
-                        if not time_series:
-                            raise Exception("No data available from Alpha Vantage")
-                        
-                        # Create DataFrame with proper column names
-                        df = pd.DataFrame.from_dict(time_series, orient='index')
-                        df.index = pd.to_datetime(df.index)
-                        df = df.sort_index()
-                        
-                        # Rename columns to match expected format
-                        column_mapping = {
-                            '1. open': 'Open',
-                            '2. high': 'High',
-                            '3. low': 'Low',
-                            '4. close': 'Close',
-                            '5. volume': 'Volume'
-                        }
-                        df = df.rename(columns=column_mapping)
-                        
-                        # Convert to numeric values
-                        for col in df.columns:
-                            df[col] = pd.to_numeric(df[col], errors='coerce')
-                        
-                        # Filter by date range
-                        start_dt = pd.to_datetime(start_date)
-                        end_dt = pd.to_datetime(end_date)
-                        hist = df[(df.index >= start_dt) & (df.index <= end_dt)]
-                        
-                        if hist.empty:
-                            raise Exception("No data available for the specified date range")
-                        
-                        logger.info(f"Successfully retrieved {len(hist)} data points from Alpha Vantage")
-                        
-                except Exception as av_error:
-                    logger.warning(f"Alpha Vantage failed for {symbol}: {str(av_error)}")
-                    logger.info(f"Falling back to yfinance for {symbol}")
-                    
-                    # Fallback to yfinance
-                    try:
-                        stock = yf.Ticker(symbol)
-                        hist = stock.history(start=start_date, end=end_date)
-                        if hist.empty:
-                            raise Exception("No data available from yfinance")
-                        logger.info(f"Successfully retrieved {len(hist)} data points from yfinance")
-                    except Exception as yf_error:
-                        logger.error(f"yfinance failed for {symbol}: {str(yf_error)}")
-                        results.append({
-                            'symbol': symbol,
-                            'error': f"Failed to fetch data from both Alpha Vantage and yfinance: {str(yf_error)}"
-                        })
-                        continue
-                
-                if hist is None or hist.empty:
-                    logger.warning(f"No data found for {symbol} in the specified date range")
-                    results.append({
-                        'symbol': symbol,
-                        'error': f"No historical data found for the specified date range"
-                    })
-                    continue
-                
-                for strategy_name, strategy in strategies.items():
-                    try:
-                        logger.info(f"Running {strategy_name} for {symbol}")
-                        result = tester.backtest_strategy(strategy, [symbol], start_date, end_date)
-                        results.append({
-                            'symbol': symbol,
-                            'strategy': strategy_name,
-                            'initialPrice': result['portfolio_value'][0],
-                            'finalPrice': result['portfolio_value'][-1],
-                            'totalReturn': result['metrics']['total_return'],
-                            'sharpeRatio': result['metrics']['sharpe_ratio'],
-                            'maxDrawdown': result['metrics']['max_drawdown'],
-                            'numTrades': result['metrics']['num_trades']
-                        })
-                        logger.info(f"Successfully completed {strategy_name} for {symbol}")
-                    except Exception as e:
-                        logger.error(f"Error backtesting {strategy_name} for {symbol}: {str(e)}")
-                        results.append({
-                            'symbol': symbol,
-                            'strategy': strategy_name,
-                            'error': str(e)
-                        })
-                        continue
-            except Exception as e:
-                logger.error(f"Error processing {symbol}: {str(e)}")
-                results.append({
-                    'symbol': symbol,
-                    'error': f"Failed to process symbol: {str(e)}"
-                })
-                continue
-        
-        if not results:
-            logger.error("No valid results found for any symbols")
-            return jsonify({
-                'status': 'error',
-                'message': 'No valid results found for any symbols'
-            }), 400
-        
-        logger.info(f"Backtest completed successfully with {len(results)} results")
-        return jsonify({
-            'status': 'success',
-            'results': results
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in backtest: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
-
-@app.route('/dashboard/api/run_tesla_analysis', methods=['POST'])
-def run_tesla_analysis():
-    """Run Tesla volume analysis and return results"""
-    try:
-        logger.info("Running Tesla volume analysis")
-        
-        # Get Tesla data from Alpha Vantage
-        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-        if not api_key:
-            raise Exception("Alpha Vantage API key not found in environment")
-        
-        url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=TSLA&outputsize=full&apikey={api_key}"
-        response = requests.get(url, timeout=10)
-        
-        if response.status_code != 200:
-            raise Exception(f"Alpha Vantage API error: {response.status_code}")
-        
-        data = response.json()
-        if 'Error Message' in data:
-            raise Exception(data['Error Message'])
-        
-        time_series = data.get('Time Series (Daily)', {})
-        if not time_series:
-            raise Exception("No data available from Alpha Vantage")
-        
-        # Convert to DataFrame
-        df = pd.DataFrame.from_dict(time_series, orient='index')
-        df.index = pd.to_datetime(df.index)
-        df = df.sort_index()
-        
-        # Rename columns
-        column_mapping = {
-            '1. open': 'Open',
-            '2. high': 'High',
-            '3. low': 'Low',
-            '4. close': 'Close',
-            '5. volume': 'Volume'
-        }
-        df = df.rename(columns=column_mapping)
-        
-        # Convert to numeric values
-        for col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Calculate metrics
-        current_volume = df['Volume'].iloc[0]
-        avg_volume = df['Volume'].mean()
-        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
-        
-        current_price = df['Close'].iloc[0]
-        prev_price = df['Close'].iloc[-1]
-        price_change = ((current_price - prev_price) / prev_price) * 100
-        
-        # Generate signal
-        signal = None
-        if volume_ratio > 2.0 and price_change > 0:
-            signal = {
-                'type': 'success',
-                'message': 'Strong buying signal: High volume with price increase'
-            }
-        elif volume_ratio > 2.0 and price_change < 0:
-            signal = {
-                'type': 'danger',
-                'message': 'Strong selling signal: High volume with price decrease'
-            }
-        
-        # Prepare chart data
-        chart_data = {
-            'labels': df.index.strftime('%Y-%m-%d').tolist(),
-            'prices': df['Close'].tolist()
-        }
-        
-        return jsonify({
-            'status': 'success',
-            'metrics': {
-                'volumeRatio': volume_ratio,
-                'priceChange': price_change
-            },
-            'signal': signal,
-            'chart': chart_data
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in Tesla analysis: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
 
 @app.route('/dashboard/api/paper_trade', methods=['POST'])
 def paper_trade():
@@ -1395,248 +395,6 @@ def search_symbols():
             'message': str(e)
         }), 500
 
-# Portfolio Management
-@app.route('/api/portfolio', methods=['GET'])
-def get_portfolio():
-    """Get current portfolio holdings"""
-    try:
-        if 'access_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        # Get portfolio data from Schwab API
-        headers = {
-            'Authorization': f'Bearer {session["access_token"]}',
-            'Accept': 'application/json'
-        }
-        response = requests.get('https://api.schwabapi.com/v1/accounts', headers=headers)
-        response.raise_for_status()
-        
-        accounts = response.json()
-        portfolio = []
-        
-        for account in accounts:
-            # Get positions for each account
-            positions_response = requests.get(
-                f'https://api.schwabapi.com/v1/accounts/{account["accountNumber"]}/positions',
-                headers=headers
-            )
-            positions_response.raise_for_status()
-            positions = positions_response.json()
-            
-            portfolio.extend(positions)
-            
-        return jsonify({
-            'status': 'success',
-            'data': portfolio
-        })
-    except Exception as e:
-        logger.error(f"Error getting portfolio: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# Trading Endpoints
-@app.route('/api/trade', methods=['POST'])
-def place_trade():
-    """Place a trade order"""
-    try:
-        if 'access_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        data = request.get_json()
-        symbol = data.get('symbol')
-        quantity = data.get('quantity')
-        order_type = data.get('order_type', 'MARKET')
-        side = data.get('side', 'BUY')
-        
-        if not all([symbol, quantity]):
-            return jsonify({'error': 'Missing required parameters'}), 400
-            
-        # Place order through Schwab API
-        headers = {
-            'Authorization': f'Bearer {session["access_token"]}',
-            'Content-Type': 'application/json'
-        }
-        
-        order_data = {
-            'orderType': order_type,
-            'session': 'NORMAL',
-            'duration': 'DAY',
-            'orderStrategyType': 'SINGLE',
-            'orderLegCollection': [{
-                'instruction': side,
-                'quantity': quantity,
-                'instrument': {
-                    'symbol': symbol,
-                    'assetType': 'EQUITY'
-                }
-            }]
-        }
-        
-        response = requests.post(
-            'https://api.schwabapi.com/v1/accounts/orders',
-            headers=headers,
-            json=order_data
-        )
-        response.raise_for_status()
-        
-        return jsonify({
-            'status': 'success',
-            'data': response.json()
-        })
-    except Exception as e:
-        logger.error(f"Error placing trade: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# Watchlist Management
-@app.route('/api/watchlist', methods=['GET', 'POST', 'DELETE'])
-def manage_watchlist():
-    """Manage watchlist items"""
-    try:
-        if 'access_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        if request.method == 'GET':
-            # Get watchlist from database or session
-            watchlist = session.get('watchlist', [])
-            return jsonify({
-                'status': 'success',
-                'data': watchlist
-            })
-            
-        elif request.method == 'POST':
-            data = request.get_json()
-            symbol = data.get('symbol')
-            
-            if not symbol:
-                return jsonify({'error': 'Symbol is required'}), 400
-                
-            watchlist = session.get('watchlist', [])
-            if symbol not in watchlist:
-                watchlist.append(symbol)
-                session['watchlist'] = watchlist
-                
-            return jsonify({
-                'status': 'success',
-                'data': watchlist
-            })
-            
-        elif request.method == 'DELETE':
-            data = request.get_json()
-            symbol = data.get('symbol')
-            
-            if not symbol:
-                return jsonify({'error': 'Symbol is required'}), 400
-                
-            watchlist = session.get('watchlist', [])
-            if symbol in watchlist:
-                watchlist.remove(symbol)
-                session['watchlist'] = watchlist
-                
-            return jsonify({
-                'status': 'success',
-                'data': watchlist
-            })
-            
-    except Exception as e:
-        logger.error(f"Error managing watchlist: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# Alerts System
-@app.route('/api/alerts', methods=['GET', 'POST', 'DELETE'])
-def manage_alerts():
-    """Manage price alerts"""
-    try:
-        if 'access_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
-        if request.method == 'GET':
-            alerts = session.get('alerts', [])
-            return jsonify({
-                'status': 'success',
-                'data': alerts
-            })
-            
-        elif request.method == 'POST':
-            data = request.get_json()
-            symbol = data.get('symbol')
-            price = data.get('price')
-            condition = data.get('condition', 'ABOVE')
-            
-            if not all([symbol, price]):
-                return jsonify({'error': 'Symbol and price are required'}), 400
-                
-            alerts = session.get('alerts', [])
-            alert = {
-                'symbol': symbol,
-                'price': price,
-                'condition': condition,
-                'created_at': datetime.now().isoformat()
-            }
-            alerts.append(alert)
-            session['alerts'] = alerts
-            
-            # Start monitoring this alert
-            asyncio.create_task(monitor_alert(alert))
-            
-            return jsonify({
-                'status': 'success',
-                'data': alert
-            })
-            
-        elif request.method == 'DELETE':
-            data = request.get_json()
-            alert_id = data.get('id')
-            
-            if not alert_id:
-                return jsonify({'error': 'Alert ID is required'}), 400
-                
-            alerts = session.get('alerts', [])
-            alerts = [a for a in alerts if a.get('id') != alert_id]
-            session['alerts'] = alerts
-            
-            return jsonify({
-                'status': 'success',
-                'data': alerts
-            })
-            
-    except Exception as e:
-        logger.error(f"Error managing alerts: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# Background task to monitor alerts
-async def monitor_alert(alert):
-    while True:
-        try:
-            stock = yf.Ticker(alert['symbol'])
-            data = stock.history(period="1d", interval="1m")
-            if not data.empty:
-                latest_price = data.iloc[-1]['Close']
-                
-                if alert['condition'] == 'ABOVE' and latest_price > alert['price']:
-                    manager.broadcast({
-                        'type': 'alert',
-                        'data': {
-                            'symbol': alert['symbol'],
-                            'price': latest_price,
-                            'condition': alert['condition'],
-                            'trigger_price': alert['price']
-                        }
-                    })
-                elif alert['condition'] == 'BELOW' and latest_price < alert['price']:
-                    manager.broadcast({
-                        'type': 'alert',
-                        'data': {
-                            'symbol': alert['symbol'],
-                            'price': latest_price,
-                            'condition': alert['condition'],
-                            'trigger_price': alert['price']
-                        }
-                    })
-                    
-            await asyncio.sleep(60)  # Check every minute
-        except Exception as e:
-            logger.error(f"Error monitoring alert: {str(e)}")
-            await asyncio.sleep(60)  # Wait before retrying
-
 if __name__ == '__main__':
     # Print all registered routes
     print("\nRegistered Routes:")
@@ -1645,4 +403,4 @@ if __name__ == '__main__':
     print("\n")
     
     # Run the app
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True) 
