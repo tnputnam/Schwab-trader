@@ -473,25 +473,76 @@ def tesla_dashboard():
     """Show Tesla analysis dashboard without authentication"""
     return render_template('strategy_dashboard.html')
 
-@app.route('/tesla_analysis')
-def tesla_analysis():
-    """Display the Tesla analysis page"""
-    return render_template('tesla_analysis.html')
-
-@app.route('/volatile_stocks')
-def volatile_stocks():
-    """Display the volatile stocks page"""
-    return render_template('volatile_stocks.html')
-
 @app.route('/api/tesla_analysis')
-def tesla_analysis():
+def tesla_analysis_api():
     """Analyze Tesla's volume patterns and their impact on price"""
     try:
-        # Get Tesla's historical data
-        tsla = yf.Ticker("TSLA")
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=30)  # Last 30 days
-        data = tsla.history(start=start_date, end=end_date)
+        # Get API key
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            raise Exception("Alpha Vantage API key not found in environment")
+        
+        # Try Alpha Vantage first
+        try:
+            logger.info("Attempting to fetch data from Alpha Vantage")
+            url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=TSLA&outputsize=full&apikey={api_key}"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data_av = response.json()
+                if 'Error Message' in data_av:
+                    raise Exception(data_av['Error Message'])
+                
+                # Convert Alpha Vantage data to DataFrame
+                time_series = data_av.get('Time Series (Daily)', {})
+                if not time_series:
+                    raise Exception("No data available from Alpha Vantage")
+                
+                # Create DataFrame with proper column names
+                df = pd.DataFrame.from_dict(time_series, orient='index')
+                df.index = pd.to_datetime(df.index)
+                df = df.sort_index()
+                
+                # Rename columns to match expected format
+                column_mapping = {
+                    '1. open': 'Open',
+                    '2. high': 'High',
+                    '3. low': 'Low',
+                    '4. close': 'Close',
+                    '5. volume': 'Volume'
+                }
+                df = df.rename(columns=column_mapping)
+                
+                # Convert to numeric values
+                for col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                
+                # Get last 30 days of data
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=30)
+                data = df[(df.index >= start_date) & (df.index <= end_date)]
+                
+                logger.info(f"Successfully retrieved {len(data)} data points from Alpha Vantage")
+                
+        except Exception as av_error:
+            logger.warning(f"Alpha Vantage failed: {str(av_error)}")
+            logger.info("Falling back to yfinance")
+            
+            # Fallback to yfinance
+            try:
+                tsla = yf.Ticker("TSLA")
+                end_date = datetime.now()
+                start_date = end_date - timedelta(days=30)
+                data = tsla.history(start=start_date, end=end_date)
+                if data.empty:
+                    raise Exception("No data available from yfinance")
+                logger.info(f"Successfully retrieved {len(data)} data points from yfinance")
+            except Exception as yf_error:
+                logger.error(f"yfinance failed: {str(yf_error)}")
+                return jsonify({'error': f"Failed to fetch data from both Alpha Vantage and yfinance: {str(yf_error)}"}), 500
+        
+        if data.empty:
+            return jsonify({'error': "No data available for analysis"}), 404
         
         # Calculate monthly average volume
         monthly_avg_volume = data['Volume'].mean()
@@ -1034,6 +1085,250 @@ def run_backtest():
         
     except Exception as e:
         logger.error(f"Error in backtest: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/dashboard/api/run_tesla_analysis', methods=['POST'])
+def run_tesla_analysis():
+    """Run Tesla volume analysis and return results"""
+    try:
+        logger.info("Running Tesla volume analysis")
+        
+        # Get Tesla data from Alpha Vantage
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            raise Exception("Alpha Vantage API key not found in environment")
+        
+        url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol=TSLA&outputsize=full&apikey={api_key}"
+        response = requests.get(url, timeout=10)
+        
+        if response.status_code != 200:
+            raise Exception(f"Alpha Vantage API error: {response.status_code}")
+        
+        data = response.json()
+        if 'Error Message' in data:
+            raise Exception(data['Error Message'])
+        
+        time_series = data.get('Time Series (Daily)', {})
+        if not time_series:
+            raise Exception("No data available from Alpha Vantage")
+        
+        # Convert to DataFrame
+        df = pd.DataFrame.from_dict(time_series, orient='index')
+        df.index = pd.to_datetime(df.index)
+        df = df.sort_index()
+        
+        # Rename columns
+        column_mapping = {
+            '1. open': 'Open',
+            '2. high': 'High',
+            '3. low': 'Low',
+            '4. close': 'Close',
+            '5. volume': 'Volume'
+        }
+        df = df.rename(columns=column_mapping)
+        
+        # Convert to numeric values
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Calculate metrics
+        current_volume = df['Volume'].iloc[0]
+        avg_volume = df['Volume'].mean()
+        volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+        
+        current_price = df['Close'].iloc[0]
+        prev_price = df['Close'].iloc[-1]
+        price_change = ((current_price - prev_price) / prev_price) * 100
+        
+        # Generate signal
+        signal = None
+        if volume_ratio > 2.0 and price_change > 0:
+            signal = {
+                'type': 'success',
+                'message': 'Strong buying signal: High volume with price increase'
+            }
+        elif volume_ratio > 2.0 and price_change < 0:
+            signal = {
+                'type': 'danger',
+                'message': 'Strong selling signal: High volume with price decrease'
+            }
+        
+        # Prepare chart data
+        chart_data = {
+            'labels': df.index.strftime('%Y-%m-%d').tolist(),
+            'prices': df['Close'].tolist()
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'metrics': {
+                'volumeRatio': volume_ratio,
+                'priceChange': price_change
+            },
+            'signal': signal,
+            'chart': chart_data
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in Tesla analysis: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/dashboard/api/paper_trade', methods=['POST'])
+def paper_trade():
+    """Run paper trading with selected strategy"""
+    try:
+        if 'access_token' not in session:
+            return jsonify({'status': 'error', 'message': 'Not authenticated'}), 401
+            
+        data = request.get_json()
+        if not data or 'strategy' not in data or 'symbols' not in data:
+            return jsonify({'status': 'error', 'message': 'Missing required parameters'}), 400
+            
+        # Get strategy function
+        strategy_name = data['strategy']
+        strategies = {
+            'moving_average_crossover': moving_average_crossover_strategy,
+            'rsi': rsi_strategy,
+            'bollinger_bands': bollinger_bands_strategy,
+            'macd': macd_strategy,
+            'volume': volume_strategy
+        }
+        
+        if strategy_name not in strategies:
+            return jsonify({'status': 'error', 'message': 'Invalid strategy'}), 400
+            
+        # Initialize strategy tester and sync with Schwab account
+        tester = StrategyTester()
+        tester.sync_with_schwab(session['access_token'])
+        
+        # Run paper trading
+        try:
+            results = tester.paper_trade(strategies[strategy_name], data['symbols'])
+            
+            # Format results for frontend
+            formatted_results = {
+                'positions': {},
+                'trades': []
+            }
+            
+            # Format positions
+            for symbol, position in results['positions'].items():
+                formatted_results['positions'][symbol] = {
+                    'quantity': position['quantity'],
+                    'average_price': position['average_price']
+                }
+            
+            # Format trades
+            for trade in results['trades']:
+                formatted_results['trades'].append({
+                    'date': trade['date'].isoformat(),
+                    'symbol': trade['symbol'],
+                    'action': trade['action'],
+                    'quantity': trade['quantity'],
+                    'price': trade['price'],
+                    'profit': trade.get('profit', None)
+                })
+            
+            return jsonify({
+                'status': 'success',
+                'results': formatted_results
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in paper trading: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': str(e)
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in paper trading route: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/dashboard/api/search_symbols', methods=['POST'])
+def search_symbols():
+    """Search for symbols or company names"""
+    try:
+        data = request.get_json()
+        query = data.get('query', '').strip().upper()
+        
+        if not query:
+            return jsonify({
+                'status': 'error',
+                'message': 'Search query is required'
+            }), 400
+        
+        # Try Alpha Vantage first
+        try:
+            api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+            if not api_key:
+                raise Exception("Alpha Vantage API key not found")
+            
+            url = f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={query}&apikey={api_key}"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'bestMatches' in data:
+                    results = []
+                    for match in data['bestMatches']:
+                        results.append({
+                            'symbol': match['1. symbol'],
+                            'name': match['2. name'],
+                            'type': match['3. type'],
+                            'region': match['4. region']
+                        })
+                    return jsonify({
+                        'status': 'success',
+                        'results': results
+                    })
+        except Exception as e:
+            logger.warning(f"Alpha Vantage search failed: {str(e)}")
+        
+        # Fallback to yfinance
+        try:
+            # Get list of major stocks
+            major_stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'INTC', 'QCOM']
+            results = []
+            
+            for symbol in major_stocks:
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info
+                    name = info.get('longName', '')
+                    
+                    if query in symbol or query in name.upper():
+                        results.append({
+                            'symbol': symbol,
+                            'name': name,
+                            'type': info.get('quoteType', ''),
+                            'region': info.get('region', '')
+                        })
+                except:
+                    continue
+            
+            return jsonify({
+                'status': 'success',
+                'results': results
+            })
+        except Exception as e:
+            logger.error(f"yfinance search failed: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to search symbols'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in symbol search: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)

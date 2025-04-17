@@ -3,80 +3,117 @@
 {% block title %}Strategy Dashboard{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>Strategy Testing Dashboard</h1>
+<div class="container mt-4">
+    <h1>Strategy Dashboard</h1>
     
     <!-- Tesla Analysis Section -->
-    <div class="section">
-        <h2>Tesla Analysis</h2>
-        <div class="analysis-container">
-            <div class="form-group">
-                <button onclick="runTeslaAnalysis()" class="btn-primary">Run Tesla Analysis</button>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Tesla Analysis</h2>
+        </div>
+        <div class="card-body">
+            <button id="runTeslaAnalysis" class="btn btn-primary">Run Analysis</button>
+            <div id="teslaResults" class="mt-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <canvas id="teslaChart"></canvas>
+                    </div>
+                    <div class="col-md-6">
+                        <div id="teslaMetrics"></div>
+                    </div>
+                </div>
             </div>
-            <div id="tesla-chart" class="chart-container"></div>
-            <div id="tesla-metrics" class="metrics-container"></div>
         </div>
     </div>
-    
-    <!-- Backtesting Section -->
-    <div class="section">
-        <h2>Backtesting</h2>
-        <div class="backtest-form">
-            <div class="form-group">
-                <label for="symbols">Symbols (comma-separated):</label>
-                <input type="text" id="symbols" placeholder="AAPL,MSFT,GOOGL" value="AAPL,MSFT,GOOGL">
-            </div>
-            <div class="form-group">
-                <label for="startDate">Start Date:</label>
-                <input type="date" id="startDate">
-            </div>
-            <div class="form-group">
-                <label for="endDate">End Date:</label>
-                <input type="date" id="endDate">
-            </div>
-            <button onclick="runBacktest()" class="btn-primary">Run Backtest</button>
+
+    <!-- Backtest Section -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Backtest Strategies</h2>
         </div>
-        <div id="backtest-results" class="results-container">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Strategy</th>
-                        <th>Initial Price</th>
-                        <th>Final Price</th>
-                        <th>Total Return</th>
-                        <th>Sharpe Ratio</th>
-                        <th>Max Drawdown</th>
-                        <th>Number of Trades</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody id="results-body"></tbody>
-            </table>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <div class="input-group">
+                        <input type="text" id="symbolSearch" class="form-control" placeholder="Search for symbols or companies...">
+                        <button class="btn btn-outline-secondary" type="button" id="searchButton">Search</button>
+                    </div>
+                    <div id="searchResults" class="mt-2" style="display: none;">
+                        <div class="list-group">
+                            <!-- Search results will be populated here -->
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <input type="text" id="symbols" class="form-control" placeholder="Enter symbols (comma-separated)">
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <input type="date" id="startDate" class="form-control">
+                </div>
+                <div class="col-md-6">
+                    <input type="date" id="endDate" class="form-control">
+                </div>
+            </div>
+            <button id="runBacktest" class="btn btn-primary">Run Backtest</button>
+            <div id="backtestResults" class="mt-3">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Symbol</th>
+                            <th>Strategy</th>
+                            <th>Initial Price</th>
+                            <th>Final Price</th>
+                            <th>Total Return</th>
+                            <th>Sharpe Ratio</th>
+                            <th>Max Drawdown</th>
+                            <th>Number of Trades</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Results will be populated here -->
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
-    
+
     <!-- Paper Trading Section -->
-    <div class="section">
-        <h2>Paper Trading</h2>
-        <div class="paper-trading-form">
-            <div class="form-group">
-                <label for="paper-symbols">Symbols (comma-separated):</label>
-                <input type="text" id="paper-symbols" placeholder="AAPL,MSFT,GOOGL" value="AAPL,MSFT,GOOGL">
-            </div>
-            <div class="form-group">
-                <label for="strategy">Strategy:</label>
-                <select id="strategy">
-                    <option value="moving_average_crossover">Moving Average Crossover</option>
-                    <option value="rsi">RSI</option>
-                    <option value="bollinger_bands">Bollinger Bands</option>
-                    <option value="macd">MACD</option>
-                    <option value="volume">Volume</option>
-                </select>
-            </div>
-            <button onclick="startPaperTrading()" class="btn-primary">Start Paper Trading</button>
+    <div class="card mb-4">
+        <div class="card-header">
+            <h2>Paper Trading</h2>
         </div>
-        <div id="paper-trading-results" class="results-container"></div>
+        <div class="card-body">
+            <div class="row mb-3">
+                <div class="col-md-6">
+                    <select id="paperTradingStrategy" class="form-select">
+                        <option value="moving_average_crossover">Moving Average Crossover</option>
+                        <option value="rsi">RSI</option>
+                        <option value="bollinger_bands">Bollinger Bands</option>
+                        <option value="macd">MACD</option>
+                        <option value="volume">Volume</option>
+                    </select>
+                </div>
+                <div class="col-md-6">
+                    <input type="text" id="paperTradingSymbols" class="form-control" placeholder="Enter symbols (comma-separated)">
+                </div>
+            </div>
+            <button id="startPaperTrading" class="btn btn-primary">Start Paper Trading</button>
+            <div id="paperTradingResults" class="mt-3">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4>Positions</h4>
+                        <div id="positionsList"></div>
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Trade History</h4>
+                        <div id="tradeHistory"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -85,112 +122,43 @@
 <style>
     .container {
         max-width: 1200px;
-        margin: 0 auto;
-        padding: 20px;
     }
-    
-    .section {
-        margin-bottom: 40px;
-        padding: 20px;
-        border: 1px solid #ddd;
-        border-radius: 5px;
-        background-color: #fff;
+    .card {
+        margin-bottom: 20px;
     }
-    
+    .card-header {
+        background-color: #f8f9fa;
+    }
     .form-group {
         margin-bottom: 15px;
     }
-    
-    label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
+    .btn {
+        margin-right: 10px;
     }
-    
-    input[type="text"],
-    input[type="date"],
-    select {
-        width: 100%;
-        padding: 8px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
+    .table {
+        margin-top: 20px;
     }
-    
-    button {
-        padding: 10px 20px;
-        background-color: #4CAF50;
-        color: white;
-        border: none;
-        border-radius: 4px;
+    .status-badge {
+        padding: 5px 10px;
+        border-radius: 5px;
+    }
+    .status-success {
+        background-color: #d4edda;
+        color: #155724;
+    }
+    .status-error {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+    #searchResults {
+        max-height: 200px;
+        overflow-y: auto;
+    }
+    .list-group-item {
         cursor: pointer;
-        font-weight: bold;
     }
-    
-    button:hover {
-        background-color: #45a049;
-    }
-    
-    .btn-primary {
-        background-color: #007bff;
-    }
-    
-    .btn-primary:hover {
-        background-color: #0056b3;
-    }
-    
-    table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-top: 20px;
-    }
-    
-    th, td {
-        padding: 12px;
-        text-align: left;
-        border-bottom: 1px solid #ddd;
-    }
-    
-    th {
+    .list-group-item:hover {
         background-color: #f8f9fa;
-        font-weight: bold;
-    }
-    
-    .analysis-container {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-    }
-    
-    .chart-container {
-        height: 400px;
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 10px;
-    }
-    
-    .metrics-container {
-        padding: 15px;
-        background-color: #f8f9fa;
-        border-radius: 4px;
-    }
-    
-    .results-container {
-        margin-top: 20px;
-        overflow-x: auto;
-    }
-    
-    .error {
-        color: #dc3545;
-        font-weight: bold;
-    }
-    
-    .success {
-        color: #28a745;
-    }
-    
-    .loading {
-        color: #6c757d;
-        font-style: italic;
     }
 </style>
 {% endblock %}
@@ -198,7 +166,7 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Set default dates
+    // Set default dates for backtest
     document.addEventListener('DOMContentLoaded', function() {
         const today = new Date();
         const oneYearAgo = new Date();
@@ -208,12 +176,105 @@
         document.getElementById('endDate').value = today.toISOString().split('T')[0];
     });
 
-    function runTeslaAnalysis() {
-        const chartContainer = document.getElementById('tesla-chart');
-        const metricsContainer = document.getElementById('tesla-metrics');
+    // Loading state management
+    function setLoading(button, isLoading) {
+        const originalText = button.dataset.originalText || button.textContent;
+        if (isLoading) {
+            button.dataset.originalText = originalText;
+            button.disabled = true;
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...';
+        } else {
+            button.disabled = false;
+            button.textContent = originalText;
+        }
+    }
+
+    // Error display function
+    function showError(element, message) {
+        element.innerHTML = `
+            <div class="alert alert-danger" role="alert">
+                <strong>Error:</strong> ${message}
+            </div>
+        `;
+    }
+
+    // Symbol search functionality
+    document.getElementById('searchButton').addEventListener('click', function() {
+        const button = this;
+        const query = document.getElementById('symbolSearch').value.trim();
+        if (!query) return;
+
+        setLoading(button, true);
+        fetch('/dashboard/api/search_symbols', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            const resultsDiv = document.getElementById('searchResults');
+            const resultsList = resultsDiv.querySelector('.list-group');
+            resultsList.innerHTML = '';
+
+            if (data.status === 'success' && data.results.length > 0) {
+                data.results.forEach(result => {
+                    const item = document.createElement('a');
+                    item.href = '#';
+                    item.className = 'list-group-item list-group-item-action';
+                    item.innerHTML = `
+                        <div class="d-flex justify-content-between">
+                            <strong>${result.symbol}</strong>
+                            <small>${result.type}</small>
+                        </div>
+                        <div>${result.name}</div>
+                        <small class="text-muted">${result.region}</small>
+                    `;
+                    item.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        addSymbolToInput(result.symbol);
+                    });
+                    resultsList.appendChild(item);
+                });
+                resultsDiv.style.display = 'block';
+            } else {
+                const item = document.createElement('div');
+                item.className = 'list-group-item';
+                item.textContent = 'No results found';
+                resultsList.appendChild(item);
+                resultsDiv.style.display = 'block';
+            }
+        })
+        .catch(error => {
+            console.error('Error searching symbols:', error);
+            const resultsDiv = document.getElementById('searchResults');
+            const resultsList = resultsDiv.querySelector('.list-group');
+            resultsList.innerHTML = '<div class="list-group-item">Error searching symbols</div>';
+            resultsDiv.style.display = 'block';
+        })
+        .finally(() => setLoading(button, false));
+    });
+
+    function addSymbolToInput(symbol) {
+        const symbolsInput = document.getElementById('symbols');
+        const currentSymbols = symbolsInput.value.split(',').map(s => s.trim()).filter(s => s);
         
-        chartContainer.innerHTML = '<div class="loading">Loading Tesla analysis...</div>';
-        metricsContainer.innerHTML = '';
+        if (!currentSymbols.includes(symbol)) {
+            if (currentSymbols.length > 0) {
+                symbolsInput.value += `, ${symbol}`;
+            } else {
+                symbolsInput.value = symbol;
+            }
+        }
+        
+        document.getElementById('searchResults').style.display = 'none';
+    }
+
+    // Tesla Analysis
+    document.getElementById('runTeslaAnalysis').addEventListener('click', function() {
+        const button = this;
+        setLoading(button, true);
         
         fetch('/dashboard/api/run_tesla_analysis', {
             method: 'POST',
@@ -223,210 +284,185 @@
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'error') {
-                chartContainer.innerHTML = `<div class="error">Error: ${data.message}</div>`;
-                return;
+            if (data.status === 'success') {
+                // Update chart
+                const ctx = document.getElementById('teslaChart').getContext('2d');
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.chart.labels,
+                        datasets: [{
+                            label: 'Tesla Price',
+                            data: data.chart.prices,
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.1
+                        }]
+                    }
+                });
+
+                // Update metrics
+                const metricsHtml = `
+                    <div class="card">
+                        <div class="card-body">
+                            <h5 class="card-title">Volume Analysis</h5>
+                            <p>Volume Ratio: ${data.metrics.volumeRatio.toFixed(2)}</p>
+                            <p>Price Change: ${data.metrics.priceChange.toFixed(2)}%</p>
+                            ${data.signal ? `
+                                <div class="alert alert-${data.signal.type}">
+                                    ${data.signal.message}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                document.getElementById('teslaMetrics').innerHTML = metricsHtml;
+            } else {
+                showError(document.getElementById('teslaMetrics'), data.message || 'Failed to run Tesla analysis');
             }
-            
-            // Update metrics
-            metricsContainer.innerHTML = `
-                <h3>Analysis Results</h3>
-                <p>Volume Ratio: ${data.metrics.volumeRatio.toFixed(2)}x average</p>
-                <p>Price Change: ${data.metrics.priceChange.toFixed(2)}%</p>
-                ${data.signal ? `<p class="alert alert-${data.signal.type}">Signal: ${data.signal.message}</p>` : ''}
-            `;
-            
-            // Create chart
-            const ctx = document.createElement('canvas');
-            chartContainer.innerHTML = '';
-            chartContainer.appendChild(ctx);
-            
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.chart.labels,
-                    datasets: [{
-                        label: 'Tesla Stock Price',
-                        data: data.chart.prices,
-                        borderColor: 'rgb(75, 192, 192)',
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false
-                }
-            });
         })
         .catch(error => {
-            chartContainer.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-        });
-    }
-    
-    function runBacktest() {
+            console.error('Error running Tesla analysis:', error);
+            showError(document.getElementById('teslaMetrics'), error.message);
+        })
+        .finally(() => setLoading(button, false));
+    });
+
+    // Backtest
+    document.getElementById('runBacktest').addEventListener('click', function() {
+        const button = this;
         const symbols = document.getElementById('symbols').value;
         const startDate = document.getElementById('startDate').value;
         const endDate = document.getElementById('endDate').value;
-        
+
         if (!symbols || !startDate || !endDate) {
             alert('Please fill in all fields');
             return;
         }
-        
-        const resultsBody = document.getElementById('results-body');
-        resultsBody.innerHTML = '<tr><td colspan="9" class="loading">Running backtest...</td></tr>';
-        
+
+        setLoading(button, true);
         fetch('/dashboard/api/run_backtest', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                symbols: symbols.split(',').map(s => s.trim()),
+                symbols: symbols,
                 startDate: startDate,
                 endDate: endDate
             })
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'error') {
-                resultsBody.innerHTML = `<tr><td colspan="9" class="error">${data.message}</td></tr>`;
-                return;
+            const tbody = document.querySelector('#backtestResults tbody');
+            tbody.innerHTML = '';
+
+            if (data.status === 'success') {
+                data.results.forEach(result => {
+                    const row = document.createElement('tr');
+                    if (result.error) {
+                        row.innerHTML = `
+                            <td>${result.symbol}</td>
+                            <td colspan="7">${result.error}</td>
+                            <td><span class="status-badge status-error">Error</span></td>
+                        `;
+                    } else {
+                        row.innerHTML = `
+                            <td>${result.symbol}</td>
+                            <td>${result.strategy}</td>
+                            <td>$${result.initialPrice.toFixed(2)}</td>
+                            <td>$${result.finalPrice.toFixed(2)}</td>
+                            <td>${result.totalReturn.toFixed(2)}%</td>
+                            <td>${result.sharpeRatio.toFixed(2)}</td>
+                            <td>${result.maxDrawdown.toFixed(2)}%</td>
+                            <td>${result.numTrades}</td>
+                            <td><span class="status-badge status-success">Success</span></td>
+                        `;
+                    }
+                    tbody.appendChild(row);
+                });
+            } else {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="text-center">${data.message}</td>
+                    </tr>
+                `;
             }
-            
-            resultsBody.innerHTML = '';
-            data.results.forEach(result => {
-                const row = document.createElement('tr');
-                if (result.error) {
-                    row.innerHTML = `
-                        <td>${result.symbol}</td>
-                        <td colspan="7" class="error">${result.error}</td>
-                        <td><span class="badge bg-danger">Failed</span></td>
-                    `;
-                } else {
-                    const returnClass = result.totalReturn >= 0 ? 'success' : 'error';
-                    row.innerHTML = `
-                        <td>${result.symbol}</td>
-                        <td>${result.strategy}</td>
-                        <td>$${result.initialPrice.toFixed(2)}</td>
-                        <td>$${result.finalPrice.toFixed(2)}</td>
-                        <td class="${returnClass}">${(result.totalReturn * 100).toFixed(2)}%</td>
-                        <td>${result.sharpeRatio.toFixed(2)}</td>
-                        <td class="error">${(result.maxDrawdown * 100).toFixed(2)}%</td>
-                        <td>${result.numTrades}</td>
-                        <td><span class="badge bg-success">Success</span></td>
-                    `;
-                }
-                resultsBody.appendChild(row);
-            });
         })
         .catch(error => {
-            resultsBody.innerHTML = `<tr><td colspan="9" class="error">Error: ${error.message}</td></tr>`;
-        });
-    }
-    
-    function startPaperTrading() {
-        const symbols = document.getElementById('paper-symbols').value;
-        const strategy = document.getElementById('strategy').value;
-        
+            console.error('Error running backtest:', error);
+            const tbody = document.querySelector('#backtestResults tbody');
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="9" class="text-center">Error: ${error.message}</td>
+                </tr>
+            `;
+        })
+        .finally(() => setLoading(button, false));
+    });
+
+    // Paper Trading
+    document.getElementById('startPaperTrading').addEventListener('click', function() {
+        const button = this;
+        const strategy = document.getElementById('paperTradingStrategy').value;
+        const symbols = document.getElementById('paperTradingSymbols').value;
+
         if (!symbols) {
             alert('Please enter symbols');
             return;
         }
-        
-        const resultsDiv = document.getElementById('paper-trading-results');
-        resultsDiv.innerHTML = '<div class="loading">Starting paper trading...</div>';
-        
+
+        setLoading(button, true);
         fetch('/dashboard/api/paper_trade', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                symbols: symbols.split(',').map(s => s.trim()),
-                strategy: strategy
+                strategy: strategy,
+                symbols: symbols
             })
         })
         .then(response => response.json())
         .then(data => {
-            if (data.status === 'error') {
-                resultsDiv.innerHTML = `<div class="error">${data.message}</div>`;
-                return;
+            if (data.status === 'success') {
+                // Update positions
+                const positionsHtml = Object.entries(data.results.positions)
+                    .map(([symbol, position]) => `
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <h5 class="card-title">${symbol}</h5>
+                                <p>Quantity: ${position.quantity}</p>
+                                <p>Average Price: $${position.average_price.toFixed(2)}</p>
+                            </div>
+                        </div>
+                    `)
+                    .join('');
+                document.getElementById('positionsList').innerHTML = positionsHtml;
+
+                // Update trade history
+                const tradesHtml = data.results.trades
+                    .map(trade => `
+                        <div class="card mb-2">
+                            <div class="card-body">
+                                <h5 class="card-title">${trade.symbol} - ${trade.action}</h5>
+                                <p>Date: ${new Date(trade.date).toLocaleString()}</p>
+                                <p>Quantity: ${trade.quantity}</p>
+                                <p>Price: $${trade.price.toFixed(2)}</p>
+                                ${trade.profit !== null ? `<p>Profit: $${trade.profit.toFixed(2)}</p>` : ''}
+                            </div>
+                        </div>
+                    `)
+                    .join('');
+                document.getElementById('tradeHistory').innerHTML = tradesHtml;
+            } else {
+                showError(document.getElementById('paperTradingResults'), data.message || 'Failed to start paper trading');
             }
-            
-            let html = '<div class="paper-trading-results">';
-            
-            // Current positions
-            if (data.positions && Object.keys(data.positions).length > 0) {
-                html += `
-                    <h3>Current Positions</h3>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Symbol</th>
-                                <th>Quantity</th>
-                                <th>Average Price</th>
-                                <th>Current Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                Object.entries(data.positions).forEach(([symbol, position]) => {
-                    html += `
-                        <tr>
-                            <td>${symbol}</td>
-                            <td>${position.quantity}</td>
-                            <td>$${position.average_price.toFixed(2)}</td>
-                            <td>$${(position.quantity * position.average_price).toFixed(2)}</td>
-                        </tr>
-                    `;
-                });
-                
-                html += '</tbody></table>';
-            }
-            
-            // Recent trades
-            if (data.trades && data.trades.length > 0) {
-                html += `
-                    <h3>Recent Trades</h3>
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Date</th>
-                                <th>Symbol</th>
-                                <th>Action</th>
-                                <th>Quantity</th>
-                                <th>Price</th>
-                                <th>Profit/Loss</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                `;
-                
-                data.trades.forEach(trade => {
-                    const profitClass = trade.profit >= 0 ? 'success' : 'error';
-                    html += `
-                        <tr>
-                            <td>${new Date(trade.date).toLocaleString()}</td>
-                            <td>${trade.symbol}</td>
-                            <td>${trade.action}</td>
-                            <td>${trade.quantity}</td>
-                            <td>$${trade.price.toFixed(2)}</td>
-                            <td class="${profitClass}">${trade.profit ? `$${trade.profit.toFixed(2)}` : '-'}</td>
-                        </tr>
-                    `;
-                });
-                
-                html += '</tbody></table>';
-            }
-            
-            html += '</div>';
-            resultsDiv.innerHTML = html;
         })
         .catch(error => {
-            resultsDiv.innerHTML = `<div class="error">Error: ${error.message}</div>`;
-        });
-    }
+            console.error('Error starting paper trading:', error);
+            showError(document.getElementById('paperTradingResults'), error.message);
+        })
+        .finally(() => setLoading(button, false));
+    });
 </script>
 {% endblock %} 
