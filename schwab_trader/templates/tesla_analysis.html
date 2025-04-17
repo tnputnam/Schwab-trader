@@ -1,387 +1,339 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Tesla (TSLA) Analysis</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-        }
-        .panel {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .metric-card {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 4px;
-        }
-        .metric-label {
-            font-size: 12px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        .metric-value {
-            font-size: 18px;
-            font-weight: bold;
-        }
-        .metric-value.positive {
-            color: #28a745;
-        }
-        .metric-value.negative {
-            color: #dc3545;
-        }
-        .chart-container {
-            height: 300px;
-            margin-top: 20px;
-        }
-        .news-item {
-            padding: 10px;
-            border-bottom: 1px solid #dee2e6;
-        }
-        .news-item:last-child {
-            border-bottom: none;
-        }
-        .news-title {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .news-source {
-            font-size: 12px;
-            color: #666;
-        }
-        .news-date {
-            font-size: 12px;
-            color: #666;
-        }
-        .volume-analysis {
-            margin-top: 20px;
-        }
-        .volume-metrics {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .volume-metric {
-            text-align: center;
-        }
-        .volume-metric .label {
-            font-size: 12px;
-            color: #666;
-        }
-        .volume-metric .value {
-            font-size: 18px;
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Tesla (TSLA) Analysis Dashboard</h1>
-        
-        <div class="panel">
-            <h2>Current Metrics</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Current Price</div>
-                    <div class="metric-value" id="current-price">$0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Today's Change</div>
-                    <div class="metric-value" id="today-change">0.00%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Market Cap</div>
-                    <div class="metric-value" id="market-cap">$0.00B</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">P/E Ratio</div>
-                    <div class="metric-value" id="pe-ratio">0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Volume</div>
-                    <div class="metric-value" id="volume">0M</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">52 Week High</div>
-                    <div class="metric-value" id="high-52">$0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">52 Week Low</div>
-                    <div class="metric-value" id="low-52">$0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Beta</div>
-                    <div class="metric-value" id="beta">0.00</div>
-                </div>
-            </div>
-        </div>
+{% extends "base.html" %}
 
-        <div class="panel">
-            <h2>Price Chart</h2>
-            <div class="chart-container">
-                <canvas id="price-chart"></canvas>
-            </div>
-        </div>
+{% block title %}Tesla (TSLA) Analysis{% endblock %}
 
-        <div class="panel">
-            <h2>Volume Analysis</h2>
-            <div class="volume-metrics">
-                <div class="volume-metric">
-                    <div class="label">30-Day Avg Volume</div>
-                    <div class="value" id="avg-volume">0M</div>
-                </div>
-                <div class="volume-metric">
-                    <div class="label">Today's Volume</div>
-                    <div class="value" id="today-volume">0M</div>
-                </div>
-                <div class="volume-metric">
-                    <div class="label">Volume Change %</div>
-                    <div class="value" id="volume-change">0%</div>
-                </div>
-                <div class="volume-metric">
-                    <div class="label">Price-Volume Correlation</div>
-                    <div class="value" id="volume-correlation">0.00</div>
-                </div>
-            </div>
-            <div class="chart-container">
-                <canvas id="volume-chart"></canvas>
-            </div>
-        </div>
+{% block extra_css %}
+<style>
+    .panel {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .metric-card {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 4px;
+    }
+    .metric-label {
+        font-size: 12px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    .metric-value {
+        font-size: 18px;
+        font-weight: bold;
+    }
+    .metric-value.positive {
+        color: #28a745;
+    }
+    .metric-value.negative {
+        color: #dc3545;
+    }
+    .chart-container {
+        height: 300px;
+        margin-top: 20px;
+    }
+    .news-item {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .news-item:last-child {
+        border-bottom: none;
+    }
+    .news-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .news-source {
+        font-size: 12px;
+        color: #666;
+    }
+    .news-date {
+        font-size: 12px;
+        color: #666;
+    }
+    .volume-analysis {
+        margin-top: 20px;
+    }
+    .volume-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .volume-metric {
+        text-align: center;
+    }
+    .volume-metric .label {
+        font-size: 12px;
+        color: #666;
+    }
+    .volume-metric .value {
+        font-size: 18px;
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
 
-        <div class="panel">
-            <h2>Technical Indicators</h2>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">RSI (14)</div>
-                    <div class="metric-value" id="rsi">0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">MACD</div>
-                    <div class="metric-value" id="macd">0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Bollinger Bands</div>
-                    <div class="metric-value" id="bollinger">0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Moving Average (50)</div>
-                    <div class="metric-value" id="ma-50">$0.00</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Moving Average (200)</div>
-                    <div class="metric-value" id="ma-200">$0.00</div>
-                </div>
+{% block content %}
+<div class="container">
+    <h1>Tesla (TSLA) Analysis Dashboard</h1>
+    
+    <div class="panel">
+        <h2>Current Metrics</h2>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">Current Price</div>
+                <div class="metric-value" id="current-price">$0.00</div>
             </div>
-            <div class="chart-container">
-                <canvas id="indicators-chart"></canvas>
+            <div class="metric-card">
+                <div class="metric-label">Today's Change</div>
+                <div class="metric-value" id="today-change">0.00%</div>
             </div>
-        </div>
-
-        <div class="panel">
-            <h2>Recent News</h2>
-            <div id="news-container">
-                <!-- News will be populated by JavaScript -->
+            <div class="metric-card">
+                <div class="metric-label">Market Cap</div>
+                <div class="metric-value" id="market-cap">$0.00B</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">P/E Ratio</div>
+                <div class="metric-value" id="pe-ratio">0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Volume</div>
+                <div class="metric-value" id="volume">0M</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">52 Week High</div>
+                <div class="metric-value" id="high-52">$0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">52 Week Low</div>
+                <div class="metric-value" id="low-52">$0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Beta</div>
+                <div class="metric-value" id="beta">0.00</div>
             </div>
         </div>
     </div>
 
-    <script>
-        let priceChart = null;
-        let volumeChart = null;
-        let indicatorsChart = null;
+    <div class="panel">
+        <h2>Price Chart</h2>
+        <div class="chart-container">
+            <canvas id="price-chart"></canvas>
+        </div>
+    </div>
 
-        async function updateTeslaData() {
-            try {
-                const response = await fetch('/api/tesla_data');
-                const data = await response.json();
-                
-                // Update current metrics
-                document.getElementById('current-price').textContent = `$${data.currentPrice.toFixed(2)}`;
-                document.getElementById('today-change').textContent = `${data.todayChange.toFixed(2)}%`;
-                document.getElementById('today-change').className = `metric-value ${data.todayChange >= 0 ? 'positive' : 'negative'}`;
-                document.getElementById('market-cap').textContent = `$${data.marketCap.toFixed(2)}B`;
-                document.getElementById('pe-ratio').textContent = data.peRatio.toFixed(2);
-                document.getElementById('volume').textContent = `${(data.volume / 1000000).toFixed(1)}M`;
-                document.getElementById('high-52').textContent = `$${data.high52.toFixed(2)}`;
-                document.getElementById('low-52').textContent = `$${data.low52.toFixed(2)}`;
-                document.getElementById('beta').textContent = data.beta.toFixed(2);
+    <div class="panel">
+        <h2>Volume Analysis</h2>
+        <div class="volume-metrics">
+            <div class="volume-metric">
+                <div class="label">30-Day Avg Volume</div>
+                <div class="value" id="avg-volume">0M</div>
+            </div>
+            <div class="volume-metric">
+                <div class="label">Today's Volume</div>
+                <div class="value" id="today-volume">0M</div>
+            </div>
+            <div class="volume-metric">
+                <div class="label">Volume Change %</div>
+                <div class="value" id="volume-change">0%</div>
+            </div>
+            <div class="volume-metric">
+                <div class="label">Price-Volume Correlation</div>
+                <div class="value" id="volume-correlation">0.00</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="volume-chart"></canvas>
+        </div>
+    </div>
 
-                // Update volume metrics
-                document.getElementById('avg-volume').textContent = `${(data.avgVolume / 1000000).toFixed(1)}M`;
-                document.getElementById('today-volume').textContent = `${(data.todayVolume / 1000000).toFixed(1)}M`;
-                document.getElementById('volume-change').textContent = `${data.volumeChange.toFixed(1)}%`;
-                document.getElementById('volume-correlation').textContent = data.volumeCorrelation.toFixed(2);
+    <div class="panel">
+        <h2>Technical Indicators</h2>
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <div class="metric-label">RSI (14)</div>
+                <div class="metric-value" id="rsi">0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">MACD</div>
+                <div class="metric-value" id="macd">0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Bollinger Bands</div>
+                <div class="metric-value" id="bollinger">0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Moving Average (50)</div>
+                <div class="metric-value" id="ma-50">$0.00</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Moving Average (200)</div>
+                <div class="metric-value" id="ma-200">$0.00</div>
+            </div>
+        </div>
+        <div class="chart-container">
+            <canvas id="indicators-chart"></canvas>
+        </div>
+    </div>
 
-                // Update technical indicators
-                document.getElementById('rsi').textContent = data.rsi.toFixed(2);
-                document.getElementById('macd').textContent = data.macd.toFixed(2);
-                document.getElementById('bollinger').textContent = data.bollinger.toFixed(2);
-                document.getElementById('ma-50').textContent = `$${data.ma50.toFixed(2)}`;
-                document.getElementById('ma-200').textContent = `$${data.ma200.toFixed(2)}`;
+    <div class="panel">
+        <h2>Recent News</h2>
+        <div id="news-container">
+            <!-- News items will be dynamically added here -->
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-                // Update charts
-                updatePriceChart(data.priceHistory);
-                updateVolumeChart(data.volumeHistory);
-                updateIndicatorsChart(data.indicators);
-
-                // Update news
-                updateNews(data.news);
-            } catch (error) {
-                console.error('Error updating Tesla data:', error);
-            }
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Initialize charts
+    const priceChart = new Chart(document.getElementById('price-chart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Price',
+                data: [],
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
         }
+    });
 
-        function updatePriceChart(priceHistory) {
-            const ctx = document.getElementById('price-chart').getContext('2d');
-            
-            if (priceChart) {
-                priceChart.destroy();
-            }
-            
-            priceChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: priceHistory.dates,
-                    datasets: [{
-                        label: 'TSLA Price',
-                        data: priceHistory.prices,
-                        borderColor: 'rgb(75, 192, 192)',
-                        tension: 0.1
-                    }]
+    const volumeChart = new Chart(document.getElementById('volume-chart'), {
+        type: 'bar',
+        data: {
+            labels: [],
+            datasets: [{
+                label: 'Volume',
+                data: [],
+                backgroundColor: 'rgba(54, 162, 235, 0.5)'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    const indicatorsChart = new Chart(document.getElementById('indicators-chart'), {
+        type: 'line',
+        data: {
+            labels: [],
+            datasets: [
+                {
+                    label: 'Price',
+                    data: [],
+                    borderColor: 'rgb(75, 192, 192)'
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: false
-                        }
-                    }
-                }
-            });
-        }
-
-        function updateVolumeChart(volumeHistory) {
-            const ctx = document.getElementById('volume-chart').getContext('2d');
-            
-            if (volumeChart) {
-                volumeChart.destroy();
-            }
-            
-            volumeChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: volumeHistory.dates,
-                    datasets: [{
-                        label: 'Volume',
-                        data: volumeHistory.volumes,
-                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                        borderColor: 'rgb(75, 192, 192)',
-                        borderWidth: 1
-                    }]
+                {
+                    label: 'MA50',
+                    data: [],
+                    borderColor: 'rgb(255, 99, 132)'
                 },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            beginAtZero: true
-                        }
-                    }
+                {
+                    label: 'MA200',
+                    data: [],
+                    borderColor: 'rgb(255, 205, 86)'
                 }
-            });
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
         }
+    });
 
-        function updateIndicatorsChart(indicators) {
-            const ctx = document.getElementById('indicators-chart').getContext('2d');
+    // Function to update metrics
+    function updateMetrics(data) {
+        document.getElementById('current-price').textContent = `$${data.price.toFixed(2)}`;
+        document.getElementById('today-change').textContent = `${data.change >= 0 ? '+' : ''}${data.change.toFixed(2)}%`;
+        document.getElementById('today-change').className = `metric-value ${data.change >= 0 ? 'positive' : 'negative'}`;
+        document.getElementById('market-cap').textContent = `$${(data.marketCap / 1e9).toFixed(2)}B`;
+        document.getElementById('pe-ratio').textContent = data.peRatio.toFixed(2);
+        document.getElementById('volume').textContent = `${(data.volume / 1e6).toFixed(2)}M`;
+        document.getElementById('high-52').textContent = `$${data.high52.toFixed(2)}`;
+        document.getElementById('low-52').textContent = `$${data.low52.toFixed(2)}`;
+        document.getElementById('beta').textContent = data.beta.toFixed(2);
+    }
+
+    // Function to update volume metrics
+    function updateVolumeMetrics(data) {
+        document.getElementById('avg-volume').textContent = `${(data.avgVolume / 1e6).toFixed(2)}M`;
+        document.getElementById('today-volume').textContent = `${(data.todayVolume / 1e6).toFixed(2)}M`;
+        document.getElementById('volume-change').textContent = `${data.volumeChange >= 0 ? '+' : ''}${data.volumeChange.toFixed(2)}%`;
+        document.getElementById('volume-correlation').textContent = data.volumeCorrelation.toFixed(2);
+    }
+
+    // Function to update technical indicators
+    function updateIndicators(data) {
+        document.getElementById('rsi').textContent = data.rsi.toFixed(2);
+        document.getElementById('macd').textContent = data.macd.toFixed(2);
+        document.getElementById('bollinger').textContent = data.bollinger.toFixed(2);
+        document.getElementById('ma-50').textContent = `$${data.ma50.toFixed(2)}`;
+        document.getElementById('ma-200').textContent = `$${data.ma200.toFixed(2)}`;
+    }
+
+    // Function to update news
+    function updateNews(news) {
+        const container = document.getElementById('news-container');
+        container.innerHTML = news.map(item => `
+            <div class="news-item">
+                <div class="news-title">${item.title}</div>
+                <div class="news-source">${item.source}</div>
+                <div class="news-date">${item.date}</div>
+            </div>
+        `).join('');
+    }
+
+    // Fetch and update data
+    async function updateData() {
+        try {
+            const response = await fetch('/api/tesla_analysis');
+            const data = await response.json();
             
-            if (indicatorsChart) {
-                indicatorsChart.destroy();
-            }
+            updateMetrics(data.metrics);
+            updateVolumeMetrics(data.volume);
+            updateIndicators(data.indicators);
+            updateNews(data.news);
             
-            indicatorsChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: indicators.dates,
-                    datasets: [
-                        {
-                            label: 'RSI',
-                            data: indicators.rsi,
-                            borderColor: 'rgb(255, 99, 132)',
-                            yAxisID: 'y'
-                        },
-                        {
-                            label: 'MACD',
-                            data: indicators.macd,
-                            borderColor: 'rgb(54, 162, 235)',
-                            yAxisID: 'y1'
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'RSI'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'MACD'
-                            },
-                            grid: {
-                                drawOnChartArea: false
-                            }
-                        }
-                    }
-                }
-            });
+            // Update charts
+            priceChart.data.labels = data.priceChart.labels;
+            priceChart.data.datasets[0].data = data.priceChart.data;
+            priceChart.update();
+            
+            volumeChart.data.labels = data.volumeChart.labels;
+            volumeChart.data.datasets[0].data = data.volumeChart.data;
+            volumeChart.update();
+            
+            indicatorsChart.data.labels = data.indicatorsChart.labels;
+            indicatorsChart.data.datasets[0].data = data.indicatorsChart.price;
+            indicatorsChart.data.datasets[1].data = data.indicatorsChart.ma50;
+            indicatorsChart.data.datasets[2].data = data.indicatorsChart.ma200;
+            indicatorsChart.update();
+        } catch (error) {
+            console.error('Error updating data:', error);
         }
+    }
 
-        function updateNews(news) {
-            const container = document.getElementById('news-container');
-            container.innerHTML = '';
-            
-            news.forEach(item => {
-                const newsItem = document.createElement('div');
-                newsItem.className = 'news-item';
-                newsItem.innerHTML = `
-                    <div class="news-title">${item.title}</div>
-                    <div class="news-source">${item.source}</div>
-                    <div class="news-date">${new Date(item.date).toLocaleString()}</div>
-                `;
-                container.appendChild(newsItem);
-            });
-        }
-
-        // Update data every minute
-        setInterval(updateTeslaData, 60000);
-        updateTeslaData(); // Initial update
-    </script>
-</body>
-</html> 
+    // Update data every minute
+    updateData();
+    setInterval(updateData, 60000);
+</script>
+{% endblock %} 
