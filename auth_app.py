@@ -19,6 +19,8 @@ from example_strategies import (
     tesla_volume_analysis
 )
 import numpy as np
+import pandas as pd
+import time
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -842,6 +844,9 @@ def run_backtest():
         start_date = data['startDate']
         end_date = data['endDate']
         
+        logger.info(f"Starting backtest for symbols: {symbols}")
+        logger.info(f"Date range: {start_date} to {end_date}")
+        
         # Initialize strategy tester
         tester = StrategyTester()
         
@@ -857,16 +862,108 @@ def run_backtest():
         
         for symbol in symbols:
             try:
-                # First verify the symbol is valid and has data
-                stock = yf.Ticker(symbol)
-                hist = stock.history(start=start_date, end=end_date)
+                logger.info(f"Processing symbol: {symbol}")
+                hist = None
                 
-                if hist.empty:
-                    logger.warning(f"No data found for {symbol} in the specified date range")
-                    continue
+                # Try Alpha Vantage first
+                try:
+                    logger.info(f"Attempting to fetch data from Alpha Vantage for {symbol}")
+                    api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+                    if not api_key:
+                        raise Exception("Alpha Vantage API key not found in environment")
                     
+                    # First try the TIME_SERIES_DAILY endpoint
+                    url = f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=full&apikey={api_key}"
+                    logger.info(f"Alpha Vantage URL: {url}")
+                    
+                    # Add a timeout and retry mechanism
+                    max_retries = 3
+                    for attempt in range(max_retries):
+                        try:
+                            response = requests.get(url, timeout=10)
+                            logger.info(f"Alpha Vantage response status: {response.status_code}")
+                            
+                            if response.status_code == 200:
+                                break
+                            elif response.status_code == 429:  # Rate limit
+                                if attempt < max_retries - 1:
+                                    logger.warning(f"Rate limited, waiting before retry {attempt + 1}")
+                                    time.sleep(5)  # Wait 5 seconds before retry
+                                    continue
+                            else:
+                                raise Exception(f"HTTP Error: {response.status_code}")
+                        except requests.Timeout:
+                            if attempt < max_retries - 1:
+                                logger.warning(f"Timeout, retrying {attempt + 1}")
+                                continue
+                            raise
+                    
+                    if not response.text.strip():
+                        raise Exception("Empty response from Alpha Vantage")
+                    
+                    data_av = response.json()
+                    logger.info(f"Alpha Vantage response keys: {list(data_av.keys())}")
+                    
+                    if 'Error Message' in data_av:
+                        error_msg = data_av['Error Message']
+                        logger.error(f"Alpha Vantage error for {symbol}: {error_msg}")
+                        raise Exception(error_msg)
+                    
+                    if 'Note' in data_av:
+                        logger.warning(f"Alpha Vantage note for {symbol}: {data_av['Note']}")
+                    
+                    # Convert Alpha Vantage data to DataFrame
+                    time_series = data_av.get('Time Series (Daily)', {})
+                    if not time_series:
+                        logger.error(f"No time series data found for {symbol}")
+                        raise Exception("No data available from Alpha Vantage")
+                    
+                    logger.info(f"Found {len(time_series)} days of data for {symbol}")
+                    
+                    # Create DataFrame with proper column names
+                    df = pd.DataFrame.from_dict(time_series, orient='index')
+                    df.index = pd.to_datetime(df.index)
+                    df = df.sort_index()
+                    
+                    # Rename columns to match expected format
+                    column_mapping = {
+                        '1. open': 'Open',
+                        '2. high': 'High',
+                        '3. low': 'Low',
+                        '4. close': 'Close',
+                        '5. volume': 'Volume'
+                    }
+                    df = df.rename(columns=column_mapping)
+                    
+                    # Convert to numeric values
+                    for col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                    
+                    # Filter by date range
+                    start_dt = pd.to_datetime(start_date)
+                    end_dt = pd.to_datetime(end_date)
+                    hist = df[(df.index >= start_dt) & (df.index <= end_dt)]
+                    
+                    if hist.empty:
+                        raise Exception("No data available for the specified date range")
+                    
+                    logger.info(f"Filtered data points for {symbol}: {len(hist)}")
+                    
+                except Exception as av_error:
+                    logger.error(f"Alpha Vantage failed for {symbol}: {str(av_error)}")
+                    raise Exception(f"Failed to fetch data from Alpha Vantage: {str(av_error)}")
+                
+                if hist is None or hist.empty:
+                    logger.warning(f"No data found for {symbol} in the specified date range")
+                    results.append({
+                        'symbol': symbol,
+                        'error': f"No historical data found for the specified date range"
+                    })
+                    continue
+                
                 for strategy_name, strategy in strategies.items():
                     try:
+                        logger.info(f"Running {strategy_name} for {symbol}")
                         result = tester.backtest_strategy(strategy, [symbol], start_date, end_date)
                         results.append({
                             'symbol': symbol,
@@ -878,6 +975,7 @@ def run_backtest():
                             'maxDrawdown': result['metrics']['max_drawdown'],
                             'numTrades': result['metrics']['num_trades']
                         })
+                        logger.info(f"Successfully completed {strategy_name} for {symbol}")
                     except Exception as e:
                         logger.error(f"Error backtesting {strategy_name} for {symbol}: {str(e)}")
                         results.append({
@@ -895,11 +993,13 @@ def run_backtest():
                 continue
         
         if not results:
+            logger.error("No valid results found for any symbols")
             return jsonify({
                 'status': 'error',
                 'message': 'No valid results found for any symbols'
             }), 400
         
+        logger.info(f"Backtest completed successfully with {len(results)} results")
         return jsonify({
             'status': 'success',
             'results': results
