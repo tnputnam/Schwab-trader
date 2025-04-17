@@ -5,12 +5,6 @@ import logging
 import base64
 import requests
 from datetime import datetime, timedelta
-from strategy_tester import StrategyTester
-from example_strategies import (
-    moving_average_crossover_strategy,
-    rsi_strategy,
-    bollinger_bands_strategy
-)
 import yfinance as yf
 from flask_cors import CORS
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
@@ -24,14 +18,14 @@ CORS(app)
 app.secret_key = 'your-secret-key-here'
 
 # Configure server name for ngrok
-app.config['SERVER_NAME'] = 'fc17-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
+app.config['SERVER_NAME'] = 'b148-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
 
 # Your Schwab API credentials
 CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
 CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
 
 # Use HTTPS ngrok URL
-REDIRECT_URI = "https://fc17-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
+REDIRECT_URI = "https://b148-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
 
 # Fixed URLs
 AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"
@@ -72,7 +66,8 @@ def login():
             scope=SCOPES
         )
         auth_url, state = oauth.authorization_url(
-            AUTHORIZATION_BASE_URL
+            AUTHORIZATION_BASE_URL,
+            state='state'  # Add a state parameter for security
         )
         logger.debug(f"Generated authorization URL: {auth_url}")
         return redirect(auth_url)
@@ -96,7 +91,7 @@ def callback():
             
         logger.debug(f"Authorization code received: {auth_code}")
         
-        # Initialize OAuth2Session
+        # Create new OAuth2Session instance for token exchange
         oauth = OAuth2Session(
             CLIENT_ID,
             redirect_uri=REDIRECT_URI,
@@ -201,31 +196,9 @@ def test_strategies():
     if 'access_token' not in session:
         return redirect(url_for('login'))
         
-    # Initialize strategy tester and sync with Schwab account
-    tester = StrategyTester()
-    tester.sync_with_schwab(session['access_token'])
-    
-    # Define test parameters
-    symbols = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL']
-    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    
-    # Test strategies
-    results = {}
-    strategies = {
-        'Moving Average Crossover': moving_average_crossover_strategy,
-        'RSI': rsi_strategy,
-        'Bollinger Bands': bollinger_bands_strategy
-    }
-    
-    for name, strategy in strategies.items():
-        tester = StrategyTester()
-        tester.sync_with_schwab(session['access_token'])
-        results[name] = tester.run_strategy(strategy, symbols, start_date, end_date)
-    
     return jsonify({
         'status': 'success',
-        'results': results
+        'message': 'Strategy testing is currently disabled'
     })
 
 @app.route('/strategy_dashboard')
