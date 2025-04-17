@@ -47,3 +47,5 @@ def create_app(test_config=None):
     
     logger.info('Schwab Trader startup')
     return app
+
+# Minimal initialization for now

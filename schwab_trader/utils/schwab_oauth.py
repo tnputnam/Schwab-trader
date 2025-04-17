@@ -1,6 +1,4 @@
 from requests_oauthlib import OAuth2Session
-import os
-from dotenv import load_dotenv
 import logging
 
 logging.basicConfig(level=logging.INFO)
@@ -8,8 +6,6 @@ logger = logging.getLogger(__name__)
 
 class SchwabOAuth:
     def __init__(self):
-        load_dotenv()
-        
         # Your specific OAuth2 settings
         self.client_id = "1wzwOrhivb2PkR1UCAUVTKYqC4MTNYlj"  # Your client ID
         self.auth_url = "https://api.schwabapi.com/v1/oauth/authorize"
@@ -28,7 +24,7 @@ class SchwabOAuth:
         """Get the URL where the user needs to authorize the app"""
         authorization_url, state = self.oauth.authorization_url(
             self.auth_url,
-            response_type='code'  # Explicitly specify response_type
+            response_type='code'
         )
         logger.info(f"Generated authorization URL: {authorization_url}")
         return authorization_url, state
