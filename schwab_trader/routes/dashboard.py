@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 import logging
 import os
 import requests
+from schwab_trader.services.alpha_vantage import AlphaVantageAPI
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -14,28 +15,12 @@ handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s -
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
-class AlphaVantageAPI:
-    def __init__(self):
-        self.api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-        self.base_url = 'https://www.alphavantage.co/query'
-        
-    def get_intraday_data(self, symbol, interval='5min'):
-        """Get intraday data for a symbol."""
-        params = {
-            'function': 'TIME_SERIES_INTRADAY',
-            'symbol': symbol,
-            'interval': interval,
-            'apikey': self.api_key,
-            'outputsize': 'full'
-        }
-        response = requests.get(self.base_url, params=params)
-        return response.json()
-
 # Initialize Alpha Vantage API
 alpha_vantage = AlphaVantageAPI()
 
 @bp.route('/')
 def index():
+    """Render the main dashboard page."""
     return render_template('index.html')
 
 @bp.route('/tesla_trading')
@@ -62,56 +47,61 @@ def strategy_dashboard():
     return render_template('strategy_dashboard.html')
 
 @bp.route('/api/market_data')
-def market_data():
+def get_market_data():
     """Get market data for the dashboard."""
     try:
+        # Get market status
+        market_status = alpha_vantage.get_market_status()
+        
+        # Get top gainers and losers
+        movers = alpha_vantage.get_top_gainers_losers()
+        
         # Get major indices
-        sp500 = yf.Ticker("^GSPC")
-        nasdaq = yf.Ticker("^IXIC")
-        dow = yf.Ticker("^DJI")
-        vix = yf.Ticker("^VIX")
-
-        # Get historical data
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=1)
-
-        sp500_data = sp500.history(start=start_date, end=end_date)
-        nasdaq_data = nasdaq.history(start=start_date, end=end_date)
-        dow_data = dow.history(start=start_date, end=end_date)
-        vix_data = vix.history(start=start_date, end=end_date)
-
-        # Calculate percentage changes
-        sp500_change = ((sp500_data['Close'][-1] - sp500_data['Open'][0]) / sp500_data['Open'][0]) * 100
-        nasdaq_change = ((nasdaq_data['Close'][-1] - nasdaq_data['Open'][0]) / nasdaq_data['Open'][0]) * 100
-        dow_change = ((dow_data['Close'][-1] - dow_data['Open'][0]) / dow_data['Open'][0]) * 100
-        vix_value = vix_data['Close'][-1]
-
-        # Get portfolio data (mock for now)
-        total_portfolio = 100000.00
-        today_pl = 1500.00
-        active_positions = 5
-
-        # Get best and worst performers (mock for now)
-        best_performer = "AAPL (+2.5%)"
-        worst_performer = "TSLA (-1.8%)"
-        total_trades = 12
-
+        indices = {
+            'SPY': alpha_vantage.get_global_quote('SPY'),
+            'QQQ': alpha_vantage.get_global_quote('QQQ'),
+            'DIA': alpha_vantage.get_global_quote('DIA'),
+            'VIX': alpha_vantage.get_global_quote('^VIX')
+        }
+        
         return jsonify({
-            'sp500': sp500_change,
-            'nasdaq': nasdaq_change,
-            'dow': dow_change,
-            'vix': vix_value,
-            'totalPortfolio': total_portfolio,
-            'todayPL': today_pl,
-            'activePositions': active_positions,
-            'bestPerformer': best_performer,
-            'worstPerformer': worst_performer,
-            'totalTrades': total_trades
+            'status': 'success',
+            'market_status': market_status,
+            'movers': movers,
+            'indices': indices
         })
-
     except Exception as e:
-        logger.error(f"Error fetching market data: {str(e)}")
-        return jsonify({'error': 'Failed to fetch market data'}), 500 
+        logger.error(f"Error getting market data: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@bp.route('/api/stock_data/<symbol>')
+def get_stock_data(symbol):
+    """Get detailed stock data for a symbol."""
+    try:
+        # Get quote data
+        quote = alpha_vantage.get_global_quote(symbol)
+        
+        # Get company overview
+        overview = alpha_vantage.get_company_overview(symbol)
+        
+        # Get intraday data
+        intraday = alpha_vantage.get_intraday_data(symbol)
+        
+        return jsonify({
+            'status': 'success',
+            'quote': quote,
+            'overview': overview,
+            'intraday': intraday
+        })
+    except Exception as e:
+        logger.error(f"Error getting stock data for {symbol}: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 @bp.route('/api/start_volume_analysis', methods=['POST'])
 def start_volume_analysis():
@@ -329,79 +319,25 @@ def run_backtest():
 
 @bp.route('/api/search_symbols', methods=['POST'])
 def search_symbols():
-    """Search for symbols or company names"""
+    """Search for symbols matching the query."""
     try:
         data = request.get_json()
-        query = data.get('query', '').strip().upper()
+        query = data.get('query')
         
         if not query:
             return jsonify({
                 'status': 'error',
-                'message': 'Search query is required'
+                'message': 'Query parameter is required'
             }), 400
+            
+        results = alpha_vantage.search_symbols(query)
         
-        # Try Alpha Vantage first
-        try:
-            api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-            if not api_key:
-                raise Exception("Alpha Vantage API key not found")
-            
-            url = f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={query}&apikey={api_key}"
-            response = requests.get(url, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                if 'bestMatches' in data:
-                    results = []
-                    for match in data['bestMatches']:
-                        results.append({
-                            'symbol': match['1. symbol'],
-                            'name': match['2. name'],
-                            'type': match['3. type'],
-                            'region': match['4. region']
-                        })
-                    return jsonify({
-                        'status': 'success',
-                        'results': results
-                    })
-        except Exception as e:
-            logger.warning(f"Alpha Vantage search failed: {str(e)}")
-        
-        # Fallback to yfinance
-        try:
-            # Get list of major stocks
-            major_stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'INTC', 'QCOM']
-            results = []
-            
-            for symbol in major_stocks:
-                try:
-                    stock = yf.Ticker(symbol)
-                    info = stock.info
-                    name = info.get('longName', '')
-                    
-                    if query in symbol or query in name.upper():
-                        results.append({
-                            'symbol': symbol,
-                            'name': name,
-                            'type': info.get('quoteType', ''),
-                            'region': info.get('region', '')
-                        })
-                except:
-                    continue
-            
-            return jsonify({
-                'status': 'success',
-                'results': results
-            })
-        except Exception as e:
-            logger.error(f"yfinance search failed: {str(e)}")
-            return jsonify({
-                'status': 'error',
-                'message': 'Failed to search symbols'
-            }), 500
-            
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
     except Exception as e:
-        logger.error(f"Error in symbol search: {str(e)}")
+        logger.error(f"Error searching symbols: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)

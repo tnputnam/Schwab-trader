@@ -51,6 +51,7 @@
     }
     .market-stat {
         text-align: center;
+        padding: 10px;
     }
     .market-stat .label {
         font-size: 12px;
@@ -59,6 +60,44 @@
     .market-stat .value {
         font-size: 18px;
         font-weight: bold;
+    }
+    .top-movers {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+    .mover-card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .mover-card h3 {
+        font-size: 16px;
+        margin-bottom: 10px;
+    }
+    .mover-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+    .mover-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 0;
+        border-bottom: 1px solid #eee;
+    }
+    .mover-item:last-child {
+        border-bottom: none;
+    }
+    .mover-symbol {
+        font-weight: bold;
+    }
+    .mover-change.positive {
+        color: #28a745;
+    }
+    .mover-change.negative {
+        color: #dc3545;
     }
     /* Portfolio, Watchlist, and Alerts styles */
     .portfolio-section, .watchlist-section, .alerts-section {
@@ -166,410 +205,158 @@
 
 {% block content %}
 <div class="container">
-    <div class="header">
-        <h1>Trading Dashboard</h1>
-        <div class="quick-stats">
-            <div class="stat-card">
-                <div class="label">Total Portfolio Value</div>
-                <div class="value" id="total-portfolio">$0.00</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Today's P/L</div>
-                <div class="value" id="today-pl">$0.00</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Active Positions</div>
-                <div class="value" id="active-positions">0</div>
-            </div>
+    <div class="market-overview">
+        <h2>Market Overview</h2>
+        <div class="market-stats" id="marketStats">
+            <!-- Market stats will be populated by JavaScript -->
         </div>
     </div>
 
-    <div class="nav-tabs">
-        <a href="#overview" class="nav-tab active">Overview</a>
-        <a href="#portfolio" class="nav-tab">Portfolio</a>
-        <a href="#watchlist" class="nav-tab">Watchlist</a>
-        <a href="#alerts" class="nav-tab">Alerts</a>
-        <a href="#strategies" class="nav-tab">Strategies</a>
-        <a href="#trading" class="nav-tab">Trading</a>
-        <a href="#news" class="nav-tab">News</a>
-    </div>
-
-    <div id="overview" class="dashboard-content active">
-        <div class="market-overview">
-            <h2>Market Overview</h2>
-            <div class="market-stats">
-                <div class="market-stat">
-                    <div class="label">S&P 500</div>
-                    <div class="value" id="sp500">0.00%</div>
-                </div>
-                <div class="market-stat">
-                    <div class="label">NASDAQ</div>
-                    <div class="value" id="nasdaq">0.00%</div>
-                </div>
-                <div class="market-stat">
-                    <div class="label">DOW</div>
-                    <div class="value" id="dow">0.00%</div>
-                </div>
-                <div class="market-stat">
-                    <div class="label">VIX</div>
-                    <div class="value" id="vix">0.00</div>
-                </div>
-            </div>
+    <div class="top-movers">
+        <div class="mover-card">
+            <h3>Top Gainers</h3>
+            <ul class="mover-list" id="topGainers">
+                <!-- Top gainers will be populated by JavaScript -->
+            </ul>
         </div>
-        <div class="quick-stats">
-            <div class="stat-card">
-                <div class="label">Best Performing</div>
-                <div class="value" id="best-performer">-</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Worst Performing</div>
-                <div class="value" id="worst-performer">-</div>
-            </div>
-            <div class="stat-card">
-                <div class="label">Total Trades Today</div>
-                <div class="value" id="total-trades">0</div>
-            </div>
+        <div class="mover-card">
+            <h3>Top Losers</h3>
+            <ul class="mover-list" id="topLosers">
+                <!-- Top losers will be populated by JavaScript -->
+            </ul>
         </div>
     </div>
 
-    <div id="portfolio" class="dashboard-content">
-        <div class="portfolio-section">
-            <h2>Portfolio</h2>
-            <table class="portfolio-table">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Quantity</th>
-                        <th>Avg. Price</th>
-                        <th>Current Price</th>
-                        <th>P/L</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="portfolio-body">
-                    <!-- Portfolio items will be populated here -->
-                </tbody>
-            </table>
+    <div class="quick-stats">
+        <div class="stat-card">
+            <div class="label">Total Portfolio Value</div>
+            <div class="value" id="totalPortfolio">$0.00</div>
         </div>
-    </div>
-
-    <div id="watchlist" class="dashboard-content">
-        <div class="watchlist-section">
-            <h2>Watchlist</h2>
-            <div class="form-group">
-                <input type="text" id="watchlist-symbol" placeholder="Enter symbol">
-                <button class="action-button" onclick="addToWatchlist()">Add</button>
-            </div>
-            <table class="watchlist-table">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        <th>Current Price</th>
-                        <th>Change</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="watchlist-body">
-                    <!-- Watchlist items will be populated here -->
-                </tbody>
-            </table>
+        <div class="stat-card">
+            <div class="label">Today's P/L</div>
+            <div class="value" id="todayPL">$0.00</div>
         </div>
-    </div>
-
-    <div id="alerts" class="dashboard-content">
-        <div class="alerts-section">
-            <h2>Price Alerts</h2>
-            <button class="action-button" onclick="showAddAlertModal()">Add Alert</button>
-            <div id="alerts-list">
-                <!-- Alerts will be populated here -->
-            </div>
+        <div class="stat-card">
+            <div class="label">Active Positions</div>
+            <div class="value" id="activePositions">0</div>
         </div>
-    </div>
-
-    <!-- Add Alert Modal -->
-    <div id="addAlertModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Add Price Alert</h3>
-                <button class="close-button" onclick="hideAddAlertModal()">&times;</button>
-            </div>
-            <div class="form-group">
-                <label for="alert-symbol">Symbol</label>
-                <input type="text" id="alert-symbol" required>
-            </div>
-            <div class="form-group">
-                <label for="alert-price">Price</label>
-                <input type="number" id="alert-price" step="0.01" required>
-            </div>
-            <div class="form-group">
-                <label for="alert-condition">Condition</label>
-                <select id="alert-condition">
-                    <option value="ABOVE">Above</option>
-                    <option value="BELOW">Below</option>
-                </select>
-            </div>
-            <button class="action-button" onclick="addAlert()">Create Alert</button>
+        <div class="stat-card">
+            <div class="label">Total Trades</div>
+            <div class="value" id="totalTrades">0</div>
         </div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
 <script>
-    // Set active tab based on URL hash
-    document.addEventListener('DOMContentLoaded', function() {
-        const hash = window.location.hash || '#overview';
-        const navTabs = document.querySelectorAll('.nav-tab');
-        const contents = document.querySelectorAll('.dashboard-content');
-        
-        navTabs.forEach(tab => {
-            if (tab.getAttribute('href') === hash) {
-                tab.classList.add('active');
-            } else {
-                tab.classList.remove('active');
-            }
-        });
-        
-        contents.forEach(content => {
-            if (content.id === hash.substring(1)) {
-                content.classList.add('active');
-            } else {
-                content.classList.remove('active');
-            }
-        });
-    });
+    // Function to format currency
+    function formatCurrency(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'currency',
+            currency: 'USD'
+        }).format(value);
+    }
 
-    // WebSocket connection
-    const socket = io();
-    
-    socket.on('connect', () => {
-        console.log('Connected to WebSocket server');
-    });
+    // Function to format percentage
+    function formatPercentage(value) {
+        return new Intl.NumberFormat('en-US', {
+            style: 'percent',
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }).format(value / 100);
+    }
 
-    socket.on('message', (data) => {
-        if (data.type === 'alert') {
-            showAlertNotification(data.data);
-        }
-    });
-
-    // Portfolio functions
-    async function loadPortfolio() {
+    // Function to update market data
+    async function updateMarketData() {
         try {
-            const response = await fetch('/api/portfolio');
+            const response = await fetch('/api/market_data');
             const data = await response.json();
-            const tbody = document.getElementById('portfolio-body');
-            tbody.innerHTML = '';
 
-            data.data.forEach(position => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${position.symbol}</td>
-                    <td>${position.quantity}</td>
-                    <td>$${position.averagePrice.toFixed(2)}</td>
-                    <td>$${position.currentPrice.toFixed(2)}</td>
-                    <td class="${position.pl >= 0 ? 'positive' : 'negative'}">
-                        $${position.pl.toFixed(2)}
-                    </td>
-                    <td>
-                        <button class="action-button" onclick="placeTrade('${position.symbol}', 'SELL')">Sell</button>
-                    </td>
+            if (data.status === 'success') {
+                // Update market stats
+                const marketStats = document.getElementById('marketStats');
+                marketStats.innerHTML = '';
+
+                // Add market status
+                const marketStatus = document.createElement('div');
+                marketStatus.className = 'market-stat';
+                marketStatus.innerHTML = `
+                    <div class="label">Market Status</div>
+                    <div class="value">${data.market_status.market}</div>
                 `;
-                tbody.appendChild(row);
-            });
+                marketStats.appendChild(marketStatus);
+
+                // Add indices
+                for (const [symbol, quote] of Object.entries(data.indices)) {
+                    const change = parseFloat(quote['Global Quote']['10. change percent'].replace('%', ''));
+                    const stat = document.createElement('div');
+                    stat.className = 'market-stat';
+                    stat.innerHTML = `
+                        <div class="label">${symbol}</div>
+                        <div class="value ${change >= 0 ? 'positive' : 'negative'}">
+                            ${formatCurrency(parseFloat(quote['Global Quote']['05. price']))}
+                            <small>(${formatPercentage(change)})</small>
+                        </div>
+                    `;
+                    marketStats.appendChild(stat);
+                }
+
+                // Update top gainers
+                const topGainers = document.getElementById('topGainers');
+                topGainers.innerHTML = '';
+                data.movers.top_gainers.slice(0, 5).forEach(mover => {
+                    const li = document.createElement('li');
+                    li.className = 'mover-item';
+                    li.innerHTML = `
+                        <span class="mover-symbol">${mover.ticker}</span>
+                        <span class="mover-change positive">+${mover.change_percentage}%</span>
+                    `;
+                    topGainers.appendChild(li);
+                });
+
+                // Update top losers
+                const topLosers = document.getElementById('topLosers');
+                topLosers.innerHTML = '';
+                data.movers.top_losers.slice(0, 5).forEach(mover => {
+                    const li = document.createElement('li');
+                    li.className = 'mover-item';
+                    li.innerHTML = `
+                        <span class="mover-symbol">${mover.ticker}</span>
+                        <span class="mover-change negative">${mover.change_percentage}%</span>
+                    `;
+                    topLosers.appendChild(li);
+                });
+            }
         } catch (error) {
-            console.error('Error loading portfolio:', error);
+            console.error('Error updating market data:', error);
         }
     }
 
-    // Watchlist functions
-    async function loadWatchlist() {
+    // Update market data every 5 minutes
+    updateMarketData();
+    setInterval(updateMarketData, 300000);
+
+    // Function to update portfolio stats
+    async function updatePortfolioStats() {
         try {
-            const response = await fetch('/api/watchlist');
+            const response = await fetch('/api/portfolio/stats');
             const data = await response.json();
-            const tbody = document.getElementById('watchlist-body');
-            tbody.innerHTML = '';
 
-            data.data.forEach(item => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${item.symbol}</td>
-                    <td>$${item.currentPrice.toFixed(2)}</td>
-                    <td class="${item.change >= 0 ? 'positive' : 'negative'}">
-                        ${item.change.toFixed(2)}%
-                    </td>
-                    <td>
-                        <button class="action-button" onclick="placeTrade('${item.symbol}', 'BUY')">Buy</button>
-                        <button class="action-button danger" onclick="removeFromWatchlist('${item.symbol}')">Remove</button>
-                    </td>
-                `;
-                tbody.appendChild(row);
-            });
-        } catch (error) {
-            console.error('Error loading watchlist:', error);
-        }
-    }
-
-    async function addToWatchlist() {
-        const symbol = document.getElementById('watchlist-symbol').value.toUpperCase();
-        if (!symbol) return;
-
-        try {
-            const response = await fetch('/api/watchlist', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ symbol })
-            });
-            
-            if (response.ok) {
-                loadWatchlist();
-                document.getElementById('watchlist-symbol').value = '';
+            if (data.status === 'success') {
+                document.getElementById('totalPortfolio').textContent = formatCurrency(data.total_value);
+                document.getElementById('todayPL').textContent = formatCurrency(data.today_pl);
+                document.getElementById('todayPL').className = `value ${data.today_pl >= 0 ? 'positive' : 'negative'}`;
+                document.getElementById('activePositions').textContent = data.active_positions;
+                document.getElementById('totalTrades').textContent = data.total_trades;
             }
         } catch (error) {
-            console.error('Error adding to watchlist:', error);
+            console.error('Error updating portfolio stats:', error);
         }
     }
 
-    async function removeFromWatchlist(symbol) {
-        try {
-            const response = await fetch('/api/watchlist', {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ symbol })
-            });
-            
-            if (response.ok) {
-                loadWatchlist();
-            }
-        } catch (error) {
-            console.error('Error removing from watchlist:', error);
-        }
-    }
-
-    // Alerts functions
-    async function loadAlerts() {
-        try {
-            const response = await fetch('/api/alerts');
-            const data = await response.json();
-            const alertsList = document.getElementById('alerts-list');
-            alertsList.innerHTML = '';
-
-            data.data.forEach(alert => {
-                const alertDiv = document.createElement('div');
-                alertDiv.className = 'alert-item';
-                alertDiv.innerHTML = `
-                    <div class="alert-info">
-                        <strong>${alert.symbol}</strong> - ${alert.condition} $${alert.price}
-                    </div>
-                    <div class="alert-actions">
-                        <button class="action-button danger" onclick="deleteAlert('${alert.id}')">Delete</button>
-                    </div>
-                `;
-                alertsList.appendChild(alertDiv);
-            });
-        } catch (error) {
-            console.error('Error loading alerts:', error);
-        }
-    }
-
-    function showAddAlertModal() {
-        document.getElementById('addAlertModal').style.display = 'block';
-    }
-
-    function hideAddAlertModal() {
-        document.getElementById('addAlertModal').style.display = 'none';
-    }
-
-    async function addAlert() {
-        const symbol = document.getElementById('alert-symbol').value.toUpperCase();
-        const price = parseFloat(document.getElementById('alert-price').value);
-        const condition = document.getElementById('alert-condition').value;
-
-        if (!symbol || !price) return;
-
-        try {
-            const response = await fetch('/api/alerts', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ symbol, price, condition })
-            });
-            
-            if (response.ok) {
-                loadAlerts();
-                hideAddAlertModal();
-                document.getElementById('alert-symbol').value = '';
-                document.getElementById('alert-price').value = '';
-            }
-        } catch (error) {
-            console.error('Error adding alert:', error);
-        }
-    }
-
-    async function deleteAlert(alertId) {
-        try {
-            const response = await fetch('/api/alerts', {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ id: alertId })
-            });
-            
-            if (response.ok) {
-                loadAlerts();
-            }
-        } catch (error) {
-            console.error('Error deleting alert:', error);
-        }
-    }
-
-    function showAlertNotification(alertData) {
-        const notification = document.createElement('div');
-        notification.className = 'alert-notification';
-        notification.innerHTML = `
-            <strong>${alertData.symbol}</strong> is now ${alertData.condition} $${alertData.price}
-            (Current: $${alertData.current_price})
-        `;
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 5000);
-    }
-
-    // Trading functions
-    async function placeTrade(symbol, side) {
-        const quantity = prompt(`Enter quantity to ${side.toLowerCase()}:`);
-        if (!quantity) return;
-
-        try {
-            const response = await fetch('/api/trade', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ symbol, quantity, side })
-            });
-            
-            if (response.ok) {
-                loadPortfolio();
-                loadWatchlist();
-            }
-        } catch (error) {
-            console.error('Error placing trade:', error);
-        }
-    }
-
-    // Initialize data
-    document.addEventListener('DOMContentLoaded', function() {
-        loadPortfolio();
-        loadWatchlist();
-        loadAlerts();
-        updateMarketData();
-        setInterval(updateMarketData, 60000); // Update every minute
-    });
+    // Update portfolio stats every minute
+    updatePortfolioStats();
+    setInterval(updatePortfolioStats, 60000);
 </script>
 {% endblock %} 
