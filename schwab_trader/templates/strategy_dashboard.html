@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "components.html" as components %}
 
 {% block title %}Strategy Dashboard{% endblock %}
 
@@ -195,7 +196,7 @@
 
 {% block content %}
 <div class="dashboard-container">
-    <div class="strategy-form">
+    <div class="strategy-form card">
         <h3>Create New Strategy</h3>
         <form id="strategyForm">
             <div class="form-group">
@@ -237,37 +238,15 @@
     </div>
 </div>
 
-<div id="apiStatus" class="api-status">
-    <i class="bi bi-circle-fill"></i> Checking API...
-</div>
+{{ components.api_status() }}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // API Status
-    function checkAPIStatus() {
-        fetch('/api/status')
-            .then(response => response.json())
-            .then(data => {
-                const statusElement = document.getElementById('apiStatus');
-                if (data.status === 'connected') {
-                    statusElement.className = 'api-status connected';
-                    statusElement.innerHTML = '<i class="bi bi-check-circle-fill"></i> API Connected';
-                } else {
-                    statusElement.className = 'api-status error';
-                    statusElement.innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error: ' + data.message;
-                }
-            })
-            .catch(error => {
-                document.getElementById('apiStatus').className = 'api-status error';
-                document.getElementById('apiStatus').innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error';
-            });
-    }
-
     // Load Strategies
     function loadStrategies() {
         const container = document.getElementById('strategyGrid');
-        container.innerHTML = '<div class="loading">Loading strategies...</div>';
+        container.innerHTML = '{{ components.loading_message() }}';
 
         fetch('/api/strategies')
             .then(response => response.json())
@@ -281,13 +260,13 @@
             })
             .catch(error => {
                 console.error('Error loading strategies:', error);
-                container.innerHTML = '<div class="error-message">Error loading strategies. Please try again.</div>';
+                container.innerHTML = '{{ components.error_message("Error loading strategies. Please try again.") }}';
             });
     }
 
     function createStrategyCard(strategy) {
         const card = document.createElement('div');
-        card.className = 'strategy-card';
+        card.className = 'card strategy-card';
         
         card.innerHTML = `
             <div class="strategy-header">
@@ -356,13 +335,14 @@
             if (data.success) {
                 loadStrategies();
                 resetForm();
+                showToast('Strategy created successfully');
             } else {
-                alert('Error creating strategy: ' + data.message);
+                showToast('Error: ' + data.message, 'error');
             }
         })
         .catch(error => {
             console.error('Error creating strategy:', error);
-            alert('Error creating strategy. Please try again.');
+            showToast('Error creating strategy', 'error');
         });
     });
 
@@ -379,13 +359,14 @@
         .then(data => {
             if (data.success) {
                 loadStrategies();
+                showToast('Strategy started successfully');
             } else {
-                alert('Error starting strategy: ' + data.message);
+                showToast('Error: ' + data.message, 'error');
             }
         })
         .catch(error => {
             console.error('Error starting strategy:', error);
-            alert('Error starting strategy. Please try again.');
+            showToast('Error starting strategy', 'error');
         });
     }
 
@@ -397,18 +378,18 @@
         .then(data => {
             if (data.success) {
                 loadStrategies();
+                showToast('Strategy stopped successfully');
             } else {
-                alert('Error stopping strategy: ' + data.message);
+                showToast('Error: ' + data.message, 'error');
             }
         })
         .catch(error => {
             console.error('Error stopping strategy:', error);
-            alert('Error stopping strategy. Please try again.');
+            showToast('Error stopping strategy', 'error');
         });
     }
 
     function editStrategy(id) {
-        // Load strategy details and populate form
         fetch(`/api/strategies/${id}`)
             .then(response => response.json())
             .then(data => {
@@ -417,14 +398,13 @@
                 document.getElementById('timeframe').value = data.timeframe;
                 document.getElementById('symbols').value = data.symbols.join(', ');
                 
-                // Update form to edit mode
                 const form = document.getElementById('strategyForm');
                 form.dataset.editId = id;
                 form.querySelector('button[type="submit"]').textContent = 'Update Strategy';
             })
             .catch(error => {
                 console.error('Error loading strategy:', error);
-                alert('Error loading strategy details. Please try again.');
+                showToast('Error loading strategy details', 'error');
             });
     }
 
@@ -437,19 +417,19 @@
             .then(data => {
                 if (data.success) {
                     loadStrategies();
+                    showToast('Strategy deleted successfully');
                 } else {
-                    alert('Error deleting strategy: ' + data.message);
+                    showToast('Error: ' + data.message, 'error');
                 }
             })
             .catch(error => {
                 console.error('Error deleting strategy:', error);
-                alert('Error deleting strategy. Please try again.');
+                showToast('Error deleting strategy', 'error');
             });
         }
     }
 
     // Initial Load
-    checkAPIStatus();
     loadStrategies();
 </script>
 {% endblock %} 

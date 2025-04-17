@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "components.html" as components %}
 
 {% block title %}Analysis Dashboard{% endblock %}
 
@@ -196,232 +197,348 @@
 
 {% block content %}
 <div class="dashboard-container">
-    <div class="tab-navigation">
-        <button class="tab-button active" data-tab="volatile">Volatile Stocks</button>
-        <button class="tab-button" data-tab="volume">Volume Analysis</button>
-    </div>
+    {{ components.tab_navigation([
+        {'id': 'volume', 'label': 'Volume Analysis'},
+        {'id': 'volatility', 'label': 'Volatility Analysis'},
+        {'id': 'technical', 'label': 'Technical Analysis'}
+    ]) }}
 
-    <div id="volatile" class="tab-content active">
-        <div class="filter-section">
-            <div class="filter-grid">
+    <div id="volume" class="tab-content active">
+        <div class="analysis-section">
+            <div class="filters card">
+                <h3>Volume Analysis Filters</h3>
                 <div class="filter-group">
-                    <label for="minVolatility">Minimum Volatility (%)</label>
-                    <input type="number" id="minVolatility" class="form-control" value="2" min="0" step="0.1">
-                </div>
-                <div class="filter-group">
-                    <label for="minVolume">Minimum Volume</label>
-                    <input type="number" id="minVolume" class="form-control" value="1000000">
-                </div>
-                <div class="filter-group">
-                    <label for="marketCap">Market Cap Range</label>
-                    <select id="marketCap" class="form-control">
-                        <option value="all">All</option>
-                        <option value="large">Large Cap (>$10B)</option>
-                        <option value="mid">Mid Cap ($2B-$10B)</option>
-                        <option value="small">Small Cap (<$2B)</option>
-                    </select>
-                </div>
-            </div>
-            <button id="refreshVolatile" class="btn btn-primary mt-3">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
-            </button>
-        </div>
-
-        <div id="volatileStocks" class="stock-grid">
-            <!-- Volatile stocks will be loaded here -->
-        </div>
-    </div>
-
-    <div id="volume" class="tab-content">
-        <div class="filter-section">
-            <div class="filter-grid">
-                <div class="filter-group">
-                    <label for="volumeThreshold">Volume Threshold</label>
-                    <input type="number" id="volumeThreshold" class="form-control" value="2000000">
-                </div>
-                <div class="filter-group">
-                    <label for="priceChange">Price Change (%)</label>
-                    <input type="number" id="priceChange" class="form-control" value="2" min="0" step="0.1">
-                </div>
-                <div class="filter-group">
-                    <label for="timeframe">Timeframe</label>
-                    <select id="timeframe" class="form-control">
+                    <label for="volume-timeframe">Timeframe</label>
+                    <select id="volume-timeframe" class="form-control">
                         <option value="1d">1 Day</option>
                         <option value="5d">5 Days</option>
                         <option value="1m">1 Month</option>
                     </select>
                 </div>
+                <div class="filter-group">
+                    <label for="volume-min-price">Min Price</label>
+                    <input type="number" id="volume-min-price" class="form-control" min="0" step="0.01">
+                </div>
+                <div class="filter-group">
+                    <label for="volume-min-volume">Min Volume</label>
+                    <input type="number" id="volume-min-volume" class="form-control" min="0">
+                </div>
+                <button id="volume-apply" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
             </div>
-            <button id="refreshVolume" class="btn btn-primary mt-3">
-                <i class="bi bi-arrow-clockwise"></i> Refresh
-            </button>
-        </div>
 
-        <div id="volumeAnalysis" class="stock-grid">
-            <!-- Volume analysis will be loaded here -->
+            <div class="analysis-results">
+                {{ components.chart_container('volume-chart', 'Volume Distribution') }}
+                <div id="volumeStocks">
+                    <!-- Volume analysis results will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="volatility" class="tab-content">
+        <div class="analysis-section">
+            <div class="filters card">
+                <h3>Volatility Analysis Filters</h3>
+                <div class="filter-group">
+                    <label for="volatility-timeframe">Timeframe</label>
+                    <select id="volatility-timeframe" class="form-control">
+                        <option value="1d">1 Day</option>
+                        <option value="5d">5 Days</option>
+                        <option value="1m">1 Month</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="volatility-min-price">Min Price</label>
+                    <input type="number" id="volatility-min-price" class="form-control" min="0" step="0.01">
+                </div>
+                <div class="filter-group">
+                    <label for="volatility-min-volume">Min Volume</label>
+                    <input type="number" id="volatility-min-volume" class="form-control" min="0">
+                </div>
+                <button id="volatility-apply" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
+            </div>
+
+            <div class="analysis-results">
+                {{ components.chart_container('volatility-chart', 'Volatility Distribution') }}
+                <div id="volatilityStocks">
+                    <!-- Volatility analysis results will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="technical" class="tab-content">
+        <div class="analysis-section">
+            <div class="filters card">
+                <h3>Technical Analysis</h3>
+                <div class="filter-group">
+                    <label for="technical-symbol">Symbol</label>
+                    <input type="text" id="technical-symbol" class="form-control" required>
+                </div>
+                <div class="filter-group">
+                    <label for="technical-timeframe">Timeframe</label>
+                    <select id="technical-timeframe" class="form-control">
+                        <option value="1d">1 Day</option>
+                        <option value="5d">5 Days</option>
+                        <option value="1m">1 Month</option>
+                        <option value="3m">3 Months</option>
+                        <option value="6m">6 Months</option>
+                        <option value="1y">1 Year</option>
+                    </select>
+                </div>
+                <button id="technical-analyze" class="btn btn-primary">
+                    <i class="bi bi-graph-up"></i> Analyze
+                </button>
+            </div>
+
+            <div class="analysis-results">
+                <div class="technical-metrics">
+                    {{ components.metric_card('RSI', '0.00', null) }}
+                    {{ components.metric_card('MACD', '0.00', null) }}
+                    {{ components.metric_card('Bollinger Bands', '0.00', null) }}
+                    {{ components.metric_card('Moving Average', '0.00', null) }}
+                </div>
+
+                <div class="technical-charts">
+                    {{ components.chart_container('price-chart', 'Price Chart') }}
+                    {{ components.chart_container('indicators-chart', 'Technical Indicators') }}
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
-<div id="apiStatus" class="api-status">
-    <i class="bi bi-circle-fill"></i> Checking API...
-</div>
+{{ components.api_status() }}
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // API Status
-    function checkAPIStatus() {
-        fetch('/api/status')
-            .then(response => response.json())
-            .then(data => {
-                const statusElement = document.getElementById('apiStatus');
-                if (data.status === 'connected') {
-                    statusElement.className = 'api-status connected';
-                    statusElement.innerHTML = '<i class="bi bi-check-circle-fill"></i> API Connected';
-                } else {
-                    statusElement.className = 'api-status error';
-                    statusElement.innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error: ' + data.message;
-                }
-            })
-            .catch(error => {
-                document.getElementById('apiStatus').className = 'api-status error';
-                document.getElementById('apiStatus').innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error';
-            });
-    }
-
-    // Tab Navigation
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            // Remove active class from all buttons and contents
-            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            // Add active class to clicked button and corresponding content
-            button.classList.add('active');
-            document.getElementById(button.dataset.tab).classList.add('active');
-            
-            // Load data for the selected tab
-            if (button.dataset.tab === 'volatile') {
-                loadVolatileStocks();
-            } else {
-                loadVolumeAnalysis();
-            }
-        });
-    });
-
-    // Volatile Stocks Functions
-    function loadVolatileStocks() {
-        const minVolatility = document.getElementById('minVolatility').value;
-        const minVolume = document.getElementById('minVolume').value;
-        const marketCap = document.getElementById('marketCap').value;
-
-        fetch(`/api/volatile_stocks?min_volatility=${minVolatility}&min_volume=${minVolume}&market_cap=${marketCap}`)
-            .then(response => response.json())
-            .then(data => {
-                const container = document.getElementById('volatileStocks');
-                container.innerHTML = '';
-                
-                data.stocks.forEach(stock => {
-                    const card = createStockCard(stock);
-                    container.appendChild(card);
-                });
-            })
-            .catch(error => {
-                console.error('Error loading volatile stocks:', error);
-                document.getElementById('volatileStocks').innerHTML = '<div class="error-message">Error loading stocks. Please try again.</div>';
-            });
-    }
+    let volumeChart;
+    let volatilityChart;
+    let priceChart;
+    let indicatorsChart;
 
     // Volume Analysis Functions
     function loadVolumeAnalysis() {
-        const threshold = document.getElementById('volumeThreshold').value;
-        const priceChange = document.getElementById('priceChange').value;
-        const timeframe = document.getElementById('timeframe').value;
+        const container = document.getElementById('volumeStocks');
+        container.innerHTML = '{{ components.loading_message() }}';
 
-        fetch(`/api/volume_analysis?threshold=${threshold}&price_change=${priceChange}&timeframe=${timeframe}`)
+        const timeframe = document.getElementById('volume-timeframe').value;
+        const minPrice = document.getElementById('volume-min-price').value;
+        const minVolume = document.getElementById('volume-min-volume').value;
+
+        fetch(`/api/analysis/volume?timeframe=${timeframe}&min_price=${minPrice}&min_volume=${minVolume}`)
             .then(response => response.json())
             .then(data => {
-                const container = document.getElementById('volumeAnalysis');
                 container.innerHTML = '';
                 
+                if (data.stocks.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No stocks found matching criteria</div>';
+                    return;
+                }
+
                 data.stocks.forEach(stock => {
-                    const card = createStockCard(stock);
-                    container.appendChild(card);
+                    const stockElement = createStockElement(stock);
+                    container.appendChild(stockElement);
                 });
+
+                updateVolumeChart(data.distribution);
             })
             .catch(error => {
                 console.error('Error loading volume analysis:', error);
-                document.getElementById('volumeAnalysis').innerHTML = '<div class="error-message">Error loading analysis. Please try again.</div>';
+                container.innerHTML = '{{ components.error_message("Error loading volume analysis. Please try again.") }}';
             });
     }
 
-    // Helper Functions
-    function createStockCard(stock) {
-        const card = document.createElement('div');
-        card.className = 'stock-card';
+    function updateVolumeChart(data) {
+        const ctx = document.getElementById('volume-chart').getContext('2d');
         
-        card.innerHTML = `
+        if (volumeChart) {
+            volumeChart.destroy();
+        }
+        
+        volumeChart = new Chart(ctx, createChartConfig('bar', {
+            labels: data.labels,
+            datasets: [{
+                label: 'Volume Distribution',
+                data: data.values,
+                backgroundColor: '#0d6efd',
+                borderColor: '#0d6efd',
+                borderWidth: 1
+            }]
+        }));
+    }
+
+    // Volatility Analysis Functions
+    function loadVolatilityAnalysis() {
+        const container = document.getElementById('volatilityStocks');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        const timeframe = document.getElementById('volatility-timeframe').value;
+        const minPrice = document.getElementById('volatility-min-price').value;
+        const minVolume = document.getElementById('volatility-min-volume').value;
+
+        fetch(`/api/analysis/volatility?timeframe=${timeframe}&min_price=${minPrice}&min_volume=${minVolume}`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.stocks.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No stocks found matching criteria</div>';
+                    return;
+                }
+
+                data.stocks.forEach(stock => {
+                    const stockElement = createStockElement(stock);
+                    container.appendChild(stockElement);
+                });
+
+                updateVolatilityChart(data.distribution);
+            })
+            .catch(error => {
+                console.error('Error loading volatility analysis:', error);
+                container.innerHTML = '{{ components.error_message("Error loading volatility analysis. Please try again.") }}';
+            });
+    }
+
+    function updateVolatilityChart(data) {
+        const ctx = document.getElementById('volatility-chart').getContext('2d');
+        
+        if (volatilityChart) {
+            volatilityChart.destroy();
+        }
+        
+        volatilityChart = new Chart(ctx, createChartConfig('bar', {
+            labels: data.labels,
+            datasets: [{
+                label: 'Volatility Distribution',
+                data: data.values,
+                backgroundColor: '#dc3545',
+                borderColor: '#dc3545',
+                borderWidth: 1
+            }]
+        }));
+    }
+
+    // Technical Analysis Functions
+    function loadTechnicalAnalysis() {
+        const symbol = document.getElementById('technical-symbol').value;
+        const timeframe = document.getElementById('technical-timeframe').value;
+
+        if (!symbol) {
+            showToast('Please enter a stock symbol', 'error');
+            return;
+        }
+
+        fetch(`/api/analysis/technical?symbol=${symbol}&timeframe=${timeframe}`)
+            .then(response => response.json())
+            .then(data => {
+                updateTechnicalMetrics(data.metrics);
+                updatePriceChart(data.price_data);
+                updateIndicatorsChart(data.indicators);
+            })
+            .catch(error => {
+                console.error('Error loading technical analysis:', error);
+                showToast('Error loading technical analysis', 'error');
+            });
+    }
+
+    function updateTechnicalMetrics(metrics) {
+        document.querySelector('[data-metric="RSI"]').textContent = metrics.rsi.toFixed(2);
+        document.querySelector('[data-metric="MACD"]').textContent = metrics.macd.toFixed(2);
+        document.querySelector('[data-metric="Bollinger Bands"]').textContent = metrics.bollinger.toFixed(2);
+        document.querySelector('[data-metric="Moving Average"]').textContent = metrics.ma.toFixed(2);
+    }
+
+    function updatePriceChart(data) {
+        const ctx = document.getElementById('price-chart').getContext('2d');
+        
+        if (priceChart) {
+            priceChart.destroy();
+        }
+        
+        priceChart = new Chart(ctx, createChartConfig('line', {
+            labels: data.dates,
+            datasets: [{
+                label: 'Price',
+                data: data.prices,
+                borderColor: '#0d6efd',
+                tension: 0.1
+            }]
+        }));
+    }
+
+    function updateIndicatorsChart(data) {
+        const ctx = document.getElementById('indicators-chart').getContext('2d');
+        
+        if (indicatorsChart) {
+            indicatorsChart.destroy();
+        }
+        
+        indicatorsChart = new Chart(ctx, createChartConfig('line', {
+            labels: data.dates,
+            datasets: [{
+                label: 'RSI',
+                data: data.rsi,
+                borderColor: '#198754',
+                tension: 0.1
+            }, {
+                label: 'MACD',
+                data: data.macd,
+                borderColor: '#dc3545',
+                tension: 0.1
+            }]
+        }));
+    }
+
+    function createStockElement(stock) {
+        const element = document.createElement('div');
+        element.className = 'stock-item';
+        
+        element.innerHTML = `
             <div class="stock-header">
                 <span class="stock-symbol">${stock.symbol}</span>
                 <span class="stock-price">$${stock.price.toFixed(2)}</span>
             </div>
-            <div class="stock-metrics">
-                <div class="metric">
-                    <span class="metric-label">Volume</span>
-                    <span class="metric-value">${formatNumber(stock.volume)}</span>
-                </div>
-                <div class="metric">
-                    <span class="metric-label">Change</span>
-                    <span class="metric-value ${stock.change >= 0 ? 'text-success' : 'text-danger'}">
+            <div class="stock-details">
+                <div class="detail">
+                    <span class="label">Change</span>
+                    <span class="value ${stock.change >= 0 ? 'positive' : 'negative'}">
                         ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
                     </span>
                 </div>
-                <div class="metric">
-                    <span class="metric-label">Volatility</span>
-                    <span class="metric-value">${stock.volatility.toFixed(2)}%</span>
+                <div class="detail">
+                    <span class="label">Volume</span>
+                    <span class="value">${formatNumber(stock.volume)}</span>
                 </div>
-                <div class="metric">
-                    <span class="metric-label">Market Cap</span>
-                    <span class="metric-value">$${formatNumber(stock.market_cap)}</span>
+                <div class="detail">
+                    <span class="label">Market Cap</span>
+                    <span class="value">$${formatNumber(stock.market_cap)}</span>
                 </div>
             </div>
             <div class="stock-actions">
-                <button class="action-button watchlist" onclick="addToWatchlist('${stock.symbol}')">
+                <button class="btn btn-sm btn-primary" onclick="addToWatchlist('${stock.symbol}')">
                     <i class="bi bi-plus-circle"></i> Watchlist
                 </button>
-                <button class="action-button alert" onclick="setAlert('${stock.symbol}')">
+                <button class="btn btn-sm btn-warning" onclick="setAlert('${stock.symbol}')">
                     <i class="bi bi-bell"></i> Alert
-                </button>
-                <button class="action-button details" onclick="viewDetails('${stock.symbol}')">
-                    <i class="bi bi-info-circle"></i> Details
                 </button>
             </div>
         `;
         
-        return card;
-    }
-
-    function formatNumber(num) {
-        if (num >= 1000000000) {
-            return (num / 1000000000).toFixed(1) + 'B';
-        }
-        if (num >= 1000000) {
-            return (num / 1000000).toFixed(1) + 'M';
-        }
-        if (num >= 1000) {
-            return (num / 1000).toFixed(1) + 'K';
-        }
-        return num.toString();
+        return element;
     }
 
     // Event Listeners
-    document.getElementById('refreshVolatile').addEventListener('click', loadVolatileStocks);
-    document.getElementById('refreshVolume').addEventListener('click', loadVolumeAnalysis);
+    document.getElementById('volume-apply').addEventListener('click', loadVolumeAnalysis);
+    document.getElementById('volatility-apply').addEventListener('click', loadVolatilityAnalysis);
+    document.getElementById('technical-analyze').addEventListener('click', loadTechnicalAnalysis);
 
     // Initial Load
-    checkAPIStatus();
-    loadVolatileStocks();
+    loadVolumeAnalysis();
 </script>
 {% endblock %} 

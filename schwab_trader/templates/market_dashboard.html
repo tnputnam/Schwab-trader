@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "components.html" as components %}
 
 {% block title %}Market Dashboard{% endblock %}
 
@@ -244,361 +245,338 @@
 
 {% block content %}
 <div class="dashboard-container">
-    <div class="tab-navigation">
-        <button class="tab-button active" data-tab="overview">Market Overview</button>
-        <button class="tab-button" data-tab="sectors">Sector Analysis</button>
-        <button class="tab-button" data-tab="news">Market News</button>
-    </div>
+    {{ components.tab_navigation([
+        {'id': 'overview', 'label': 'Market Overview'},
+        {'id': 'sectors', 'label': 'Sector Performance'},
+        {'id': 'trending', 'label': 'Trending Stocks'}
+    ]) }}
 
     <div id="overview" class="tab-content active">
-        <div class="market-overview">
-            <div class="overview-card">
-                <h3>S&P 500</h3>
-                <div class="value" id="sp500-value">-</div>
-                <div class="change" id="sp500-change">-</div>
+        <div class="market-section">
+            <div class="market-indices">
+                {{ components.metric_card('S&P 500', '0.00', null) }}
+                {{ components.metric_card('Dow Jones', '0.00', null) }}
+                {{ components.metric_card('NASDAQ', '0.00', null) }}
+                {{ components.metric_card('Russell 2000', '0.00', null) }}
             </div>
-            <div class="overview-card">
-                <h3>NASDAQ</h3>
-                <div class="value" id="nasdaq-value">-</div>
-                <div class="change" id="nasdaq-change">-</div>
-            </div>
-            <div class="overview-card">
-                <h3>Dow Jones</h3>
-                <div class="value" id="dow-value">-</div>
-                <div class="change" id="dow-change">-</div>
-            </div>
-            <div class="overview-card">
-                <h3>VIX</h3>
-                <div class="value" id="vix-value">-</div>
-                <div class="change" id="vix-change">-</div>
-            </div>
-        </div>
 
-        <div class="chart-container">
-            <h3>Market Performance</h3>
-            <div class="chart">
-                <canvas id="market-chart"></canvas>
+            <div class="market-charts">
+                {{ components.chart_container('market-chart', 'Market Performance') }}
+            </div>
+
+            <div class="market-news card">
+                <h3>Market News</h3>
+                <div id="marketNews">
+                    <!-- Market news will be loaded here -->
+                </div>
             </div>
         </div>
     </div>
 
     <div id="sectors" class="tab-content">
-        <div class="sector-performance" id="sector-grid">
-            <!-- Sector cards will be loaded here -->
-        </div>
-    </div>
+        <div class="sector-section">
+            <div class="sector-performance">
+                {{ components.chart_container('sector-chart', 'Sector Performance') }}
+            </div>
 
-    <div id="news" class="tab-content">
-        <div class="news-feed">
-            <div class="news-header">
-                <h3>Latest Market News</h3>
-                <div class="news-filters">
-                    <select id="news-source" class="form-control">
-                        <option value="all">All Sources</option>
-                        <option value="reuters">Reuters</option>
-                        <option value="bloomberg">Bloomberg</option>
-                        <option value="cnbc">CNBC</option>
-                        <option value="wsj">Wall Street Journal</option>
-                    </select>
-                    <select id="news-category" class="form-control">
-                        <option value="all">All Categories</option>
-                        <option value="market">Market News</option>
-                        <option value="economy">Economy</option>
-                        <option value="stocks">Stocks</option>
-                        <option value="crypto">Cryptocurrency</option>
-                    </select>
-                    <button id="refresh-news" class="btn btn-primary">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                    </button>
+            <div class="sector-list">
+                <div id="sectorList">
+                    <!-- Sector list will be loaded here -->
                 </div>
             </div>
-            <div id="news-container">
-                <!-- News items will be loaded here -->
+        </div>
+    </div>
+
+    <div id="trending" class="tab-content">
+        <div class="trending-section">
+            <div class="trending-filters card">
+                <h3>Filters</h3>
+                <div class="filter-group">
+                    <label for="trending-timeframe">Timeframe</label>
+                    <select id="trending-timeframe" class="form-control">
+                        <option value="1d">1 Day</option>
+                        <option value="5d">5 Days</option>
+                        <option value="1m">1 Month</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="trending-min-volume">Min Volume</label>
+                    <input type="number" id="trending-min-volume" class="form-control" min="0">
+                </div>
+                <button id="trending-apply" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
             </div>
-            <div class="news-pagination">
-                <button id="prev-page" class="btn btn-outline-primary">
-                    <i class="bi bi-chevron-left"></i> Previous
-                </button>
-                <span id="page-info">Page 1 of 1</span>
-                <button id="next-page" class="btn btn-outline-primary">
-                    Next <i class="bi bi-chevron-right"></i>
-                </button>
+
+            <div class="trending-stocks">
+                <div id="trendingStocks">
+                    <!-- Trending stocks will be loaded here -->
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div id="apiStatus" class="api-status">
-    <i class="bi bi-circle-fill"></i> Checking API...
-</div>
+{{ components.api_status() }}
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     let marketChart;
-
-    // API Status
-    function checkAPIStatus() {
-        fetch('/api/status')
-            .then(response => response.json())
-            .then(data => {
-                const statusElement = document.getElementById('apiStatus');
-                if (data.status === 'connected') {
-                    statusElement.className = 'api-status connected';
-                    statusElement.innerHTML = '<i class="bi bi-check-circle-fill"></i> API Connected';
-                } else {
-                    statusElement.className = 'api-status error';
-                    statusElement.innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error: ' + data.message;
-                }
-            })
-            .catch(error => {
-                document.getElementById('apiStatus').className = 'api-status error';
-                document.getElementById('apiStatus').innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error';
-            });
-    }
-
-    // Tab Navigation
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.addEventListener('click', () => {
-            // Remove active class from all buttons and contents
-            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-            
-            // Add active class to clicked button and corresponding content
-            button.classList.add('active');
-            document.getElementById(button.dataset.tab).classList.add('active');
-            
-            // Load data for the selected tab
-            if (button.dataset.tab === 'overview') {
-                loadMarketOverview();
-            } else if (button.dataset.tab === 'sectors') {
-                loadSectorAnalysis();
-            } else {
-                loadMarketNews();
-            }
-        });
-    });
+    let sectorChart;
 
     // Market Overview Functions
-    function loadMarketOverview() {
-        fetch('/api/market/overview')
+    function loadMarketIndices() {
+        fetch('/api/market/indices')
             .then(response => response.json())
             .then(data => {
-                updateMarketIndices(data.indices);
-                updateMarketChart(data.chart_data);
+                document.querySelector('[data-metric="S&P 500"]').textContent = data.sp500.toFixed(2);
+                document.querySelector('[data-metric="Dow Jones"]').textContent = data.dow.toFixed(2);
+                document.querySelector('[data-metric="NASDAQ"]').textContent = data.nasdaq.toFixed(2);
+                document.querySelector('[data-metric="Russell 2000"]').textContent = data.russell.toFixed(2);
             })
             .catch(error => {
-                console.error('Error loading market overview:', error);
-                document.getElementById('overview').innerHTML = '<div class="error-message">Error loading market data. Please try again.</div>';
+                console.error('Error loading market indices:', error);
+                showToast('Error loading market indices', 'error');
             });
     }
 
-    function updateMarketIndices(indices) {
-        indices.forEach(index => {
-            document.getElementById(`${index.symbol.toLowerCase()}-value`).textContent = 
-                `$${index.price.toFixed(2)}`;
-            document.getElementById(`${index.symbol.toLowerCase()}-change`).textContent = 
-                `${index.change >= 0 ? '+' : ''}${index.change.toFixed(2)}%`;
-            document.getElementById(`${index.symbol.toLowerCase()}-change`).className = 
-                `change ${index.change >= 0 ? 'positive' : 'negative'}`;
-        });
-    }
-
-    function updateMarketChart(data) {
-        const ctx = document.getElementById('market-chart').getContext('2d');
-        
-        if (marketChart) {
-            marketChart.destroy();
-        }
-        
-        marketChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.dates,
-                datasets: [{
-                    label: 'S&P 500',
-                    data: data.sp500,
-                    borderColor: '#0d6efd',
-                    tension: 0.1
-                }, {
-                    label: 'NASDAQ',
-                    data: data.nasdaq,
-                    borderColor: '#198754',
-                    tension: 0.1
-                }, {
-                    label: 'Dow Jones',
-                    data: data.dow,
-                    borderColor: '#dc3545',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'top',
-                    }
-                },
-                scales: {
-                    y: {
-                        beginAtZero: false
-                    }
-                }
-            }
-        });
-    }
-
-    // Sector Analysis Functions
-    function loadSectorAnalysis() {
-        fetch('/api/market/sectors')
+    function loadMarketChart() {
+        fetch('/api/market/chart')
             .then(response => response.json())
             .then(data => {
-                const container = document.getElementById('sector-grid');
-                container.innerHTML = '';
+                const ctx = document.getElementById('market-chart').getContext('2d');
                 
-                data.sectors.forEach(sector => {
-                    const card = createSectorCard(sector);
-                    container.appendChild(card);
-                });
+                if (marketChart) {
+                    marketChart.destroy();
+                }
+                
+                marketChart = new Chart(ctx, createChartConfig('line', {
+                    labels: data.dates,
+                    datasets: [{
+                        label: 'S&P 500',
+                        data: data.sp500,
+                        borderColor: '#0d6efd',
+                        tension: 0.1
+                    }, {
+                        label: 'Dow Jones',
+                        data: data.dow,
+                        borderColor: '#198754',
+                        tension: 0.1
+                    }, {
+                        label: 'NASDAQ',
+                        data: data.nasdaq,
+                        borderColor: '#dc3545',
+                        tension: 0.1
+                    }]
+                }));
             })
             .catch(error => {
-                console.error('Error loading sector analysis:', error);
-                document.getElementById('sectors').innerHTML = '<div class="error-message">Error loading sector data. Please try again.</div>';
+                console.error('Error loading market chart:', error);
+                showToast('Error loading market chart', 'error');
             });
     }
-
-    function createSectorCard(sector) {
-        const card = document.createElement('div');
-        card.className = 'sector-card';
-        
-        card.innerHTML = `
-            <h4>${sector.name}</h4>
-            <div class="sector-metrics">
-                <div class="sector-metric">
-                    <span class="label">Performance</span>
-                    <span class="value ${sector.performance >= 0 ? 'positive' : 'negative'}">
-                        ${sector.performance >= 0 ? '+' : ''}${sector.performance.toFixed(2)}%
-                    </span>
-                </div>
-                <div class="sector-metric">
-                    <span class="label">Volume</span>
-                    <span class="value">${formatNumber(sector.volume)}</span>
-                </div>
-                <div class="sector-metric">
-                    <span class="label">Market Cap</span>
-                    <span class="value">$${formatNumber(sector.market_cap)}</span>
-                </div>
-                <div class="sector-metric">
-                    <span class="label">Stocks</span>
-                    <span class="value">${sector.stock_count}</span>
-                </div>
-            </div>
-        `;
-        
-        return card;
-    }
-
-    // Enhanced Market News Functions
-    let currentPage = 1;
-    let totalPages = 1;
-    let currentSource = 'all';
-    let currentCategory = 'all';
 
     function loadMarketNews() {
-        const container = document.getElementById('news-container');
-        container.innerHTML = '<div class="loading">Loading news...</div>';
+        const container = document.getElementById('marketNews');
+        container.innerHTML = '{{ components.loading_message() }}';
 
-        fetch(`/api/market/news?page=${currentPage}&source=${currentSource}&category=${currentCategory}`)
+        fetch('/api/market/news')
             .then(response => response.json())
             .then(data => {
                 container.innerHTML = '';
-                totalPages = data.total_pages;
                 
-                updatePagination();
-                
-                data.news.forEach(item => {
-                    const newsItem = createNewsItem(item);
-                    container.appendChild(newsItem);
+                if (data.news.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No market news available</div>';
+                    return;
+                }
+
+                data.news.forEach(news => {
+                    const newsElement = createNewsElement(news);
+                    container.appendChild(newsElement);
                 });
             })
             .catch(error => {
                 console.error('Error loading market news:', error);
-                container.innerHTML = '<div class="error-message">Error loading news. Please try again.</div>';
+                container.innerHTML = '{{ components.error_message("Error loading market news. Please try again.") }}';
             });
     }
 
-    function createNewsItem(item) {
-        const newsItem = document.createElement('div');
-        newsItem.className = 'news-item';
+    // Sector Performance Functions
+    function loadSectorChart() {
+        fetch('/api/market/sectors/chart')
+            .then(response => response.json())
+            .then(data => {
+                const ctx = document.getElementById('sector-chart').getContext('2d');
+                
+                if (sectorChart) {
+                    sectorChart.destroy();
+                }
+                
+                sectorChart = new Chart(ctx, createChartConfig('bar', {
+                    labels: data.sectors,
+                    datasets: [{
+                        label: 'Performance',
+                        data: data.performance,
+                        backgroundColor: data.performance.map(p => p >= 0 ? '#198754' : '#dc3545'),
+                        borderColor: data.performance.map(p => p >= 0 ? '#198754' : '#dc3545'),
+                        borderWidth: 1
+                    }]
+                }));
+            })
+            .catch(error => {
+                console.error('Error loading sector chart:', error);
+                showToast('Error loading sector chart', 'error');
+            });
+    }
+
+    function loadSectorList() {
+        const container = document.getElementById('sectorList');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        fetch('/api/market/sectors')
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.sectors.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No sector data available</div>';
+                    return;
+                }
+
+                data.sectors.forEach(sector => {
+                    const sectorElement = createSectorElement(sector);
+                    container.appendChild(sectorElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading sector list:', error);
+                container.innerHTML = '{{ components.error_message("Error loading sector list. Please try again.") }}';
+            });
+    }
+
+    // Trending Stocks Functions
+    function loadTrendingStocks() {
+        const container = document.getElementById('trendingStocks');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        const timeframe = document.getElementById('trending-timeframe').value;
+        const minVolume = document.getElementById('trending-min-volume').value;
+
+        fetch(`/api/market/trending?timeframe=${timeframe}&min_volume=${minVolume}`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.stocks.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No trending stocks found</div>';
+                    return;
+                }
+
+                data.stocks.forEach(stock => {
+                    const stockElement = createStockElement(stock);
+                    container.appendChild(stockElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading trending stocks:', error);
+                container.innerHTML = '{{ components.error_message("Error loading trending stocks. Please try again.") }}';
+            });
+    }
+
+    function createNewsElement(news) {
+        const element = document.createElement('div');
+        element.className = 'news-item';
         
-        newsItem.innerHTML = `
-            <div class="news-title">${item.title}</div>
-            <div class="news-summary">${item.summary}</div>
-            <div class="news-meta">
-                <span>${item.source}</span>
-                <span>${new Date(item.published_at).toLocaleString()}</span>
-                <span>${item.category}</span>
+        element.innerHTML = `
+            <div class="news-header">
+                <span class="news-title">${news.title}</span>
+                <span class="news-time">${new Date(news.timestamp).toLocaleString()}</span>
+            </div>
+            <div class="news-content">
+                <p>${news.content}</p>
+            </div>
+            <div class="news-source">
+                <span>Source: ${news.source}</span>
             </div>
         `;
         
-        newsItem.addEventListener('click', () => {
-            window.open(item.url, '_blank');
-        });
+        return element;
+    }
+
+    function createSectorElement(sector) {
+        const element = document.createElement('div');
+        element.className = 'sector-item';
         
-        return newsItem;
+        element.innerHTML = `
+            <div class="sector-header">
+                <span class="sector-name">${sector.name}</span>
+                <span class="sector-change ${sector.change >= 0 ? 'positive' : 'negative'}">
+                    ${sector.change >= 0 ? '+' : ''}${sector.change.toFixed(2)}%
+                </span>
+            </div>
+            <div class="sector-details">
+                <div class="detail">
+                    <span class="label">Volume</span>
+                    <span class="value">${formatNumber(sector.volume)}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Market Cap</span>
+                    <span class="value">$${formatNumber(sector.market_cap)}</span>
+                </div>
+            </div>
+        `;
+        
+        return element;
     }
 
-    function updatePagination() {
-        document.getElementById('page-info').textContent = `Page ${currentPage} of ${totalPages}`;
-        document.getElementById('prev-page').disabled = currentPage === 1;
-        document.getElementById('next-page').disabled = currentPage === totalPages;
+    function createStockElement(stock) {
+        const element = document.createElement('div');
+        element.className = 'stock-item';
+        
+        element.innerHTML = `
+            <div class="stock-header">
+                <span class="stock-symbol">${stock.symbol}</span>
+                <span class="stock-price">$${stock.price.toFixed(2)}</span>
+            </div>
+            <div class="stock-details">
+                <div class="detail">
+                    <span class="label">Change</span>
+                    <span class="value ${stock.change >= 0 ? 'positive' : 'negative'}">
+                        ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+                    </span>
+                </div>
+                <div class="detail">
+                    <span class="label">Volume</span>
+                    <span class="value">${formatNumber(stock.volume)}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Market Cap</span>
+                    <span class="value">$${formatNumber(stock.market_cap)}</span>
+                </div>
+            </div>
+            <div class="stock-actions">
+                <button class="btn btn-sm btn-primary" onclick="addToWatchlist('${stock.symbol}')">
+                    <i class="bi bi-plus-circle"></i> Watchlist
+                </button>
+                <button class="btn btn-sm btn-warning" onclick="setAlert('${stock.symbol}')">
+                    <i class="bi bi-bell"></i> Alert
+                </button>
+            </div>
+        `;
+        
+        return element;
     }
 
-    // Event Listeners for News
-    document.getElementById('news-source').addEventListener('change', (e) => {
-        currentSource = e.target.value;
-        currentPage = 1;
-        loadMarketNews();
-    });
-
-    document.getElementById('news-category').addEventListener('change', (e) => {
-        currentCategory = e.target.value;
-        currentPage = 1;
-        loadMarketNews();
-    });
-
-    document.getElementById('refresh-news').addEventListener('click', loadMarketNews);
-    document.getElementById('prev-page').addEventListener('click', () => {
-        if (currentPage > 1) {
-            currentPage--;
-            loadMarketNews();
-        }
-    });
-    document.getElementById('next-page').addEventListener('click', () => {
-        if (currentPage < totalPages) {
-            currentPage++;
-            loadMarketNews();
-        }
-    });
-
-    // Helper Functions
-    function formatNumber(num) {
-        if (num >= 1000000000) {
-            return (num / 1000000000).toFixed(1) + 'B';
-        }
-        if (num >= 1000000) {
-            return (num / 1000000).toFixed(1) + 'M';
-        }
-        if (num >= 1000) {
-            return (num / 1000).toFixed(1) + 'K';
-        }
-        return num.toString();
-    }
+    // Event Listeners
+    document.getElementById('trending-apply').addEventListener('click', loadTrendingStocks);
 
     // Initial Load
-    checkAPIStatus();
-    loadMarketOverview();
+    loadMarketIndices();
+    loadMarketChart();
+    loadMarketNews();
+    loadSectorChart();
+    loadSectorList();
+    loadTrendingStocks();
 </script>
 {% endblock %} 
