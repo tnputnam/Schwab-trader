@@ -2,7 +2,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import numpy as np
-import talib
+# import talib
 
 class TechnicalAnalysisVisualizer:
     def __init__(self, strategy):
@@ -18,19 +18,43 @@ class TechnicalAnalysisVisualizer:
         prices = df['close'].values
         volumes = df['volume'].values
         
-        # Calculate technical indicators using the strategy's parameters
-        rsi = talib.RSI(prices, timeperiod=self.strategy.rsi_period)
-        macd, macd_signal, macd_hist = talib.MACD(
-            prices, 
-            fastperiod=12, 
-            slowperiod=26, 
-            signalperiod=9
-        )
-        bb_upper, bb_middle, bb_lower = talib.BBANDS(
+        # Calculate technical indicators using numpy
+        # Simple Moving Average for RSI calculation
+        def calculate_sma(data, period):
+            return np.convolve(data, np.ones(period)/period, mode='valid')
+            
+        # Calculate RSI
+        def calculate_rsi(prices, period=14):
+            deltas = np.diff(prices)
+            gain = np.where(deltas > 0, deltas, 0)
+            loss = np.where(deltas < 0, -deltas, 0)
+            avg_gain = calculate_sma(gain, period)
+            avg_loss = calculate_sma(loss, period)
+            rs = avg_gain / avg_loss
+            return 100 - (100 / (1 + rs))
+            
+        # Calculate MACD
+        def calculate_macd(prices, fast=12, slow=26, signal=9):
+            exp1 = pd.Series(prices).ewm(span=fast, adjust=False).mean()
+            exp2 = pd.Series(prices).ewm(span=slow, adjust=False).mean()
+            macd = exp1 - exp2
+            signal_line = macd.ewm(span=signal, adjust=False).mean()
+            return macd, signal_line, macd - signal_line
+            
+        # Calculate Bollinger Bands
+        def calculate_bollinger_bands(prices, period=20, std=2):
+            sma = calculate_sma(prices, period)
+            std_dev = np.std(prices[-period:])
+            upper = sma + (std * std_dev)
+            lower = sma - (std * std_dev)
+            return upper, sma, lower
+            
+        rsi = calculate_rsi(prices, self.strategy.rsi_period)
+        macd, macd_signal, macd_hist = calculate_macd(prices)
+        bb_upper, bb_middle, bb_lower = calculate_bollinger_bands(
             prices,
-            timeperiod=self.strategy.bollinger_period,
-            nbdevup=self.strategy.bollinger_std,
-            nbdevdn=self.strategy.bollinger_std
+            self.strategy.bollinger_period,
+            self.strategy.bollinger_std
         )
         
         # Create subplots

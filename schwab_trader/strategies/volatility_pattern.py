@@ -2,7 +2,7 @@ from .base import TradingStrategy
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-import talib
+# import talib
 from collections import defaultdict
 
 class VolatilityPatternStrategy(TradingStrategy):

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Tesla Volume Trading Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .control-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .performance-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .trades-panel {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .button.stop {
+            background: #dc3545;
+        }
+        .button.stop:hover {
+            background: #c82333;
+        }
+        .metric {
+            display: inline-block;
+            margin-right: 20px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+        }
+        .metric-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        .positive {
+            color: #28a745;
+        }
+        .negative {
+            color: #dc3545;
+        }
+        .chart-container {
+            height: 300px;
+            margin-top: 20px;
+        }
+        .trade-list {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .trade-item {
+            padding: 10px;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .trade-item:last-child {
+            border-bottom: none;
+        }
+        .trade-buy {
+            background-color: rgba(40, 167, 69, 0.1);
+        }
+        .trade-sell {
+            background-color: rgba(220, 53, 69, 0.1);
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .status.running {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .status.stopped {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .volume-analysis {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .volume-metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .volume-metric {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .volume-metric .label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .volume-metric .value {
+            font-size: 20px;
+            font-weight: bold;
+        }
+        .correlation-chart {
+            height: 300px;
+            margin-top: 20px;
+        }
+        .volume-settings {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .volume-settings label {
+            display: block;
+            margin-bottom: 10px;
+        }
+        .volume-settings input {
+            width: 100px;
+            padding: 5px;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tesla Volume Trading Dashboard</h1>
+        
+        <div class="control-panel">
+            <h2>Control Panel</h2>
+            <div class="status" id="trading-status">Status: Stopped</div>
+            <button class="button" id="start-button" onclick="startTrading()">Start Trading</button>
+            <button class="button stop" id="stop-button" onclick="stopTrading()" disabled>Stop Trading</button>
+            
+            <div class="volume-settings">
+                <h3>Volume Analysis Settings</h3>
+                <label>
+                    Volume Lookback Period (days):
+                    <input type="number" id="volume-lookback" value="30" min="5" max="90">
+                </label>
+                <label>
+                    Volume Increase Threshold (%):
+                    <input type="number" id="volume-threshold" value="15" min="5" max="50" step="0.1">
+                </label>
+                <label>
+                    Minimum Volume (millions):
+                    <input type="number" id="min-volume" value="10" min="1" max="100" step="0.1">
+                </label>
+                <label>
+                    Correlation Window (days):
+                    <input type="number" id="correlation-window" value="5" min="1" max="20">
+                </label>
+            </div>
+            
+            <div style="margin-top: 20px;">
+                <div class="metric">
+                    <div class="metric-label">Initial Budget</div>
+                    <div class="metric-value">$2,000.00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Current Balance</div>
+                    <div class="metric-value" id="current-balance">$2,000.00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Total Profit/Loss</div>
+                    <div class="metric-value" id="total-pl">$0.00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Active Positions</div>
+                    <div class="metric-value" id="active-positions">0</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="volume-analysis">
+            <h2>Volume Analysis</h2>
+            <div class="volume-metrics">
+                <div class="volume-metric">
+                    <div class="label">30-Day Avg Volume</div>
+                    <div class="value" id="avg-volume">0M</div>
+                </div>
+                <div class="volume-metric">
+                    <div class="label">Today's Volume</div>
+                    <div class="value" id="today-volume">0M</div>
+                </div>
+                <div class="volume-metric">
+                    <div class="label">Volume Change %</div>
+                    <div class="value" id="volume-change">0%</div>
+                </div>
+                <div class="volume-metric">
+                    <div class="label">Price-Volume Correlation</div>
+                    <div class="value" id="volume-correlation">0.00</div>
+                </div>
+            </div>
+            <div class="correlation-chart">
+                <canvas id="volume-price-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="performance-panel">
+            <h2>30-Day Performance</h2>
+            <div class="chart-container">
+                <canvas id="performance-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="trades-panel">
+            <h2>Recent Trades</h2>
+            <div class="trade-list" id="trade-list">
+                <!-- Trades will be added here dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let performanceChart = null;
+        let volumePriceChart = null;
+        let tradingActive = false;
+        const initialBudget = 2000;
+        let currentBalance = initialBudget;
+        let tradeHistory = [];
+        let volumeData = [];
+        let priceData = [];
+
+        function updateStatus(status) {
+            const statusElement = document.getElementById('trading-status');
+            statusElement.textContent = `Status: ${status}`;
+            statusElement.className = `status ${status.toLowerCase()}`;
+            
+            document.getElementById('start-button').disabled = status === 'Running';
+            document.getElementById('stop-button').disabled = status === 'Stopped';
+        }
+
+        function updateMetrics() {
+            document.getElementById('current-balance').textContent = `$${currentBalance.toFixed(2)}`;
+            const totalPL = currentBalance - initialBudget;
+            const plElement = document.getElementById('total-pl');
+            plElement.textContent = `$${totalPL.toFixed(2)}`;
+            plElement.className = `metric-value ${totalPL >= 0 ? 'positive' : 'negative'}`;
+        }
+
+        function addTrade(trade) {
+            const tradeList = document.getElementById('trade-list');
+            const tradeItem = document.createElement('div');
+            tradeItem.className = `trade-item trade-${trade.type.toLowerCase()}`;
+            
+            const timestamp = new Date(trade.timestamp).toLocaleString();
+            tradeItem.innerHTML = `
+                <div><strong>${trade.type}</strong> ${trade.symbol} @ $${trade.price.toFixed(2)}</div>
+                <div>Quantity: ${trade.quantity} | Total: $${(trade.price * trade.quantity).toFixed(2)}</div>
+                <div>Time: ${timestamp}</div>
+            `;
+            
+            tradeList.insertBefore(tradeItem, tradeList.firstChild);
+            tradeHistory.unshift(trade);
+            
+            // Update balance
+            const tradeAmount = trade.price * trade.quantity;
+            currentBalance += trade.type === 'BUY' ? -tradeAmount : tradeAmount;
+            updateMetrics();
+            
+            // Update performance chart
+            updatePerformanceChart();
+        }
+
+        function updatePerformanceChart() {
+            const ctx = document.getElementById('performance-chart').getContext('2d');
+            
+            if (performanceChart) {
+                performanceChart.destroy();
+            }
+            
+            const dates = tradeHistory.map(t => new Date(t.timestamp));
+            const balances = [];
+            let runningBalance = initialBudget;
+            
+            tradeHistory.forEach(trade => {
+                const tradeAmount = trade.price * trade.quantity;
+                runningBalance += trade.type === 'BUY' ? -tradeAmount : tradeAmount;
+                balances.push(runningBalance);
+            });
+            
+            performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [{
+                        label: 'Account Balance',
+                        data: balances,
+                        borderColor: 'rgb(75, 192, 192)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateVolumeMetrics(data) {
+            document.getElementById('avg-volume').textContent = `${(data.avgVolume / 1000000).toFixed(1)}M`;
+            document.getElementById('today-volume').textContent = `${(data.todayVolume / 1000000).toFixed(1)}M`;
+            document.getElementById('volume-change').textContent = `${data.volumeChange.toFixed(1)}%`;
+            document.getElementById('volume-correlation').textContent = data.correlation.toFixed(2);
+        }
+
+        function updateVolumePriceChart() {
+            const ctx = document.getElementById('volume-price-chart').getContext('2d');
+            
+            if (volumePriceChart) {
+                volumePriceChart.destroy();
+            }
+            
+            volumePriceChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'Volume vs Price Change',
+                        data: volumeData.map((v, i) => ({
+                            x: v,
+                            y: priceData[i]
+                        })),
+                        backgroundColor: 'rgba(75, 192, 192, 0.5)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Volume Change (%)'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'Price Change (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        async function startTrading() {
+            try {
+                const volumeSettings = {
+                    lookback_period: parseInt(document.getElementById('volume-lookback').value),
+                    volume_threshold: parseFloat(document.getElementById('volume-threshold').value),
+                    min_volume: parseFloat(document.getElementById('min-volume').value) * 1000000,
+                    correlation_window: parseInt(document.getElementById('correlation-window').value)
+                };
+
+                const response = await fetch('/api/start_auto_trading', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        strategy: 'tesla_volume',
+                        symbols: ['TSLA'],
+                        budget: 2000,
+                        settings: volumeSettings
+                    })
+                });
+                
+                if (response.ok) {
+                    tradingActive = true;
+                    updateStatus('Running');
+                    startTradeUpdates();
+                } else {
+                    alert('Failed to start trading');
+                }
+            } catch (error) {
+                console.error('Error starting trading:', error);
+                alert('Error starting trading');
+            }
+        }
+
+        async function stopTrading() {
+            try {
+                const response = await fetch('/api/stop_auto_trading', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    tradingActive = false;
+                    updateStatus('Stopped');
+                } else {
+                    alert('Failed to stop trading');
+                }
+            } catch (error) {
+                console.error('Error stopping trading:', error);
+                alert('Error stopping trading');
+            }
+        }
+
+        function startTradeUpdates() {
+            if (tradingActive) {
+                setTimeout(async () => {
+                    if (tradingActive) {
+                        try {
+                            const response = await fetch('/api/get_volume_data');
+                            const data = await response.json();
+                            
+                            // Update volume metrics
+                            updateVolumeMetrics(data);
+                            
+                            // Update volume and price data for correlation chart
+                            volumeData = data.volumeChanges;
+                            priceData = data.priceChanges;
+                            updateVolumePriceChart();
+                            
+                            // Add any new trades
+                            if (data.newTrades && data.newTrades.length > 0) {
+                                data.newTrades.forEach(trade => addTrade(trade));
+                            }
+                            
+                            startTradeUpdates();
+                        } catch (error) {
+                            console.error('Error fetching volume data:', error);
+                        }
+                    }
+                }, 5000); // Update every 5 seconds
+            }
+        }
+
+        // Initialize the dashboard
+        updateStatus('Stopped');
+        updateMetrics();
+    </script>
+</body>
+</html> 
