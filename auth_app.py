@@ -104,78 +104,76 @@ def callback():
             'Origin': REDIRECT_URI.rsplit('/', 1)[0]
         }
         
-        # First get the account numbers
-        accounts_response = requests.get(
-            'https://api.schwabapi.com/v1/accounts/accountNumbers',
-            headers=api_headers
-        )
+        # Get account details
+        accounts_url = "https://api.schwabapi.com/trader/v1/accounts"
+        accounts_headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token_data['access_token']}",
+            "X-Authorization": f"Bearer {token_data['access_token']}",
+            "Schwab-Client-Correlid": client_correlid,
+            "Origin": REDIRECT_URI.rsplit('/', 1)[0]
+        }
         
-        if accounts_response.status_code == 200:
-            accounts_data = accounts_response.json()
-            logger.debug(f"Accounts data: {accounts_data}")
+        try:
+            accounts_response = requests.get(accounts_url, headers=accounts_headers)
+            logger.debug(f"Accounts response status: {accounts_response.status_code}")
+            logger.debug(f"Accounts response headers: {accounts_response.headers}")
+            logger.debug(f"Accounts response body: {accounts_response.text}")
             
-            # Try to get positions and portfolio for each account
-            results = []
-            for account_number in accounts_data.get('accountNumbers', []):
-                # Get account details
-                account_response = requests.get(
-                    f'https://api.schwabapi.com/v1/accounts/{account_number}',
-                    headers=api_headers
-                )
+            if accounts_response.status_code == 200:
+                accounts_data = accounts_response.json()
+                logger.debug(f"Accounts data: {accounts_data}")
                 
-                # Get positions
-                positions_response = requests.get(
-                    f'https://api.schwabapi.com/v1/accounts/{account_number}/positions',
-                    headers=api_headers
-                )
+                # Get positions and portfolio for each account
+                for account in accounts_data:  # accounts_data is a list
+                    account_number = account['securitiesAccount']['accountNumber']
+                    
+                    # Get positions
+                    positions_url = f"https://api.schwabapi.com/trader/v1/accounts/{account_number}/positions"
+                    positions_response = requests.get(positions_url, headers=accounts_headers)
+                    
+                    # Get portfolio
+                    portfolio_url = f"https://api.schwabapi.com/trader/v1/accounts/{account_number}/portfolio"
+                    portfolio_response = requests.get(portfolio_url, headers=accounts_headers)
+                    
+                    account['positions'] = positions_response.json() if positions_response.status_code == 200 else None
+                    account['portfolio'] = portfolio_response.json() if portfolio_response.status_code == 200 else None
                 
-                # Get portfolio
-                portfolio_response = requests.get(
-                    f'https://api.schwabapi.com/v1/accounts/{account_number}/portfolio',
-                    headers=api_headers
-                )
-                
-                results.append({
-                    'account_number': account_number,
-                    'account_details': account_response.json() if account_response.status_code == 200 else None,
-                    'positions': positions_response.json() if positions_response.status_code == 200 else None,
-                    'portfolio': portfolio_response.json() if portfolio_response.status_code == 200 else None
+                return jsonify({
+                    "success": True,
+                    "message": "Successfully authenticated with Schwab",
+                    "accounts": accounts_data
                 })
             
             return jsonify({
                 "success": True,
                 "message": "Successfully authenticated with Schwab",
-                "accounts": accounts_data,
-                "results": results,
-                "debug_info": {
-                    "client_correlid": client_correlid,
-                    "headers_used": api_headers
+                "error": {
+                    "accounts_error": {
+                        "status_code": accounts_response.status_code,
+                        "response": accounts_response.json() if accounts_response.status_code != 404 else None,
+                        "headers": dict(accounts_response.headers)
+                    },
+                    "token_info": {
+                        "scope": token_data.get('scope'),
+                        "token_type": token_data.get('token_type'),
+                        "expires_in": token_data.get('expires_in'),
+                        "client_correlid": client_correlid,
+                        "access_token": token_data.get('access_token')
+                    },
+                    "debug_info": {
+                        "headers_used": accounts_headers,
+                        "token_response_headers": dict(token_response.headers)
+                    }
                 }
             })
-        
-        # If we get here, return error information
-        return jsonify({
-            "success": True,
-            "message": "Successfully authenticated with Schwab",
-            "error": {
-                "accounts_error": {
-                    "status_code": accounts_response.status_code,
-                    "response": accounts_response.json() if accounts_response.status_code != 404 else None,
-                    "headers": dict(accounts_response.headers)
-                },
-                "token_info": {
-                    "scope": token_data.get('scope'),
-                    "token_type": token_data.get('token_type'),
-                    "expires_in": token_data.get('expires_in'),
-                    "client_correlid": client_correlid,
-                    "access_token": token_data.get('access_token')
-                },
-                "debug_info": {
-                    "headers_used": api_headers,
-                    "token_response_headers": dict(token_response.headers)
-                }
-            }
-        })
+            
+        except Exception as e:
+            logger.error(f"Error accessing accounts: {str(e)}")
+            return jsonify({
+                "success": False,
+                "error": str(e)
+            }), 500
         
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
