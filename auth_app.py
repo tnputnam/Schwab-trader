@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 import yfinance as yf
 from flask_cors import CORS
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
+from schwab_trader.routes.dashboard import bp as dashboard_bp
 from strategy_tester import StrategyTester
 from example_strategies import (
     moving_average_crossover_strategy,
@@ -19,13 +20,16 @@ from example_strategies import (
 )
 import numpy as np
 
-# Set up logging
-logging.basicConfig(level=logging.DEBUG)
+# Configure logging
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 CORS(app)
 app.secret_key = 'your-secret-key-here'
+
+# Register blueprints
+app.register_blueprint(dashboard_bp, url_prefix='/')
 
 # Configure server name for ngrok
 app.config['SERVER_NAME'] = 'b148-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
@@ -55,16 +59,6 @@ schwab.authorization_base_url = AUTHORIZATION_BASE_URL
 schwab.token_url = TOKEN_URL
 schwab.scopes = SCOPES
 
-@app.route('/')
-def index():
-    return """
-    <h1>Schwab OAuth Test</h1>
-    <p>Authorization URL: {}</p>
-    <p>Token URL: {}</p>
-    <p>Scopes: {}</p>
-    <a href="/login">Login with Schwab</a>
-    """.format(AUTHORIZATION_BASE_URL, TOKEN_URL, SCOPES)
-
 @app.route('/login')
 def login():
     """Start OAuth login flow"""
@@ -72,7 +66,7 @@ def login():
         # Clear any existing session data
         session.clear()
         
-    logger.debug("Starting login process")
+        logger.debug("Starting login process")
         oauth = OAuth2Session(
             CLIENT_ID,
             redirect_uri=REDIRECT_URI,
@@ -89,7 +83,7 @@ def login():
             state=state
         )
         logger.debug(f"Generated authorization URL: {auth_url}")
-    return redirect(auth_url)
+        return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error in login: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -387,6 +381,16 @@ def tesla_dashboard():
     """Show Tesla analysis dashboard without authentication"""
     return render_template('strategy_dashboard.html')
 
+@app.route('/tesla_analysis')
+def tesla_analysis_page():
+    """Display the Tesla analysis page."""
+    return render_template('tesla_analysis.html')
+
+@app.route('/volatile_stocks')
+def volatile_stocks_page():
+    """Display the volatile stocks page."""
+    return render_template('volatile_stocks.html')
+
 @app.route('/api/tesla_analysis')
 def tesla_analysis():
     """Analyze Tesla's volume patterns and their impact on price"""
@@ -549,11 +553,6 @@ def get_trading_status():
         logger.error(f"Error getting trading status: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@app.route('/volatile_stocks')
-def volatile_stocks_dashboard():
-    """Show dashboard for top volatile stocks"""
-    return render_template('volatile_stocks.html')
-
 @app.route('/api/top_volatile_stocks')
 def top_volatile_stocks():
     """Get top 10 most volatile stocks with volume analysis"""
@@ -687,16 +686,16 @@ def top_volatile_stocks():
                         'volume_history': volume_history,
                         'current_indicators': current_indicators,
                         'news': formatted_news
-            })
+                    })
             
-        except Exception as e:
+            except Exception as e:
                 logger.error(f"Error analyzing {symbol}: {str(e)}")
                 continue
         
         # Sort by volatility (highest first)
         results.sort(key=lambda x: x['volatility'], reverse=True)
         
-            return jsonify({
+        return jsonify({
             'status': 'success',
             'stocks': results[:10]  # Return top 10 most volatile
         })
@@ -704,6 +703,65 @@ def top_volatile_stocks():
     except Exception as e:
         logger.error(f"Error in volatile stocks analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/analyze_volatility')
+def analyze_volatility():
+    try:
+        # Get list of stocks to analyze
+        stocks = ['TSLA', 'AAPL', 'MSFT', 'AMZN', 'GOOGL', 'META', 'NVDA', 'AMD', 'INTC', 'QCOM']
+        results = []
+        
+        for symbol in stocks:
+            try:
+                # Get stock data
+                stock = yf.Ticker(symbol)
+                hist = stock.history(period='1mo')
+                
+                # Calculate volatility
+                returns = hist['Close'].pct_change()
+                volatility = returns.std() * (252 ** 0.5)  # Annualized volatility
+                
+                # Get current indicators
+                current_price = hist['Close'][-1]
+                current_volume = hist['Volume'][-1]
+                current_indicators = {
+                    'price': current_price,
+                    'volume': current_volume,
+                    'volatility': volatility
+                }
+                
+                # Get news
+                news = stock.news
+                formatted_news = [{
+                    'title': item['title'],
+                    'link': item['link'],
+                    'date': item['publisher']['publishedAt']
+                } for item in news[:5]]  # Get top 5 news items
+                
+                results.append({
+                    'symbol': symbol,
+                    'volatility': volatility,
+                    'current_indicators': current_indicators,
+                    'news': formatted_news
+                })
+                
+            except Exception as e:
+                logger.error(f"Error analyzing {symbol}: {str(e)}")
+                continue
+        
+        results.sort(key=lambda x: x['volatility'], reverse=True)
+        
+        return jsonify({
+            'status': 'success',
+            'stocks': results[:10]  # Return top 10 most volatile
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in analyze_volatility: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 if __name__ == '__main__':
     # For development only

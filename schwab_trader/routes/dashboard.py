@@ -14,8 +14,7 @@ logger.setLevel(logging.INFO)
 
 @bp.route('/')
 def index():
-    """Display the main dashboard."""
-    return render_template('index.html')
+    return render_template('tesla_trading.html')
 
 @bp.route('/tesla_trading')
 def tesla_trading():
