@@ -33,11 +33,100 @@ app = Flask(__name__,
 CORS(app)
 app.secret_key = 'your-secret-key-here'
 
+# Simple test route
+@app.route('/test')
+def test():
+    logger.info("Test route accessed")
+    return "Test route working!"
+
+@app.route('/test_alpha_vantage', methods=['GET'])
+def test_alpha_vantage():
+    """Test page for Alpha Vantage API"""
+    logger.info("Accessing test_alpha_vantage route")
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"Template folder: {app.template_folder}")
+    try:
+        return render_template('test_alpha_vantage.html')
+    except Exception as e:
+        logger.error(f"Error rendering template: {str(e)}")
+        return str(e), 500
+
+@app.route('/api/test_alpha_vantage', methods=['POST'])
+def test_alpha_vantage_api():
+    """Test Alpha Vantage API endpoint"""
+    logger.info("Accessing test_alpha_vantage_api route")
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol', 'AAPL')
+        
+        logger.info(f"Testing Alpha Vantage API for symbol: {symbol}")
+        
+        # Get API key
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            return jsonify({
+                'status': 'error',
+                'message': 'Alpha Vantage API key not found in environment'
+            }), 400
+        
+        # Test different endpoints
+        endpoints = {
+            'TIME_SERIES_DAILY': f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=full&apikey={api_key}",
+            'GLOBAL_QUOTE': f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}",
+            'SYMBOL_SEARCH': f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={symbol}&apikey={api_key}"
+        }
+        
+        results = {}
+        for endpoint, url in endpoints.items():
+            try:
+                logger.info(f"Testing {endpoint} endpoint")
+                response = requests.get(url, timeout=10)
+                logger.info(f"Response status: {response.status_code}")
+                logger.info(f"Response content: {response.text[:500]}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    results[endpoint] = {
+                        'status': 'success',
+                        'data': data
+                    }
+                else:
+                    results[endpoint] = {
+                        'status': 'error',
+                        'message': f"HTTP Error: {response.status_code}",
+                        'response': response.text
+                    }
+            except Exception as e:
+                results[endpoint] = {
+                    'status': 'error',
+                    'message': str(e)
+                }
+        
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing Alpha Vantage API: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/strategy_dashboard')
+def strategy_dashboard():
+    """Show strategy testing dashboard"""
+    logger.info("Accessing strategy dashboard")
+    if 'access_token' not in session:
+        return redirect(url_for('login'))
+    return render_template('strategy_dashboard.html')
+
 # Register blueprints
 app.register_blueprint(dashboard_bp, url_prefix='/')
 
-# Configure server name for ngrok
-app.config['SERVER_NAME'] = 'b148-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
+# Remove server name configuration to allow localhost access
+# app.config['SERVER_NAME'] = 'b148-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
 
 # Your Schwab API credentials
 CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
@@ -289,13 +378,6 @@ def paper_trade():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/strategy_dashboard')
-def strategy_dashboard():
-    """Show strategy testing dashboard"""
-    if 'access_token' not in session:
-        return redirect(url_for('login'))
-    return render_template('strategy_dashboard.html')
-
 @app.route('/api/market_data')
 def get_market_data():
     """Get real-time market data for positions"""
@@ -397,8 +479,8 @@ def tesla_analysis_page():
     return render_template('tesla_analysis.html')
 
 @app.route('/volatile_stocks')
-def volatile_stocks_page():
-    """Display the volatile stocks page."""
+def volatile_stocks():
+    """Display the volatile stocks page"""
     return render_template('volatile_stocks.html')
 
 @app.route('/api/tesla_analysis')
@@ -803,87 +885,10 @@ def auto_trading():
     """Display the auto trading page"""
     return render_template('auto_trading.html')
 
-@app.route('/strategy_dashboard')
-def strategy_dashboard():
-    """Display the strategy dashboard page"""
-    return render_template('strategy_dashboard.html')
-
 @app.route('/tesla_analysis')
 def tesla_analysis():
     """Display the Tesla analysis page"""
     return render_template('tesla_analysis.html')
-
-@app.route('/volatile_stocks')
-def volatile_stocks():
-    """Display the volatile stocks page"""
-    return render_template('volatile_stocks.html')
-
-@app.route('/test_alpha_vantage', methods=['GET'])
-def test_alpha_vantage():
-    """Test page for Alpha Vantage API"""
-    return render_template('test_alpha_vantage.html')
-
-@app.route('/api/test_alpha_vantage', methods=['POST'])
-def test_alpha_vantage_api():
-    """Test Alpha Vantage API endpoint"""
-    try:
-        data = request.get_json()
-        symbol = data.get('symbol', 'AAPL')
-        
-        logger.info(f"Testing Alpha Vantage API for symbol: {symbol}")
-        
-        # Get API key
-        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-        if not api_key:
-            return jsonify({
-                'status': 'error',
-                'message': 'Alpha Vantage API key not found in environment'
-            }), 400
-        
-        # Test different endpoints
-        endpoints = {
-            'TIME_SERIES_DAILY': f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=full&apikey={api_key}",
-            'GLOBAL_QUOTE': f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}",
-            'SYMBOL_SEARCH': f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={symbol}&apikey={api_key}"
-        }
-        
-        results = {}
-        for endpoint, url in endpoints.items():
-            try:
-                logger.info(f"Testing {endpoint} endpoint")
-                response = requests.get(url, timeout=10)
-                logger.info(f"Response status: {response.status_code}")
-                logger.info(f"Response content: {response.text[:500]}")
-                
-                if response.status_code == 200:
-                    data = response.json()
-                    results[endpoint] = {
-                        'status': 'success',
-                        'data': data
-                    }
-                else:
-                    results[endpoint] = {
-                        'status': 'error',
-                        'message': f"HTTP Error: {response.status_code}",
-                        'response': response.text
-                    }
-            except Exception as e:
-                results[endpoint] = {
-                    'status': 'error',
-                    'message': str(e)
-                }
-        
-        return jsonify({
-            'status': 'success',
-            'results': results
-        })
-        
-    except Exception as e:
-        logger.error(f"Error testing Alpha Vantage API: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
 
 @app.route('/dashboard/api/run_backtest', methods=['POST'])
 def run_backtest():
@@ -1064,10 +1069,11 @@ def run_backtest():
         }), 500
 
 if __name__ == '__main__':
-    # For development only
-    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-    logger.info("Starting Flask app...")
-    logger.info(f"Using Authorization URL: {AUTHORIZATION_BASE_URL}")
-    logger.info(f"Using Token URL: {TOKEN_URL}")
-    logger.info(f"Using Scopes: {SCOPES}")
+    # Print all registered routes
+    print("\nRegistered Routes:")
+    for rule in app.url_map.iter_rules():
+        print(f"{rule.endpoint}: {rule.methods} {rule}")
+    print("\n")
+    
+    # Run the app
     app.run(host='0.0.0.0', port=5000, debug=True)
