@@ -1,216 +1,512 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Top Volatile Stocks Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-        .panel {
-            background: white;
-            border-radius: 8px;
-            padding: 20px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stock-card {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        .stock-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        .stock-symbol {
-            font-size: 20px;
-            font-weight: bold;
-        }
-        .stock-price {
-            font-size: 18px;
-        }
-        .positive {
-            color: #28a745;
-        }
-        .negative {
-            color: #dc3545;
-        }
-        .stock-metrics {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-        .metric {
-            background: white;
-            padding: 8px;
-            border-radius: 4px;
-        }
-        .metric-label {
-            font-size: 12px;
-            color: #666;
-        }
-        .metric-value {
-            font-size: 14px;
-            font-weight: bold;
-        }
-        .chart-container {
-            height: 200px;
-            margin-top: 10px;
-        }
-        .news-item {
-            padding: 8px;
-            border-bottom: 1px solid #dee2e6;
-            font-size: 14px;
-        }
-        .news-item:last-child {
-            border-bottom: none;
-        }
-        .news-title {
-            font-weight: bold;
-            margin-bottom: 5px;
-        }
-        .news-date {
-            color: #666;
-            font-size: 12px;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h1>Top Volatile Stocks Dashboard</h1>
-        
-        <div class="panel">
-            <h2>Most Volatile Stocks</h2>
-            <div id="stocks-container">
-                <!-- Stock cards will be populated by JavaScript -->
+{% extends "base.html" %}
+
+{% block title %}Top Volatile Stocks Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .panel {
+        background: white;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stock-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 15px;
+        transition: transform 0.2s ease;
+    }
+    .stock-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .stock-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .stock-symbol {
+        font-size: 20px;
+        font-weight: bold;
+    }
+    .stock-price {
+        font-size: 18px;
+    }
+    .positive {
+        color: #28a745;
+    }
+    .negative {
+        color: #dc3545;
+    }
+    .stock-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    .metric {
+        background: white;
+        padding: 8px;
+        border-radius: 4px;
+        text-align: center;
+    }
+    .metric-label {
+        font-size: 12px;
+        color: #666;
+    }
+    .metric-value {
+        font-size: 14px;
+        font-weight: bold;
+    }
+    .chart-container {
+        height: 200px;
+        margin-top: 10px;
+    }
+    .news-item {
+        padding: 8px;
+        border-bottom: 1px solid #dee2e6;
+        font-size: 14px;
+    }
+    .news-item:last-child {
+        border-bottom: none;
+    }
+    .news-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    .news-date {
+        color: #666;
+        font-size: 12px;
+    }
+    .refresh-button {
+        margin-bottom: 20px;
+    }
+    .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0,0,0,.1);
+        border-radius: 50%;
+        border-top-color: #007bff;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .error-message {
+        color: #dc3545;
+        margin-top: 10px;
+        padding: 10px;
+        background: #f8d7da;
+        border-radius: 4px;
+    }
+    .api-status {
+        margin-bottom: 20px;
+        padding: 10px;
+        border-radius: 4px;
+        background: #e9ecef;
+    }
+    .api-status.connected {
+        background: #d4edda;
+        color: #155724;
+    }
+    .api-status.error {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .filters {
+        margin-bottom: 20px;
+        padding: 15px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .filter-group {
+        margin-bottom: 10px;
+    }
+    .stock-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+    }
+    .action-button {
+        padding: 5px 10px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-size: 12px;
+    }
+    .add-watchlist {
+        background: #007bff;
+        color: white;
+    }
+    .set-alert {
+        background: #28a745;
+        color: white;
+    }
+    .view-details {
+        background: #6c757d;
+        color: white;
+    }
+    .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6c757d;
+    }
+    .empty-state i {
+        font-size: 48px;
+        margin-bottom: 10px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1>Top Volatile Stocks Dashboard</h1>
+    
+    <div class="api-status" id="api-status">
+        <i class="bi bi-info-circle"></i> Checking API connection...
+    </div>
+    
+    <div class="filters">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="filter-group">
+                    <label for="minVolatility">Minimum Volatility (%)</label>
+                    <input type="number" class="form-control" id="minVolatility" min="0" step="0.1" value="5">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="filter-group">
+                    <label for="minVolume">Minimum Volume</label>
+                    <input type="number" class="form-control" id="minVolume" min="0" value="1000000">
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="filter-group">
+                    <label for="marketCap">Market Cap Range</label>
+                    <select class="form-control" id="marketCap">
+                        <option value="all">All</option>
+                        <option value="small">Small Cap (< $2B)</option>
+                        <option value="mid">Mid Cap ($2B - $10B)</option>
+                        <option value="large">Large Cap (> $10B)</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>
+    
+    <button class="btn btn-primary refresh-button" id="refresh-button">
+        <i class="bi bi-arrow-clockwise"></i> Refresh Data
+    </button>
+    <div id="loading" class="loading" style="display: none;"></div>
+    <div id="error-message" class="error-message" style="display: none;"></div>
+    
+    <div class="panel">
+        <h2>Most Volatile Stocks</h2>
+        <div id="stocks-container">
+            <!-- Stock cards will be populated by JavaScript -->
+        </div>
+        <div id="empty-state" class="empty-state" style="display: none;">
+            <i class="bi bi-search"></i>
+            <h3>No stocks found</h3>
+            <p>Try adjusting your filters or refresh the data</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
-    <script>
-        async function fetchVolatileStocks() {
-            try {
-                const response = await fetch('/api/top_volatile_stocks');
-                const data = await response.json();
-                
-                if (data.status === 'success') {
-                    updateStocks(data.stocks);
-                }
-            } catch (error) {
-                console.error('Error fetching volatile stocks:', error);
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let charts = {};
+    let isLoading = false;
+    let currentFilters = {
+        minVolatility: 5,
+        minVolume: 1000000,
+        marketCap: 'all'
+    };
+
+    async function checkAPIStatus() {
+        try {
+            const response = await fetch('/api/alpha_vantage/status');
+            const data = await response.json();
+            
+            const statusElement = document.getElementById('api-status');
+            if (data.status === 'success') {
+                statusElement.className = 'api-status connected';
+                statusElement.innerHTML = `<i class="bi bi-check-circle"></i> Alpha Vantage API Connected`;
+            } else {
+                statusElement.className = 'api-status error';
+                statusElement.innerHTML = `<i class="bi bi-exclamation-circle"></i> Alpha Vantage API Error: ${data.message}`;
             }
+        } catch (error) {
+            const statusElement = document.getElementById('api-status');
+            statusElement.className = 'api-status error';
+            statusElement.innerHTML = `<i class="bi bi-exclamation-circle"></i> Alpha Vantage API Error: ${error.message}`;
         }
+    }
 
-        function updateStocks(stocks) {
-            const container = document.getElementById('stocks-container');
-            container.innerHTML = stocks.map(stock => `
-                <div class="stock-card">
-                    <div class="stock-header">
-                        <div class="stock-symbol">${stock.symbol}</div>
-                        <div class="stock-price ${stock.price_change >= 0 ? 'positive' : 'negative'}">
-                            $${stock.current_price.toFixed(2)} (${stock.price_change.toFixed(2)}%)
-                        </div>
-                    </div>
-                    
-                    <div class="stock-metrics">
-                        <div class="metric">
-                            <div class="metric-label">Volatility</div>
-                            <div class="metric-value">${stock.volatility.toFixed(2)}%</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">Volume</div>
-                            <div class="metric-value">${stock.current_volume.toLocaleString()}</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">Volume Ratio</div>
-                            <div class="metric-value">${stock.volume_ratio.toFixed(2)}x</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-label">Market Cap</div>
-                            <div class="metric-value">$${(stock.market_cap / 1e9).toFixed(2)}B</div>
-                        </div>
-                    </div>
+    function applyFilters(stocks) {
+        return stocks.filter(stock => {
+            const meetsVolatility = stock.volatility >= currentFilters.minVolatility;
+            const meetsVolume = stock.current_volume >= currentFilters.minVolume;
+            let meetsMarketCap = true;
+            
+            if (currentFilters.marketCap !== 'all') {
+                const marketCap = stock.market_cap;
+                switch(currentFilters.marketCap) {
+                    case 'small':
+                        meetsMarketCap = marketCap < 2e9;
+                        break;
+                    case 'mid':
+                        meetsMarketCap = marketCap >= 2e9 && marketCap <= 10e9;
+                        break;
+                    case 'large':
+                        meetsMarketCap = marketCap > 10e9;
+                        break;
+                }
+            }
+            
+            return meetsVolatility && meetsVolume && meetsMarketCap;
+        });
+    }
 
-                    <div class="chart-container">
-                        <canvas id="chart-${stock.symbol}"></canvas>
-                    </div>
+    async function fetchVolatileStocks() {
+        if (isLoading) return;
+        
+        isLoading = true;
+        const loadingElement = document.getElementById('loading');
+        const errorElement = document.getElementById('error-message');
+        const emptyStateElement = document.getElementById('empty-state');
+        
+        loadingElement.style.display = 'inline-block';
+        errorElement.style.display = 'none';
+        emptyStateElement.style.display = 'none';
+        
+        try {
+            const response = await fetch('/api/alpha_vantage/volatile_stocks');
+            if (!response.ok) throw new Error('Failed to fetch data');
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                const filteredStocks = applyFilters(data.stocks);
+                updateStocks(filteredStocks);
+                
+                if (filteredStocks.length === 0) {
+                    emptyStateElement.style.display = 'block';
+                }
+            } else {
+                throw new Error(data.message || 'Unknown error occurred');
+            }
+        } catch (error) {
+            console.error('Error fetching volatile stocks:', error);
+            errorElement.textContent = error.message;
+            errorElement.style.display = 'block';
+        } finally {
+            isLoading = false;
+            loadingElement.style.display = 'none';
+        }
+    }
 
-                    <div class="news-container">
-                        <h3>Recent News</h3>
-                        ${stock.news.map(item => `
-                            <div class="news-item">
-                                <div class="news-title">${item.title}</div>
-                                <div class="news-date">${new Date(item.published).toLocaleString()}</div>
-                                <a href="${item.link}" target="_blank">Read more</a>
-                            </div>
-                        `).join('')}
+    function updateStocks(stocks) {
+        const container = document.getElementById('stocks-container');
+        container.innerHTML = stocks.map(stock => `
+            <div class="stock-card">
+                <div class="stock-header">
+                    <div class="stock-symbol">${stock.symbol}</div>
+                    <div class="stock-price ${stock.price_change >= 0 ? 'positive' : 'negative'}">
+                        $${stock.current_price.toFixed(2)} (${stock.price_change.toFixed(2)}%)
                     </div>
                 </div>
-            `).join('');
+                
+                <div class="stock-metrics">
+                    <div class="metric">
+                        <div class="metric-label">Volatility</div>
+                        <div class="metric-value">${stock.volatility.toFixed(2)}%</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Volume</div>
+                        <div class="metric-value">${stock.current_volume.toLocaleString()}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Volume Ratio</div>
+                        <div class="metric-value">${stock.volume_ratio.toFixed(2)}x</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Market Cap</div>
+                        <div class="metric-value">$${(stock.market_cap / 1e9).toFixed(2)}B</div>
+                    </div>
+                </div>
 
-            // Initialize charts for each stock
-            stocks.forEach(stock => {
-                const ctx = document.getElementById(`chart-${stock.symbol}`).getContext('2d');
-                new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: stock.volume_history.dates,
-                        datasets: [
-                            {
-                                label: 'Price',
-                                data: stock.volume_history.prices,
-                                borderColor: 'rgb(75, 192, 192)',
-                                yAxisID: 'y'
-                            },
-                            {
-                                label: 'Volume',
-                                data: stock.volume_history.volumes,
-                                borderColor: 'rgb(255, 99, 132)',
-                                yAxisID: 'y1'
+                <div class="chart-container">
+                    <canvas id="chart-${stock.symbol}"></canvas>
+                </div>
+
+                <div class="stock-actions">
+                    <button class="action-button add-watchlist" onclick="addToWatchlist('${stock.symbol}')">
+                        <i class="bi bi-plus-circle"></i> Add to Watchlist
+                    </button>
+                    <button class="action-button set-alert" onclick="setPriceAlert('${stock.symbol}')">
+                        <i class="bi bi-bell"></i> Set Alert
+                    </button>
+                    <button class="action-button view-details" onclick="viewStockDetails('${stock.symbol}')">
+                        <i class="bi bi-info-circle"></i> View Details
+                    </button>
+                </div>
+
+                <div class="news-container">
+                    <h3>Recent News</h3>
+                    ${stock.news.map(item => `
+                        <div class="news-item">
+                            <div class="news-title">${item.title}</div>
+                            <div class="news-date">${new Date(item.published).toLocaleString()}</div>
+                            <a href="${item.link}" target="_blank">Read more</a>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `).join('');
+
+        // Initialize or update charts for each stock
+        stocks.forEach(stock => {
+            const chartId = `chart-${stock.symbol}`;
+            const ctx = document.getElementById(chartId).getContext('2d');
+            
+            if (charts[chartId]) {
+                charts[chartId].destroy();
+            }
+            
+            charts[chartId] = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: stock.volume_history.dates,
+                    datasets: [
+                        {
+                            label: 'Price',
+                            data: stock.volume_history.prices,
+                            borderColor: 'rgb(75, 192, 192)',
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Volume',
+                            data: stock.volume_history.volumes,
+                            borderColor: 'rgb(255, 99, 132)',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Price'
                             }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            y: {
-                                type: 'linear',
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
                                 display: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Price'
-                                }
+                                text: 'Volume'
                             },
-                            y1: {
-                                type: 'linear',
-                                display: true,
-                                position: 'right',
-                                title: {
-                                    display: true,
-                                    text: 'Volume'
-                                }
+                            grid: {
+                                drawOnChartArea: false
                             }
                         }
                     }
-                });
+                }
             });
-        }
+        });
+    }
 
-        // Fetch data initially and then every 5 minutes
+    // Action functions
+    async function addToWatchlist(symbol) {
+        try {
+            const response = await fetch('/api/watchlist/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol })
+            });
+            
+            if (response.ok) {
+                alert(`${symbol} added to watchlist successfully!`);
+            } else {
+                throw new Error('Failed to add to watchlist');
+            }
+        } catch (error) {
+            console.error('Error adding to watchlist:', error);
+            alert('Failed to add to watchlist: ' + error.message);
+        }
+    }
+
+    async function setPriceAlert(symbol) {
+        const price = prompt('Enter price alert value:');
+        if (!price) return;
+        
+        try {
+            const response = await fetch('/api/alerts/set', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol, price: parseFloat(price) })
+            });
+            
+            if (response.ok) {
+                alert(`Price alert set for ${symbol} at $${price}`);
+            } else {
+                throw new Error('Failed to set price alert');
+            }
+        } catch (error) {
+            console.error('Error setting price alert:', error);
+            alert('Failed to set price alert: ' + error.message);
+        }
+    }
+
+    function viewStockDetails(symbol) {
+        window.location.href = `/stock/${symbol}`;
+    }
+
+    // Event listeners
+    document.getElementById('refresh-button').addEventListener('click', fetchVolatileStocks);
+    
+    // Filter event listeners
+    document.getElementById('minVolatility').addEventListener('change', (e) => {
+        currentFilters.minVolatility = parseFloat(e.target.value);
         fetchVolatileStocks();
-        setInterval(fetchVolatileStocks, 300000);
-    </script>
-</body>
-</html> 
+    });
+    
+    document.getElementById('minVolume').addEventListener('change', (e) => {
+        currentFilters.minVolume = parseInt(e.target.value);
+        fetchVolatileStocks();
+    });
+    
+    document.getElementById('marketCap').addEventListener('change', (e) => {
+        currentFilters.marketCap = e.target.value;
+        fetchVolatileStocks();
+    });
+    
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        checkAPIStatus();
+        fetchVolatileStocks();
+    });
+    
+    // Auto-refresh every 5 minutes
+    setInterval(fetchVolatileStocks, 300000);
+</script>
+{% endblock %} 
