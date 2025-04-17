@@ -290,10 +290,20 @@
                 const marketDataUrl = '{{ account.market_data_url }}';
                 console.log('Market data URL:', marketDataUrl);
                 
-                const response = await fetch(marketDataUrl);
+                const response = await fetch(marketDataUrl, {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json',
+                        'Content-Type': 'application/json'
+                    },
+                    credentials: 'include'  // Important for session cookies
+                });
+                
                 if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
                 }
+                
                 const marketData = await response.json();
                 console.log('Received market data:', marketData);
                 

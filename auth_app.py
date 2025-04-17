@@ -12,23 +12,26 @@ from example_strategies import (
     bollinger_bands_strategy
 )
 import yfinance as yf
+from flask_cors import CORS
+from schwab_trader.utils.schwab_oauth import SchwabOAuth
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app)
 app.secret_key = 'your-secret-key-here'
 
 # Configure server name for ngrok
-app.config['SERVER_NAME'] = 'fff5-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
+app.config['SERVER_NAME'] = 'fc17-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
 
 # Your Schwab API credentials
 CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
 CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
 
 # Use HTTPS ngrok URL
-REDIRECT_URI = "https://fff5-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
+REDIRECT_URI = "https://fc17-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
 
 # Fixed URLs
 AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"
@@ -36,6 +39,17 @@ TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
 
 # Updated scope
 SCOPES = ["api"]
+
+# Initialize Schwab OAuth client
+schwab = SchwabOAuth()
+
+# Set the configuration
+schwab.client_id = CLIENT_ID
+schwab.client_secret = CLIENT_SECRET
+schwab.redirect_uri = REDIRECT_URI
+schwab.authorization_base_url = AUTHORIZATION_BASE_URL
+schwab.token_url = TOKEN_URL
+schwab.scopes = SCOPES
 
 @app.route('/')
 def index():
@@ -49,127 +63,123 @@ def index():
 
 @app.route('/login')
 def login():
-    logger.debug("Starting login process")
-    
-    # Construct authorization URL directly
-    auth_url = f"{AUTHORIZATION_BASE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}"
-    logger.debug(f"Generated Authorization URL: {auth_url}")
-    
-    return redirect(auth_url)
+    """Start OAuth login flow"""
+    try:
+        logger.debug("Starting login process")
+        oauth = OAuth2Session(
+            CLIENT_ID,
+            redirect_uri=REDIRECT_URI,
+            scope=SCOPES
+        )
+        auth_url, state = oauth.authorization_url(
+            AUTHORIZATION_BASE_URL
+        )
+        logger.debug(f"Generated authorization URL: {auth_url}")
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Error in login: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/callback')
 def callback():
-    logger.debug("Received callback")
+    """Handle OAuth callback"""
     try:
-        # Get the authorization code from the callback
-        auth_code = request.args.get('code', '')
-        if '@' not in auth_code:
-            auth_code = f"{auth_code}@"
+        logger.debug("Received callback request")
+        logger.debug(f"Request args: {request.args}")
+        logger.debug(f"Request URL: {request.url}")
         
-        logger.debug(f"Authorization code: {auth_code}")
+        # Get authorization code
+        auth_code = request.args.get('code')
+        if not auth_code:
+            logger.error("No authorization code received")
+            return jsonify({'error': 'No authorization code'}), 400
+            
+        logger.debug(f"Authorization code received: {auth_code}")
         
-        # Construct credentials
-        credentials = f"{CLIENT_ID}:{CLIENT_SECRET}"
-        base64_credentials = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
-        
-        # Construct headers and payload for token request
-        token_headers = {
-            "Authorization": f"Basic {base64_credentials}",
-            "Content-Type": "application/x-www-form-urlencoded",
-            "Accept": "application/json"
-        }
-        
-        token_payload = {
-            "grant_type": "authorization_code",
-            "code": auth_code,
-            "redirect_uri": REDIRECT_URI
-        }
-        
-        # Get token
-        token_response = requests.post(
-            url=TOKEN_URL,
-            headers=token_headers,
-            data=token_payload
+        # Initialize OAuth2Session
+        oauth = OAuth2Session(
+            CLIENT_ID,
+            redirect_uri=REDIRECT_URI,
+            scope=SCOPES
         )
         
-        token_data = token_response.json()
-        logger.debug(f"Token response: {token_data}")
+        # Exchange code for token
+        logger.debug("Attempting to fetch token...")
+        try:
+            token = oauth.fetch_token(
+                TOKEN_URL,
+                authorization_response=request.url,
+                client_secret=CLIENT_SECRET,
+                include_client_id=True
+            )
+            logger.debug("Token fetch successful")
+            logger.debug(f"Token data: {token}")
+        except Exception as e:
+            logger.error(f"Error fetching token: {str(e)}")
+            return jsonify({'error': f'Failed to get token: {str(e)}'}), 401
+            
+        # Store token in session
+        session['access_token'] = token
+        logger.debug("Token stored in session")
         
-        # Store token
-        session['oauth_token'] = token_data
-        session['access_token'] = token_data['access_token']
-        
-        # Get client correlation ID from token response headers
-        client_correlid = token_response.headers.get('Schwab-Client-Correlid')
-        if not client_correlid:
-            client_correlid = token_data.get('client_correlid', '')
-        
-        logger.debug(f"Client correlation ID: {client_correlid}")
-        
-        # API headers for subsequent requests
-        api_headers = {
-            'Accept': 'application/json',
-            'Authorization': f"Bearer {token_data['access_token']}",
-            'X-Authorization': f"Bearer {token_data['access_token']}",
-            'Schwab-Client-Correlid': client_correlid,
-            'Origin': REDIRECT_URI.rsplit('/', 1)[0]
-        }
-        
-        # Get account details
-        accounts_url = "https://api.schwabapi.com/trader/v1/accounts"
-        accounts_response = requests.get(accounts_url, headers=api_headers)
-        
-        if accounts_response.status_code == 200:
-            accounts_data = accounts_response.json()
-            if accounts_data and isinstance(accounts_data, list):
-                account = accounts_data[0]  # Get first account
-                session['account_data'] = account
+        # Get account data
+        logger.debug("Fetching account data")
+        try:
+            account_data = schwab.get_accounts(token)
+            if not account_data:
+                logger.error("Failed to get account data")
+                return jsonify({'error': 'Failed to get account data'}), 500
                 
-                # Get positions if available
-                account_number = account['securitiesAccount']['accountNumber']
-                positions_url = f"https://api.schwabapi.com/trader/v1/accounts/{account_number}/positions"
-                positions_response = requests.get(positions_url, headers=api_headers)
-                
-                if positions_response.status_code == 200:
-                    session['positions'] = positions_response.json()
-                else:
-                    session['positions'] = []
-                    logger.warning(f"Could not fetch positions: {positions_response.status_code}")
-                
-                return redirect(url_for('dashboard'))
-            else:
-                return jsonify({
-                    "success": False,
-                    "error": "No accounts found"
-                }), 404
-        else:
-            return jsonify({
-                "success": False,
-                "error": f"Failed to get accounts: {accounts_response.status_code}"
-            }), accounts_response.status_code
+            logger.debug(f"Account data received: {account_data}")
+            
+            # Store account data in session
+            session['account_data'] = account_data
+            logger.debug("Account data stored in session")
+            
+            # Get positions
+            logger.debug("Fetching positions")
+            positions = schwab.get_positions(token)
+            logger.debug(f"Positions received: {positions}")
+            
+            # Store positions in session
+            session['positions'] = positions
+            logger.debug(f"Positions stored in session: {positions}")
+            
+            return redirect(url_for('dashboard'))
+        except Exception as e:
+            logger.error(f"Error getting account data: {str(e)}")
+            return jsonify({'error': f'Failed to get account data: {str(e)}'}), 500
             
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 400
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/dashboard')
 def dashboard():
     """Display account dashboard"""
+    logger.debug("Accessing dashboard route")
+    logger.debug(f"Session data: {dict(session)}")
+    
     if 'access_token' not in session:
+        logger.error("No access token in session, redirecting to login")
         return redirect(url_for('login'))
         
     account_data = session.get('account_data', {})
     positions = session.get('positions', [])
     
+    logger.debug(f"Account data: {account_data}")
+    logger.debug(f"Positions: {positions}")
+    
     if not account_data:
+        logger.error("No account data in session, redirecting to login")
         return redirect(url_for('login'))
         
     # Extract relevant account information
     account = account_data.get('securitiesAccount', {})
     current_balances = account.get('currentBalances', {})
+    
+    # Construct the market data URL
+    market_data_url = f"https://{app.config['SERVER_NAME']}/api/market_data"
     
     account_info = {
         'account_number': account.get('accountNumber'),
@@ -179,9 +189,10 @@ def dashboard():
         'total_value': current_balances.get('liquidationValue', 0),
         'long_market_value': current_balances.get('longMarketValue', 0),
         'positions': positions,
-        'market_data_url': url_for('get_market_data', _external=True)
+        'market_data_url': market_data_url
     }
     
+    logger.debug(f"Account info being passed to template: {account_info}")
     return render_template('dashboard.html', account=account_info)
 
 @app.route('/test_strategies', methods=['GET'])
@@ -227,85 +238,92 @@ def strategy_dashboard():
 @app.route('/api/market_data')
 def get_market_data():
     """Get real-time market data for positions"""
-    if 'access_token' not in session:
-        logger.error("No access token in session")
-        return jsonify({'error': 'Not authenticated'}), 401
+    try:
+        logger.debug("Market data endpoint called")
+        logger.debug(f"Session data: {dict(session)}")
         
-    positions = session.get('positions', [])
-    logger.debug(f"Positions from session: {positions}")
-    
-    if not positions:
-        logger.warning("No positions found in session")
-        return jsonify({'error': 'No positions found'}), 404
+        if 'access_token' not in session:
+            logger.error("No access token in session")
+            return jsonify({'error': 'Not authenticated'}), 401
+            
+        positions = session.get('positions', [])
+        logger.debug(f"Positions from session: {positions}")
         
-    market_data = {}
-    
-    for position in positions:
-        symbol = position.get('symbol')
-        logger.debug(f"Processing position for symbol: {symbol}")
+        if not positions:
+            logger.warning("No positions found in session")
+            return jsonify({'error': 'No positions found'}), 404
+            
+        market_data = {}
         
-        if symbol:
-            try:
-                stock = yf.Ticker(symbol)
-                info = stock.info
-                logger.debug(f"YFinance info for {symbol}: {info}")
-                
-                # Get historical data for technical indicators
-                hist = stock.history(period="1mo", interval="1d")
-                logger.debug(f"Historical data shape for {symbol}: {hist.shape}")
-                
-                # Calculate technical indicators
-                hist['SMA_20'] = hist['Close'].rolling(window=20).mean()
-                hist['SMA_50'] = hist['Close'].rolling(window=50).mean()
-                
-                # Calculate RSI
-                delta = hist['Close'].diff()
-                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-                rs = gain / loss
-                hist['RSI'] = 100 - (100 / (1 + rs))
-                
-                # Calculate Bollinger Bands
-                hist['BB_middle'] = hist['Close'].rolling(window=20).mean()
-                hist['BB_std'] = hist['Close'].rolling(window=20).std()
-                hist['BB_upper'] = hist['BB_middle'] + (hist['BB_std'] * 2)
-                hist['BB_lower'] = hist['BB_middle'] - (hist['BB_std'] * 2)
-                
-                # Format historical data for chart
-                chart_data = {
-                    'dates': hist.index.strftime('%Y-%m-%d').tolist(),
-                    'close': hist['Close'].tolist(),
-                    'sma_20': hist['SMA_20'].tolist(),
-                    'sma_50': hist['SMA_50'].tolist(),
-                    'bb_upper': hist['BB_upper'].tolist(),
-                    'bb_lower': hist['BB_lower'].tolist(),
-                    'rsi': hist['RSI'].tolist()
-                }
-                
-                market_data[symbol] = {
-                    'current_price': info.get('regularMarketPrice', 0),
-                    'change': info.get('regularMarketChange', 0),
-                    'change_percent': info.get('regularMarketChangePercent', 0),
-                    'volume': info.get('regularMarketVolume', 0),
-                    'high': info.get('regularMarketDayHigh', 0),
-                    'low': info.get('regularMarketDayLow', 0),
-                    'bid': info.get('bid', 0),
-                    'ask': info.get('ask', 0),
-                    'bid_size': info.get('bidSize', 0),
-                    'ask_size': info.get('askSize', 0),
-                    'fifty_two_week_high': info.get('fiftyTwoWeekHigh', 0),
-                    'fifty_two_week_low': info.get('fiftyTwoWeekLow', 0),
-                    'pe_ratio': info.get('trailingPE', 0),
-                    'market_cap': info.get('marketCap', 0),
-                    'chart_data': chart_data
-                }
-                logger.debug(f"Market data for {symbol}: {market_data[symbol]}")
-            except Exception as e:
-                logger.error(f"Error getting market data for {symbol}: {str(e)}")
-                market_data[symbol] = {'error': str(e)}
-    
-    logger.debug(f"Final market data response: {market_data}")
-    return jsonify(market_data)
+        for position in positions:
+            symbol = position.get('symbol')
+            logger.debug(f"Processing position for symbol: {symbol}")
+            
+            if symbol:
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info
+                    logger.debug(f"YFinance info for {symbol}: {info}")
+                    
+                    # Get historical data for technical indicators
+                    hist = stock.history(period="1mo", interval="1d")
+                    logger.debug(f"Historical data shape for {symbol}: {hist.shape}")
+                    
+                    # Calculate technical indicators
+                    hist['SMA_20'] = hist['Close'].rolling(window=20).mean()
+                    hist['SMA_50'] = hist['Close'].rolling(window=50).mean()
+                    
+                    # Calculate RSI
+                    delta = hist['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain / loss
+                    hist['RSI'] = 100 - (100 / (1 + rs))
+                    
+                    # Calculate Bollinger Bands
+                    hist['BB_middle'] = hist['Close'].rolling(window=20).mean()
+                    hist['BB_std'] = hist['Close'].rolling(window=20).std()
+                    hist['BB_upper'] = hist['BB_middle'] + (hist['BB_std'] * 2)
+                    hist['BB_lower'] = hist['BB_middle'] - (hist['BB_std'] * 2)
+                    
+                    # Format historical data for chart
+                    chart_data = {
+                        'dates': hist.index.strftime('%Y-%m-%d').tolist(),
+                        'close': hist['Close'].tolist(),
+                        'sma_20': hist['SMA_20'].tolist(),
+                        'sma_50': hist['SMA_50'].tolist(),
+                        'bb_upper': hist['BB_upper'].tolist(),
+                        'bb_lower': hist['BB_lower'].tolist(),
+                        'rsi': hist['RSI'].tolist()
+                    }
+                    
+                    market_data[symbol] = {
+                        'current_price': info.get('regularMarketPrice', 0),
+                        'change': info.get('regularMarketChange', 0),
+                        'change_percent': info.get('regularMarketChangePercent', 0),
+                        'volume': info.get('regularMarketVolume', 0),
+                        'high': info.get('regularMarketDayHigh', 0),
+                        'low': info.get('regularMarketDayLow', 0),
+                        'bid': info.get('bid', 0),
+                        'ask': info.get('ask', 0),
+                        'bid_size': info.get('bidSize', 0),
+                        'ask_size': info.get('askSize', 0),
+                        'fifty_two_week_high': info.get('fiftyTwoWeekHigh', 0),
+                        'fifty_two_week_low': info.get('fiftyTwoWeekLow', 0),
+                        'pe_ratio': info.get('trailingPE', 0),
+                        'market_cap': info.get('marketCap', 0),
+                        'chart_data': chart_data
+                    }
+                    logger.debug(f"Market data for {symbol}: {market_data[symbol]}")
+                except Exception as e:
+                    logger.error(f"Error getting market data for {symbol}: {str(e)}")
+                    market_data[symbol] = {'error': str(e)}
+        
+        logger.debug(f"Final market data response: {market_data}")
+        return jsonify(market_data)
+    except Exception as e:
+        logger.error(f"Unexpected error in market data endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # For development only
