@@ -24,6 +24,8 @@ class StrategyTester:
         self.budget = 0
         self.active_positions = {}
         self.running = False
+        self.last_balance_check = 0
+        self.profit_loss_threshold = 500  # $500 threshold for detailed summaries
         
     def is_market_open(self) -> bool:
         """Check if the market is currently open"""
@@ -151,10 +153,14 @@ class StrategyTester:
         import time
         
         self.running = True
+        self.last_balance_check = self.get_current_balance()
         logger.info(f"Starting auto trading with strategy {strategy.__name__} on symbols {symbols}")
         
         while self.running:
             try:
+                # Check for significant profit/loss changes
+                self.check_profit_loss()
+                
                 # Check if market is open
                 if not self.is_market_open():
                     logger.info("Market is closed, waiting...")
@@ -457,4 +463,56 @@ class StrategyTester:
         
     def get_trade_history(self):
         """Get trade history"""
-        return self.trade_history 
+        return self.trade_history
+    
+    def check_profit_loss(self):
+        """Check for significant profit/loss changes and generate detailed summary"""
+        current_balance = self.get_current_balance()
+        change = current_balance - self.last_balance_check
+        
+        if abs(change) >= self.profit_loss_threshold:
+            summary = self.generate_profit_loss_summary(change)
+            logger.info(f"\n{'='*50}\nSignificant Balance Change: ${change:.2f}\n{summary}\n{'='*50}")
+            self.last_balance_check = current_balance
+            
+    def generate_profit_loss_summary(self, change):
+        """Generate detailed summary of profit/loss causes"""
+        summary = []
+        
+        # Add current positions and their performance
+        summary.append("\nCurrent Positions:")
+        for symbol, position in self.active_positions.items():
+            try:
+                stock = yf.Ticker(symbol)
+                current_price = stock.info.get('regularMarketPrice', 0)
+                position_value = position['shares'] * current_price
+                position_pnl = (current_price - position['entry_price']) * position['shares']
+                
+                # Get recent trading decision details
+                data = stock.history(period="30d")
+                if not data.empty:
+                    signal, decision_details = self.strategy(data)
+                    summary.append(f"{symbol}: {position['shares']} shares @ ${current_price:.2f} (P/L: ${position_pnl:.2f})")
+                    summary.append(f"  Last Decision: {decision_details['reason']}")
+                    summary.append(f"  Volume Ratio: {decision_details['current_volume_ratio']:.2f}")
+                    summary.append(f"  Up Volume: {decision_details['up_volume']:.0f}")
+                    summary.append(f"  Down Volume: {decision_details['down_volume']:.0f}")
+            except Exception as e:
+                logger.error(f"Error getting position data for {symbol}: {str(e)}")
+        
+        # Add recent trade history with decision details
+        summary.append("\nRecent Trades:")
+        recent_trades = self.trade_history[-5:]  # Last 5 trades
+        for trade in recent_trades:
+            try:
+                stock = yf.Ticker(trade['symbol'])
+                data = stock.history(period="30d", start=trade['timestamp'])
+                if not data.empty:
+                    signal, decision_details = self.strategy(data)
+                    summary.append(f"{trade['type']} {trade['symbol']}: {trade['quantity']} shares @ ${trade['price']:.2f}")
+                    summary.append(f"  Decision Reason: {decision_details['reason']}")
+                    summary.append(f"  Volume Conditions: Ratio={decision_details['current_volume_ratio']:.2f}")
+            except Exception as e:
+                logger.error(f"Error analyzing trade {trade['symbol']}: {str(e)}")
+        
+        return "\n".join(summary) 

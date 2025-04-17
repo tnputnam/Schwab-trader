@@ -180,4 +180,56 @@ def tesla_volume_analysis(data: pd.DataFrame, volume_threshold: float = 1.15) ->
         'price_changes': price_changes,
         'volume_correlation': volume_correlation,
         'high_volume_days_data': high_volume_days[['Volume', 'Close']].to_dict('records')
-    } 
+    }
+
+def volume_ratio_strategy(data, buy_threshold=1.15, sell_threshold=1.05):
+    """
+    Volume-based strategy that:
+    1. Tracks buy/sell volume ratio over 30 days
+    2. Buys when buy volume is 15% above sell volume
+    3. Sells when buy volume drops below 5% above sell volume
+    
+    Parameters:
+    - data: DataFrame with OHLCV data
+    - buy_threshold: Minimum buy/sell volume ratio to trigger buy (default 1.15 = 15% above)
+    - sell_threshold: Maximum buy/sell volume ratio to trigger sell (default 1.05 = 5% above)
+    
+    Returns:
+    - tuple: (signal, decision_details)
+      signal: 'BUY', 'SELL', or 'HOLD'
+      decision_details: dict containing detailed information about the decision
+    """
+    if len(data) < 30:  # Need 30 days of data for meaningful analysis
+        return 'HOLD', {'reason': 'Insufficient data', 'days_available': len(data)}
+        
+    # Calculate price change
+    data['price_change'] = data['Close'].pct_change()
+    
+    # Calculate volume ratios using last 30 days
+    up_volume = data[data['price_change'] > 0]['Volume'].mean()
+    down_volume = data[data['price_change'] < 0]['Volume'].mean()
+    
+    # Calculate current volume ratio
+    current_volume_ratio = up_volume / down_volume if down_volume > 0 else 0
+    
+    # Prepare decision details
+    decision_details = {
+        'current_volume_ratio': current_volume_ratio,
+        'buy_threshold': buy_threshold,
+        'sell_threshold': sell_threshold,
+        'up_volume': up_volume,
+        'down_volume': down_volume,
+        'recent_price_change': data['Close'].pct_change().iloc[-1],
+        'average_daily_volume': data['Volume'].mean()
+    }
+    
+    # Generate signals based only on volume ratio
+    if current_volume_ratio >= buy_threshold:
+        decision_details['reason'] = f'Buy volume {current_volume_ratio:.2f}x above sell volume (threshold: {buy_threshold})'
+        return 'BUY', decision_details
+    elif current_volume_ratio <= sell_threshold:
+        decision_details['reason'] = f'Buy volume {current_volume_ratio:.2f}x above sell volume (threshold: {sell_threshold})'
+        return 'SELL', decision_details
+    else:
+        decision_details['reason'] = f'Volume ratio {current_volume_ratio:.2f} within normal range'
+        return 'HOLD', decision_details 

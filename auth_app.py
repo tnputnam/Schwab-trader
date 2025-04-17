@@ -72,7 +72,7 @@ def login():
         # Clear any existing session data
         session.clear()
         
-        logger.debug("Starting login process")
+    logger.debug("Starting login process")
         oauth = OAuth2Session(
             CLIENT_ID,
             redirect_uri=REDIRECT_URI,
@@ -89,7 +89,7 @@ def login():
             state=state
         )
         logger.debug(f"Generated authorization URL: {auth_url}")
-        return redirect(auth_url)
+    return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error in login: {str(e)}")
         return jsonify({'error': str(e)}), 500
@@ -687,16 +687,16 @@ def top_volatile_stocks():
                         'volume_history': volume_history,
                         'current_indicators': current_indicators,
                         'news': formatted_news
-                    })
-                    
-            except Exception as e:
+            })
+            
+        except Exception as e:
                 logger.error(f"Error analyzing {symbol}: {str(e)}")
                 continue
         
         # Sort by volatility (highest first)
         results.sort(key=lambda x: x['volatility'], reverse=True)
         
-        return jsonify({
+            return jsonify({
             'status': 'success',
             'stocks': results[:10]  # Return top 10 most volatile
         })
