@@ -89,90 +89,67 @@ def callback():
         
         # Get client correlation ID from token response headers
         client_correlid = token_response.headers.get('Schwab-Client-Correlid')
-        logger.debug(f"Client correlation ID from headers: {client_correlid}")
+        if not client_correlid:
+            # Try to get it from the token response body
+            client_correlid = token_data.get('jti', '')
+        
+        logger.debug(f"Client correlation ID: {client_correlid}")
         
         # API headers for subsequent requests
         api_headers = {
-            'Accept': 'application/json',
+            'Accept': '*/*',
             'Authorization': f"Bearer {token_data['access_token']}",
+            'X-Authorization': f"Bearer {token_data['access_token']}",
             'Schwab-Client-Correlid': client_correlid,
             'Origin': REDIRECT_URI.rsplit('/', 1)[0],
             'Content-Type': 'application/json'
         }
         
-        # First try to get the list of accounts
+        # First get the account hash value
         accounts_response = requests.get(
-            'https://api.schwabapi.com/v1/accounts',
+            'https://api.schwabapi.com/trader/v1/accounts/accountNumbers',
             headers=api_headers
         )
-        
-        if accounts_response.status_code != 200:
-            # Try alternative accounts endpoint
-            accounts_response = requests.get(
-                'https://api.schwabapi.com/v1/brokerage/accounts',
-                headers=api_headers
-            )
-            
-        if accounts_response.status_code != 200:
-            # Try trading accounts endpoint
-            accounts_response = requests.get(
-                'https://api.schwabapi.com/v1/trading/accounts',
-                headers=api_headers
-            )
+        logger.debug(f"Account numbers response: {accounts_response.status_code}")
         
         if accounts_response.status_code == 200:
             accounts_data = accounts_response.json()
             logger.debug(f"Accounts data: {accounts_data}")
             
-            # Try to get positions and portfolio for each account
-            for account in accounts_data.get('accounts', []):
-                account_id = account.get('accountId')
-                if account_id:
-                    # Try different position endpoints
-                    positions_endpoints = [
-                        f'v1/trading/accounts/{account_id}/positions',
-                        f'v1/brokerage/accounts/{account_id}/positions',
-                        f'v1/accounts/{account_id}/positions'
-                    ]
-                    
-                    positions_response = None
-                    for endpoint in positions_endpoints:
-                        try:
-                            positions_response = requests.get(
-                                f'https://api.schwabapi.com/{endpoint}',
-                                headers=api_headers
-                            )
-                            if positions_response.status_code == 200:
-                                break
-                        except Exception as e:
-                            logger.warning(f"Error trying positions endpoint {endpoint}: {e}")
-                    
-                    # Try different portfolio endpoints
-                    portfolio_endpoints = [
-                        f'v1/trading/accounts/{account_id}/portfolio',
-                        f'v1/brokerage/accounts/{account_id}/portfolio',
-                        f'v1/accounts/{account_id}/portfolio'
-                    ]
-                    
-                    portfolio_response = None
-                    for endpoint in portfolio_endpoints:
-                        try:
-                            portfolio_response = requests.get(
-                                f'https://api.schwabapi.com/{endpoint}',
-                                headers=api_headers
-                            )
-                            if portfolio_response.status_code == 200:
-                                break
-                        except Exception as e:
-                            logger.warning(f"Error trying portfolio endpoint {endpoint}: {e}")
-                    
-                    return jsonify({
-                        "success": True,
-                        "message": "Successfully authenticated with Schwab",
-                        "account": account,
-                        "positions": positions_response.json() if positions_response and positions_response.status_code == 200 else None,
-                        "portfolio": portfolio_response.json() if portfolio_response and portfolio_response.status_code == 200 else None
-                    })
+            # Get the hash value for the account
+            account_hash = None
+            for account in accounts_data:
+                if '400' in str(account.get('accountNumber', '')):
+                    account_hash = account.get('hashValue')
+                    break
+            
+            if account_hash:
+                # Try to get positions using the hash value
+                positions_response = requests.get(
+                    f'https://api.schwabapi.com/trader/v1/accounts/{account_hash}/positions',
+                    headers=api_headers
+                )
+                logger.debug(f"Positions response: {positions_response.status_code}")
+                
+                # Try to get portfolio using the hash value
+                portfolio_response = requests.get(
+                    f'https://api.schwabapi.com/trader/v1/accounts/{account_hash}/portfolio',
+                    headers=api_headers
+                )
+                logger.debug(f"Portfolio response: {portfolio_response.status_code}")
+                
+                return jsonify({
+                    "success": True,
+                    "message": "Successfully authenticated with Schwab",
+                    "account_hash": account_hash,
+                    "positions": positions_response.json() if positions_response.status_code == 200 else None,
+                    "portfolio": portfolio_response.json() if portfolio_response.status_code == 200 else None,
+                    "debug_info": {
+                        "client_correlid": client_correlid,
+                        "headers_used": api_headers,
+                        "accounts_data": accounts_data
+                    }
+                })
         
         # If we get here, return error information
         return jsonify({
@@ -188,7 +165,12 @@ def callback():
                     "scope": token_data.get('scope'),
                     "token_type": token_data.get('token_type'),
                     "expires_in": token_data.get('expires_in'),
-                    "client_correlid": client_correlid
+                    "client_correlid": client_correlid,
+                    "access_token": token_data.get('access_token')
+                },
+                "debug_info": {
+                    "headers_used": api_headers,
+                    "token_response_headers": dict(token_response.headers)
                 }
             }
         })
