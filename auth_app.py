@@ -2,28 +2,29 @@ from flask import Flask, session, redirect, request, jsonify
 from requests_oauthlib import OAuth2Session
 import os
 import logging
-import jwt
+import base64
+import requests
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'  # Required for session management
+app.secret_key = 'your-secret-key-here'
 
 # Your Schwab API credentials
 CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
 CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
 
-# Updated with your ngrok URL
+# Use HTTPS ngrok URL
 REDIRECT_URI = "https://fff5-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
 
-# Fixed URLs to use api.schwabapi.com
+# Fixed URLs
 AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"
 TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
 
-# Updated scope to match Schwab's API
-SCOPES = ["api"]  # Using the api scope as returned by the token endpoint
+# Updated scope
+SCOPES = ["api"]
 
 @app.route('/')
 def index():
@@ -38,131 +39,156 @@ def index():
 @app.route('/login')
 def login():
     logger.debug("Starting login process")
-    schwab = OAuth2Session(
-        CLIENT_ID,
-        redirect_uri=REDIRECT_URI,
-        scope=SCOPES
-    )
-    authorization_url, state = schwab.authorization_url(AUTHORIZATION_BASE_URL)
     
-    logger.debug(f"Generated Authorization URL: {authorization_url}")
+    # Construct authorization URL directly
+    auth_url = f"{AUTHORIZATION_BASE_URL}?client_id={CLIENT_ID}&redirect_uri={REDIRECT_URI}"
+    logger.debug(f"Generated Authorization URL: {auth_url}")
     
-    # Store state for later validation
-    session['oauth_state'] = state
-    return redirect(authorization_url)
+    return redirect(auth_url)
 
 @app.route('/callback')
 def callback():
     logger.debug("Received callback")
     try:
-        schwab = OAuth2Session(
-            CLIENT_ID,
-            redirect_uri=REDIRECT_URI,
-            state=session.get('oauth_state')
-        )
+        # Get the authorization code from the callback
+        auth_code = request.args.get('code', '')
+        if '@' not in auth_code:
+            auth_code = f"{auth_code}@"
         
-        logger.debug(f"Callback URL: {request.url}")
+        logger.debug(f"Authorization code: {auth_code}")
         
-        token_response = schwab.fetch_token(
-            TOKEN_URL,
-            client_secret=CLIENT_SECRET,
-            authorization_response=request.url
-        )
+        # Construct credentials
+        credentials = f"{CLIENT_ID}:{CLIENT_SECRET}"
+        base64_credentials = base64.b64encode(credentials.encode("utf-8")).decode("utf-8")
         
-        # Store token in session
-        session['oauth_token'] = token_response
-        
-        # Get the Schwab-Client-Correlid from the token response headers
-        client_correlid = request.headers.get('Schwab-Client-Correlid')
-        if not client_correlid:
-            # Extract from token response headers if available
-            client_correlid = token_response.get('jti', '')
-            if not client_correlid:
-                # Use the jti from the id_token as fallback
-                try:
-                    id_token = jwt.decode(token_response['id_token'], options={"verify_signature": False})
-                    client_correlid = id_token.get('jti', '')
-                except Exception as e:
-                    logger.warning(f"Could not decode id_token: {e}")
-        
-        logger.debug(f"Using client correlation ID: {client_correlid}")
-        
-        # Common headers for all requests
-        headers = {
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {token_response["access_token"]}',
-            'X-Authorization': f'Bearer {token_response["access_token"]}',
-            'Schwab-Client-Correlid': client_correlid,
-            'Origin': REDIRECT_URI.split('/callback')[0],
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        # Construct headers and payload for token request
+        token_headers = {
+            "Authorization": f"Basic {base64_credentials}",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json"
         }
         
-        # Try different API endpoints
-        api_endpoints = [
-            'v1/accounts',  # Try base accounts endpoint
-            'v1/trading/accounts',  # Try trading accounts endpoint
-            'v1/brokerage/accounts'  # Try brokerage accounts endpoint
-        ]
+        token_payload = {
+            "grant_type": "authorization_code",
+            "code": auth_code,
+            "redirect_uri": REDIRECT_URI
+        }
         
-        accounts_response = None
-        positions_response = None
-        portfolio_response = None
+        # Get token
+        token_response = requests.post(
+            url=TOKEN_URL,
+            headers=token_headers,
+            data=token_payload
+        )
         
-        for endpoint in api_endpoints:
-            try:
-                # Try to get accounts list first
-                accounts_response = schwab.get(f'https://api.schwabapi.com/{endpoint}', headers=headers)
-                if accounts_response.status_code == 200:
-                    accounts_data = accounts_response.json()
-                    logger.debug(f"Successfully got accounts from {endpoint}")
+        token_data = token_response.json()
+        logger.debug(f"Token response: {token_data}")
+        
+        # Store token
+        session['oauth_token'] = token_data
+        
+        # Get client correlation ID from token response headers
+        client_correlid = token_response.headers.get('Schwab-Client-Correlid')
+        logger.debug(f"Client correlation ID from headers: {client_correlid}")
+        
+        # API headers for subsequent requests
+        api_headers = {
+            'Accept': 'application/json',
+            'Authorization': f"Bearer {token_data['access_token']}",
+            'Schwab-Client-Correlid': client_correlid,
+            'Origin': REDIRECT_URI.rsplit('/', 1)[0],
+            'Content-Type': 'application/json'
+        }
+        
+        # First try to get the list of accounts
+        accounts_response = requests.get(
+            'https://api.schwabapi.com/v1/accounts',
+            headers=api_headers
+        )
+        
+        if accounts_response.status_code != 200:
+            # Try alternative accounts endpoint
+            accounts_response = requests.get(
+                'https://api.schwabapi.com/v1/brokerage/accounts',
+                headers=api_headers
+            )
+            
+        if accounts_response.status_code != 200:
+            # Try trading accounts endpoint
+            accounts_response = requests.get(
+                'https://api.schwabapi.com/v1/trading/accounts',
+                headers=api_headers
+            )
+        
+        if accounts_response.status_code == 200:
+            accounts_data = accounts_response.json()
+            logger.debug(f"Accounts data: {accounts_data}")
+            
+            # Try to get positions and portfolio for each account
+            for account in accounts_data.get('accounts', []):
+                account_id = account.get('accountId')
+                if account_id:
+                    # Try different position endpoints
+                    positions_endpoints = [
+                        f'v1/trading/accounts/{account_id}/positions',
+                        f'v1/brokerage/accounts/{account_id}/positions',
+                        f'v1/accounts/{account_id}/positions'
+                    ]
                     
-                    # If we have accounts, try to get positions and portfolio for each account
-                    for account in accounts_data.get('accounts', []):
-                        account_id = account.get('accountId')
-                        if account_id:
-                            try:
-                                positions_response = schwab.get(
-                                    f'https://api.schwabapi.com/{endpoint}/{account_id}/positions',
-                                    headers=headers
-                                )
-                                portfolio_response = schwab.get(
-                                    f'https://api.schwabapi.com/{endpoint}/{account_id}/portfolio',
-                                    headers=headers
-                                )
-                                if positions_response.status_code == 200 or portfolio_response.status_code == 200:
-                                    break
-                            except Exception as e:
-                                logger.warning(f"Error getting positions/portfolio for account {account_id}: {e}")
-                    break
-            except Exception as e:
-                logger.warning(f"Error trying endpoint {endpoint}: {e}")
-                continue
+                    positions_response = None
+                    for endpoint in positions_endpoints:
+                        try:
+                            positions_response = requests.get(
+                                f'https://api.schwabapi.com/{endpoint}',
+                                headers=api_headers
+                            )
+                            if positions_response.status_code == 200:
+                                break
+                        except Exception as e:
+                            logger.warning(f"Error trying positions endpoint {endpoint}: {e}")
+                    
+                    # Try different portfolio endpoints
+                    portfolio_endpoints = [
+                        f'v1/trading/accounts/{account_id}/portfolio',
+                        f'v1/brokerage/accounts/{account_id}/portfolio',
+                        f'v1/accounts/{account_id}/portfolio'
+                    ]
+                    
+                    portfolio_response = None
+                    for endpoint in portfolio_endpoints:
+                        try:
+                            portfolio_response = requests.get(
+                                f'https://api.schwabapi.com/{endpoint}',
+                                headers=api_headers
+                            )
+                            if portfolio_response.status_code == 200:
+                                break
+                        except Exception as e:
+                            logger.warning(f"Error trying portfolio endpoint {endpoint}: {e}")
+                    
+                    return jsonify({
+                        "success": True,
+                        "message": "Successfully authenticated with Schwab",
+                        "account": account,
+                        "positions": positions_response.json() if positions_response and positions_response.status_code == 200 else None,
+                        "portfolio": portfolio_response.json() if portfolio_response and portfolio_response.status_code == 200 else None
+                    })
         
+        # If we get here, return error information
         return jsonify({
             "success": True,
             "message": "Successfully authenticated with Schwab",
             "error": {
-                "positions_error": {
-                    "status_code": positions_response.status_code if positions_response else None,
-                    "response": positions_response.json() if positions_response else None,
-                    "headers": dict(positions_response.headers) if positions_response else None
-                } if positions_response else None,
                 "accounts_error": {
-                    "status_code": accounts_response.status_code if accounts_response else None,
-                    "response": accounts_response.json() if accounts_response else None,
-                    "headers": dict(accounts_response.headers) if accounts_response else None
-                } if accounts_response else None,
-                "portfolio_error": {
-                    "status_code": portfolio_response.status_code if portfolio_response else None,
-                    "response": portfolio_response.json() if portfolio_response else None,
-                    "headers": dict(portfolio_response.headers) if portfolio_response else None
-                } if portfolio_response else None,
+                    "status_code": accounts_response.status_code,
+                    "response": accounts_response.json() if accounts_response.status_code != 404 else None,
+                    "headers": dict(accounts_response.headers)
+                },
                 "token_info": {
-                    "scope": token_response.get('scope'),
-                    "token_type": token_response.get('token_type'),
-                    "expires_in": token_response.get('expires_in'),
-                    "client_correlid": client_correlid,
-                    "id_token": token_response.get('id_token')
+                    "scope": token_data.get('scope'),
+                    "token_type": token_data.get('token_type'),
+                    "expires_in": token_data.get('expires_in'),
+                    "client_correlid": client_correlid
                 }
             }
         })
