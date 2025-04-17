@@ -5,6 +5,8 @@ import pandas as pd
 import os
 from werkzeug.utils import secure_filename
 import traceback
+import talib
+import numpy as np
 
 bp = Blueprint('compare', __name__, url_prefix='/compare')
 
@@ -170,4 +172,10 @@ def generate_mock_portfolio_data():
         'dates': dates,
         'schwab_values': schwab_values,
         'auto_values': auto_values
-    } 
+    }
+
+# Create some sample data
+close_prices = np.random.random(100)
+
+# Try a simple TA-Lib function
+sma = talib.SMA(close_prices, timeperiod=20) 
