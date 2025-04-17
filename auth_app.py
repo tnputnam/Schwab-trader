@@ -8,6 +8,14 @@ from datetime import datetime, timedelta
 import yfinance as yf
 from flask_cors import CORS
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
+from strategy_tester import StrategyTester
+from example_strategies import (
+    moving_average_crossover_strategy,
+    rsi_strategy,
+    bollinger_bands_strategy,
+    macd_strategy,
+    volume_strategy
+)
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -59,15 +67,24 @@ def index():
 def login():
     """Start OAuth login flow"""
     try:
+        # Clear any existing session data
+        session.clear()
+        
         logger.debug("Starting login process")
         oauth = OAuth2Session(
             CLIENT_ID,
             redirect_uri=REDIRECT_URI,
             scope=SCOPES
         )
-        auth_url, state = oauth.authorization_url(
+        
+        # Generate a random state for security
+        import secrets
+        state = secrets.token_urlsafe(16)
+        session['oauth_state'] = state
+        
+        auth_url, _ = oauth.authorization_url(
             AUTHORIZATION_BASE_URL,
-            state='state'  # Add a state parameter for security
+            state=state
         )
         logger.debug(f"Generated authorization URL: {auth_url}")
         return redirect(auth_url)
@@ -82,6 +99,12 @@ def callback():
         logger.debug("Received callback request")
         logger.debug(f"Request args: {request.args}")
         logger.debug(f"Request URL: {request.url}")
+        
+        # Verify state parameter
+        state = request.args.get('state')
+        if not state or state != session.get('oauth_state'):
+            logger.error("Invalid state parameter")
+            return jsonify({'error': 'Invalid state parameter'}), 400
         
         # Get authorization code
         auth_code = request.args.get('code')
@@ -196,10 +219,69 @@ def test_strategies():
     if 'access_token' not in session:
         return redirect(url_for('login'))
         
+    # Initialize strategy tester and sync with Schwab account
+    tester = StrategyTester()
+    tester.sync_with_schwab(session['access_token'])
+    
+    # Define test parameters
+    symbols = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL']
+    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    
+    # Test strategies
+    results = {}
+    strategies = {
+        'Moving Average Crossover': moving_average_crossover_strategy,
+        'RSI': rsi_strategy,
+        'Bollinger Bands': bollinger_bands_strategy,
+        'MACD': macd_strategy,
+        'Volume': volume_strategy
+    }
+    
+    for name, strategy in strategies.items():
+        results[name] = tester.backtest_strategy(strategy, symbols, start_date, end_date)
+    
     return jsonify({
         'status': 'success',
-        'message': 'Strategy testing is currently disabled'
+        'results': results
     })
+
+@app.route('/paper_trade', methods=['POST'])
+def paper_trade():
+    """Run paper trading with selected strategy"""
+    if 'access_token' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+        
+    data = request.get_json()
+    if not data or 'strategy' not in data or 'symbols' not in data:
+        return jsonify({'error': 'Missing required parameters'}), 400
+        
+    # Get strategy function
+    strategy_name = data['strategy']
+    strategies = {
+        'moving_average_crossover': moving_average_crossover_strategy,
+        'rsi': rsi_strategy,
+        'bollinger_bands': bollinger_bands_strategy,
+        'macd': macd_strategy,
+        'volume': volume_strategy
+    }
+    
+    if strategy_name not in strategies:
+        return jsonify({'error': 'Invalid strategy'}), 400
+        
+    # Initialize strategy tester and sync with Schwab account
+    tester = StrategyTester()
+    tester.sync_with_schwab(session['access_token'])
+    
+    # Run paper trading
+    try:
+        results = tester.paper_trade(strategies[strategy_name], data['symbols'])
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/strategy_dashboard')
 def strategy_dashboard():
