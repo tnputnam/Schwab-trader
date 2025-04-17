@@ -23,16 +23,17 @@ CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
 # Updated with your ngrok URL
 REDIRECT_URI = "https://edb0-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
 
-# Schwab OAuth endpoints
-AUTHORIZATION_BASE_URL = "https://api.schwab.com/oauth2/authorize"
-TOKEN_URL = "https://api.schwab.com/oauth2/token"
+# Fixed URLs to use api.schwabapi.com
+AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"  # Fixed domain
+TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"  # Fixed domain
 
-# Required scopes for your application
-SCOPES = [
-    "accounts_trading:read",
-    "accounts_trading:write",
-    "market_data:read"
-]
+# Updated scope to match Swagger UI
+SCOPES = ["readonly"]  # Using only the readonly scope as shown in Swagger
+
+@app.after_request
+def after_request(response):
+    response.headers.add('ngrok-skip-browser-warning', '1')
+    return response
 
 @app.route('/login')
 def login():
@@ -41,7 +42,10 @@ def login():
         redirect_uri=REDIRECT_URI,
         scope=SCOPES
     )
-    authorization_url, state = schwab.authorization_url(AUTHORIZATION_BASE_URL)
+    authorization_url, state = schwab.authorization_url(
+        AUTHORIZATION_BASE_URL,
+        response_type="code"  # Explicitly setting response_type
+    )
     
     # Store state for later validation
     session['oauth_state'] = state
@@ -66,7 +70,7 @@ def callback():
         session['oauth_token'] = token
         
         # Test the token by getting account information
-        accounts_response = schwab.get('https://api.schwab.com/v1/accounts')
+        accounts_response = schwab.get('https://api.schwabapi.com/v1/accounts')  # Fixed domain
         
         return jsonify({
             "success": True,
@@ -83,4 +87,7 @@ def callback():
 if __name__ == '__main__':
     # For development only
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-    app.run(port=5000) 
+    print(f"Using Authorization URL: {AUTHORIZATION_BASE_URL}")
+    print(f"Using Token URL: {TOKEN_URL}")
+    print(f"Using Scopes: {SCOPES}")
+    app.run(port=5001, debug=True)  # Changed port to 5001 
