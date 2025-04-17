@@ -1,3 +1,14 @@
+from flask import Flask, session, redirect, request, jsonify
+from requests_oauthlib import OAuth2Session
+import os
+
+app = Flask(__name__)
+app.secret_key = 'your-secret-key-here'
+
+# Your Schwab API credentials
+CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
+CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
+
 import os
 import sys
 

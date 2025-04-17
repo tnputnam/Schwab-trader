@@ -1,6 +1,11 @@
 from flask import Flask, session, redirect, request, jsonify
 from requests_oauthlib import OAuth2Session
 import os
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # Required for session management
@@ -10,27 +15,39 @@ CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
 CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
 
 # Updated with your ngrok URL
-REDIRECT_URI = "https://edb0-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
+REDIRECT_URI = "https://fff5-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
 
-# Schwab OAuth endpoints
-AUTHORIZATION_BASE_URL = "https://api.schwab.com/oauth2/authorize"
-TOKEN_URL = "https://api.schwab.com/oauth2/token"
+# Fixed URLs to use api.schwabapi.com
+AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"
+TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
 
-# Required scopes for your application
-SCOPES = [
-    "accounts_trading:read",
-    "accounts_trading:write",
-    "market_data:read"
-]
+# Updated scope to match Swagger UI
+SCOPES = ["readonly"]  # Using only the readonly scope as shown in Swagger
+
+@app.route('/')
+def index():
+    return """
+    <h1>Schwab OAuth Test</h1>
+    <p>Authorization URL: {}</p>
+    <p>Token URL: {}</p>
+    <p>Scopes: {}</p>
+    <a href="/login">Login with Schwab</a>
+    """.format(AUTHORIZATION_BASE_URL, TOKEN_URL, SCOPES)
 
 @app.route('/login')
 def login():
+    logger.debug("Starting login process")
     schwab = OAuth2Session(
         CLIENT_ID,
         redirect_uri=REDIRECT_URI,
         scope=SCOPES
     )
-    authorization_url, state = schwab.authorization_url(AUTHORIZATION_BASE_URL)
+    authorization_url, state = schwab.authorization_url(
+        AUTHORIZATION_BASE_URL,
+        response_type="code"  # Explicitly setting response_type
+    )
+    
+    logger.debug(f"Generated Authorization URL: {authorization_url}")
     
     # Store state for later validation
     session['oauth_state'] = state
@@ -38,12 +55,15 @@ def login():
 
 @app.route('/callback')
 def callback():
+    logger.debug("Received callback")
     try:
         schwab = OAuth2Session(
             CLIENT_ID,
             redirect_uri=REDIRECT_URI,
             state=session.get('oauth_state')
         )
+        
+        logger.debug(f"Callback URL: {request.url}")
         
         token = schwab.fetch_token(
             TOKEN_URL,
@@ -55,7 +75,7 @@ def callback():
         session['oauth_token'] = token
         
         # Test the token by getting account information
-        accounts_response = schwab.get('https://api.schwab.com/v1/accounts')
+        accounts_response = schwab.get('https://api.schwabapi.com/v1/accounts')
         
         return jsonify({
             "success": True,
@@ -64,6 +84,7 @@ def callback():
         })
         
     except Exception as e:
+        logger.error(f"Error in callback: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -72,4 +93,8 @@ def callback():
 if __name__ == '__main__':
     # For development only
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-    app.run(port=5000)
+    logger.info("Starting Flask app...")
+    logger.info(f"Using Authorization URL: {AUTHORIZATION_BASE_URL}")
+    logger.info(f"Using Token URL: {TOKEN_URL}")
+    logger.info(f"Using Scopes: {SCOPES}")
+    app.run(host='0.0.0.0', port=5000, debug=True)
