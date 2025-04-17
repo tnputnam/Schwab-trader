@@ -20,8 +20,8 @@ app.secret_key = 'your-secret-key-here'  # Required for session management
 CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
 CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
 
-# Updated with your ngrok URL
-REDIRECT_URI = "https://edb0-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
+# Updated with your new ngrok URL
+REDIRECT_URI = "https://db50-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
 
 # Fixed URLs to use api.schwabapi.com
 AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"  # Fixed domain
@@ -35,6 +35,16 @@ def after_request(response):
     response.headers.add('ngrok-skip-browser-warning', '1')
     return response
 
+@app.route('/')
+def index():
+    return """
+    <h1>Schwab OAuth Test</h1>
+    <p>Authorization URL: {}</p>
+    <p>Token URL: {}</p>
+    <p>Scopes: {}</p>
+    <a href="/login">Login with Schwab</a>
+    """.format(AUTHORIZATION_BASE_URL, TOKEN_URL, SCOPES)
+
 @app.route('/login')
 def login():
     schwab = OAuth2Session(
@@ -46,6 +56,9 @@ def login():
         AUTHORIZATION_BASE_URL,
         response_type="code"  # Explicitly setting response_type
     )
+    
+    # Debug print
+    print(f"Generated Authorization URL: {authorization_url}")
     
     # Store state for later validation
     session['oauth_state'] = state
@@ -59,6 +72,9 @@ def callback():
             redirect_uri=REDIRECT_URI,
             state=session.get('oauth_state')
         )
+        
+        # Debug print
+        print(f"Callback URL: {request.url}")
         
         token = schwab.fetch_token(
             TOKEN_URL,
@@ -79,6 +95,7 @@ def callback():
         })
         
     except Exception as e:
+        print(f"Error in callback: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
@@ -90,4 +107,4 @@ if __name__ == '__main__':
     print(f"Using Authorization URL: {AUTHORIZATION_BASE_URL}")
     print(f"Using Token URL: {TOKEN_URL}")
     print(f"Using Scopes: {SCOPES}")
-    app.run(port=5001, debug=True)  # Changed port to 5001 
+    app.run(port=5000, debug=True)  # Changed port to 5000 
