@@ -15,13 +15,13 @@ logger = logging.getLogger(__name__)
 class SchwabOAuthTest:
     def __init__(self):
         # Your OAuth2 settings
-        self.client_id = "1wzwOrhivb2PkR1UCAUVTKYqC4MTNYlj"
+        self.client_id = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
         # Add your client secret here
-        self.client_secret = input("Enter your client secret: ").strip()
-        self.auth_url = "https://api.schwabapi.com/v1/oauth/authorize"
-        self.token_url = "https://api.schwabapi.com/v1/oauth/token"
-        self.redirect_uri = "https://developer.schwab.com/oauth2-redirect.html"
-        self.scope = ["readonly"]
+        self.client_secret = "xzuIIEWzAs7nQd5A"
+        self.auth_url = "https://api.schwab.com/oauth2/authorize"
+        self.token_url = "https://api.schwab.com/oauth2/token"
+        self.redirect_uri = "https://c0fe-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
+        self.scope = ["accounts_trading:read", "accounts_trading:write", "market_data:read"]
         
         # Initialize OAuth session
         self.oauth = OAuth2Session(
@@ -129,7 +129,7 @@ class SchwabOAuthTest:
                 # Try to get accounts
                 print("\nAttempting to get accounts...")
                 accounts_response = requests.get(
-                    "https://api.schwabapi.com/v1/accounts",
+                    "https://api.schwab.com/v1/accounts",
                     headers={
                         "Authorization": f"Bearer {token['access_token']}",
                         "Accept": "application/json"
