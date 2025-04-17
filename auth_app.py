@@ -59,6 +59,11 @@ schwab.authorization_base_url = AUTHORIZATION_BASE_URL
 schwab.token_url = TOKEN_URL
 schwab.scopes = SCOPES
 
+@app.route('/')
+def index():
+    """Display the main index page"""
+    return render_template('index.html')
+
 @app.route('/login')
 def login():
     """Start OAuth login flow"""
@@ -762,6 +767,26 @@ def analyze_volatility():
             'status': 'error',
             'message': str(e)
         }), 500
+
+@app.route('/portfolio')
+def portfolio():
+    """Display portfolio page"""
+    return render_template('portfolio.html')
+
+@app.route('/news')
+def news():
+    """Display news page"""
+    return render_template('news.html')
+
+@app.route('/trading')
+def trading():
+    """Display trading page"""
+    return render_template('trading.html')
+
+@app.route('/compare')
+def compare():
+    """Display compare page"""
+    return render_template('compare.html')
 
 if __name__ == '__main__':
     # For development only

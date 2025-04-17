@@ -14,7 +14,7 @@ logger.setLevel(logging.INFO)
 
 @bp.route('/')
 def index():
-    return render_template('tesla_trading.html')
+    return render_template('index.html')
 
 @bp.route('/tesla_trading')
 def tesla_trading():
