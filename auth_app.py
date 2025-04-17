@@ -14,7 +14,8 @@ from example_strategies import (
     rsi_strategy,
     bollinger_bands_strategy,
     macd_strategy,
-    volume_strategy
+    volume_strategy,
+    tesla_volume_analysis
 )
 
 # Set up logging
@@ -378,6 +379,61 @@ def get_market_data():
         return jsonify(market_data)
     except Exception as e:
         logger.error(f"Unexpected error in market data endpoint: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/tesla_dashboard')
+def tesla_dashboard():
+    """Show Tesla analysis dashboard without authentication"""
+    return render_template('strategy_dashboard.html')
+
+@app.route('/api/tesla_analysis')
+def tesla_analysis():
+    """Analyze Tesla's volume patterns and their impact on price"""
+    try:
+        # Get Tesla's historical data
+        tsla = yf.Ticker("TSLA")
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=30)  # Last 30 days
+        data = tsla.history(start=start_date, end=end_date)
+        
+        # Calculate monthly average volume
+        monthly_avg_volume = data['Volume'].mean()
+        
+        # Identify high volume days (15% above average)
+        high_volume_mask = data['Volume'] > (monthly_avg_volume * 1.15)
+        high_volume_days = data[high_volume_mask]
+        
+        # Calculate price changes during high volume days
+        price_changes = []
+        for idx, day in high_volume_days.iterrows():
+            next_day_idx = data.index.get_loc(idx) + 1
+            if next_day_idx < len(data):
+                next_day = data.iloc[next_day_idx]
+                price_change = ((next_day['Close'] - day['Close']) / day['Close']) * 100
+                price_changes.append({
+                    'date': idx.strftime('%Y-%m-%d'),
+                    'volume': day['Volume'],
+                    'close_price': day['Close'],
+                    'price_change': price_change
+                })
+        
+        # Calculate volume-price correlation
+        volume_correlation = data['Volume'].corr(data['Close'].pct_change())
+        
+        analysis = {
+            'monthly_avg_volume': monthly_avg_volume,
+            'high_volume_days': len(high_volume_days),
+            'price_changes': price_changes,
+            'volume_correlation': volume_correlation,
+            'high_volume_days_data': high_volume_days[['Volume', 'Close']].to_dict('records')
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'analysis': analysis
+        })
+    except Exception as e:
+        logger.error(f"Error in Tesla analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

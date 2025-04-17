@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from datetime import datetime, timedelta
 
 def moving_average_crossover_strategy(data: pd.DataFrame) -> str:
     """
@@ -122,4 +123,61 @@ def volume_strategy(data: pd.DataFrame,
     elif last_volume < last_volume_ma / volume_threshold:
         return 'SELL'
     
-    return 'HOLD' 
+    return 'HOLD'
+
+def tesla_volume_analysis(data: pd.DataFrame, volume_threshold: float = 1.15) -> dict:
+    """
+    Analyze Tesla's volume patterns and their impact on price.
+    
+    Args:
+        data: DataFrame with historical data
+        volume_threshold: Percentage above average volume to consider significant (default 15%)
+    
+    Returns:
+        dict containing analysis results including:
+        - monthly_avg_volume: Average volume for the month
+        - high_volume_days: Number of days with volume > threshold
+        - price_changes: Price changes during high volume days
+        - volume_correlation: Correlation between volume and price changes
+    """
+    if len(data) < 20:  # Need at least 20 days of data
+        return {
+            'error': 'Insufficient data for analysis',
+            'monthly_avg_volume': 0,
+            'high_volume_days': 0,
+            'price_changes': [],
+            'volume_correlation': 0
+        }
+    
+    # Calculate monthly average volume
+    monthly_avg_volume = data['Volume'].mean()
+    
+    # Identify high volume days
+    high_volume_mask = data['Volume'] > (monthly_avg_volume * volume_threshold)
+    high_volume_days = data[high_volume_mask]
+    
+    # Calculate price changes during high volume days
+    price_changes = []
+    for idx, day in high_volume_days.iterrows():
+        # Get next day's price change
+        next_day_idx = data.index.get_loc(idx) + 1
+        if next_day_idx < len(data):
+            next_day = data.iloc[next_day_idx]
+            price_change = ((next_day['Close'] - day['Close']) / day['Close']) * 100
+            price_changes.append({
+                'date': idx,
+                'volume': day['Volume'],
+                'price_change': price_change,
+                'close_price': day['Close']
+            })
+    
+    # Calculate correlation between volume and price changes
+    volume_correlation = data['Volume'].corr(data['Close'].pct_change())
+    
+    return {
+        'monthly_avg_volume': monthly_avg_volume,
+        'high_volume_days': len(high_volume_days),
+        'price_changes': price_changes,
+        'volume_correlation': volume_correlation,
+        'high_volume_days_data': high_volume_days[['Volume', 'Close']].to_dict('records')
+    } 

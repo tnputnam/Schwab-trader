@@ -19,6 +19,19 @@
     <div class="container mt-4">
         <h1>Strategy Testing Dashboard</h1>
         
+        <!-- Tesla Analysis Section -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h2>Tesla Volume Analysis</h2>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary" onclick="runTeslaAnalysis()">Run Tesla Analysis</button>
+                <div id="teslaAnalysisResults" class="mt-4">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+        </div>
+        
         <!-- Backtesting Section -->
         <div class="card mb-4">
             <div class="card-header">
@@ -130,6 +143,18 @@
                 console.error('Error:', error);
                 alert('Error running paper trading');
             });
+        }
+        
+        function runTeslaAnalysis() {
+            fetch('/api/tesla_analysis')
+                .then(response => response.json())
+                .then(data => {
+                    displayTeslaAnalysis(data.analysis);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error running Tesla analysis');
+                });
         }
         
         function displayBacktestResults(results) {
@@ -258,6 +283,97 @@
                 </div>
             `;
             container.appendChild(tradesCard);
+        }
+        
+        function displayTeslaAnalysis(analysis) {
+            const container = document.getElementById('teslaAnalysisResults');
+            container.innerHTML = '';
+            
+            if (analysis.error) {
+                container.innerHTML = `<div class="alert alert-danger">${analysis.error}</div>`;
+                return;
+            }
+            
+            // Create analysis card
+            const card = document.createElement('div');
+            card.className = 'card';
+            
+            const cardBody = document.createElement('div');
+            cardBody.className = 'card-body';
+            
+            // Basic metrics
+            cardBody.innerHTML = `
+                <h3>Volume Analysis Results</h3>
+                <div class="mb-3">
+                    <p><strong>Monthly Average Volume:</strong> ${analysis.monthly_avg_volume.toLocaleString()}</p>
+                    <p><strong>High Volume Days (15% above average):</strong> ${analysis.high_volume_days}</p>
+                    <p><strong>Volume-Price Correlation:</strong> ${analysis.volume_correlation.toFixed(3)}</p>
+                </div>
+            `;
+            
+            // Price changes during high volume days
+            if (analysis.price_changes.length > 0) {
+                const changesTable = document.createElement('table');
+                changesTable.className = 'table';
+                changesTable.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Volume</th>
+                            <th>Close Price</th>
+                            <th>Next Day Change</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${analysis.price_changes.map(change => `
+                            <tr>
+                                <td>${new Date(change.date).toLocaleDateString()}</td>
+                                <td>${change.volume.toLocaleString()}</td>
+                                <td>$${change.close_price.toFixed(2)}</td>
+                                <td class="${change.price_change >= 0 ? 'text-success' : 'text-danger'}">
+                                    ${change.price_change.toFixed(2)}%
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                `;
+                cardBody.appendChild(changesTable);
+            }
+            
+            // Volume chart
+            const chartContainer = document.createElement('div');
+            chartContainer.className = 'chart-container';
+            cardBody.appendChild(chartContainer);
+            
+            container.appendChild(card);
+            
+            // Create volume chart
+            new Chart(chartContainer, {
+                type: 'bar',
+                data: {
+                    labels: analysis.high_volume_days_data.map(d => new Date(d.date).toLocaleDateString()),
+                    datasets: [{
+                        label: 'Volume',
+                        data: analysis.high_volume_days_data.map(d => d.Volume),
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Volume'
+                            }
+                        }
+                    }
+                }
+            });
         }
     </script>
 </body>
