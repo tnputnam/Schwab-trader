@@ -20,7 +20,7 @@ class SchwabOAuthTest:
         self.client_secret = "xzuIIEWzAs7nQd5A"
         self.auth_url = "https://api.schwab.com/oauth2/authorize"
         self.token_url = "https://api.schwab.com/oauth2/token"
-        self.redirect_uri = "https://c0fe-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
+        self.redirect_uri = "https://edb0-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
         self.scope = ["accounts_trading:read", "accounts_trading:write", "market_data:read"]
         
         # Initialize OAuth session
