@@ -5,46 +5,79 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Function to check if Chrome is running with remote debugging
-check_chrome_running() {
-    pgrep -f "remote-debugging-port=9222" >/dev/null
-    return $?
+# Function to log messages with timestamps
+log_message() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# Function to kill existing Flask server
+kill_flask_server() {
+    log_message "Checking for existing Flask server..."
+    if pgrep -f "flask run" > /dev/null; then
+        log_message "Stopping existing Flask server..."
+        pkill -f "flask run"
+        sleep 2  # Give it time to shut down gracefully
+    fi
+    
+    # Double check if port is still in use
+    if lsof -i :5000 > /dev/null; then
+        log_message "Force closing port 5000..."
+        kill $(lsof -t -i:5000) 2>/dev/null || true
+        sleep 1
+    fi
 }
 
 # Check if Python is installed
 if ! command_exists python3; then
-    echo "Python 3 is not installed. Please install Python 3 and try again."
+    log_message "Error: Python 3 is not installed. Please install Python 3 and try again."
     exit 1
 fi
 
 # Check if pip is installed
 if ! command_exists pip3; then
-    echo "pip3 is not installed. Please install pip3 and try again."
+    log_message "Error: pip3 is not installed. Please install pip3 and try again."
     exit 1
 fi
 
+# Create logs directory if it doesn't exist
+mkdir -p logs
+
+# Kill any existing Flask server
+kill_flask_server
+
 # Check if virtual environment exists, if not create it
 if [ ! -d "schwab-trading-env" ]; then
-    echo "Creating virtual environment..."
+    log_message "Creating virtual environment..."
     python3 -m venv schwab-trading-env
 fi
 
 # Activate virtual environment
-echo "Activating virtual environment..."
+log_message "Activating virtual environment..."
 source schwab-trading-env/bin/activate
 
 # Install/upgrade pip
-echo "Upgrading pip..."
+log_message "Upgrading pip..."
 pip install --upgrade pip
 
-# Install package in development mode
-echo "Installing package in development mode..."
-pip install -e .
+# Install requirements
+log_message "Installing requirements..."
+pip install Flask==2.2.5 \
+    Flask-SQLAlchemy==3.0.5 \
+    Flask-Login==0.6.2 \
+    Flask-Caching==2.0.2 \
+    Werkzeug==2.2.3 \
+    pandas==2.1.3 \
+    numpy==1.26.2 \
+    matplotlib==3.8.2 \
+    yfinance==0.2.31 \
+    python-dotenv==1.0.0 \
+    requests==2.31.0 \
+    sqlalchemy==2.0.23
 
 # Check for config file
 CONFIG_FILE=".env"
 if [ ! -f "$CONFIG_FILE" ]; then
-    echo "Creating .env file..."
+    log_message "Creating .env file..."
     touch "$CONFIG_FILE"
     chmod 600 "$CONFIG_FILE"  # Make it readable only by the user
 fi
@@ -52,10 +85,7 @@ fi
 # Function to load environment variables
 load_env_vars() {
     if [ -f "$CONFIG_FILE" ]; then
-        echo "Loading environment variables from $CONFIG_FILE..."
-        # Remove any existing export statements to avoid duplicates
-        sed -i '/^export /d' "$CONFIG_FILE"
-        # Load each line as an environment variable
+        log_message "Loading environment variables from $CONFIG_FILE..."
         while IFS= read -r line; do
             if [[ ! -z "$line" && ! "$line" =~ ^# ]]; then
                 export "$line"
@@ -68,11 +98,8 @@ load_env_vars() {
 save_env_var() {
     local var_name=$1
     local var_value=$2
-    # Remove existing line if it exists
     sed -i "/^$var_name=/d" "$CONFIG_FILE"
-    # Add new line
     echo "$var_name=$var_value" >> "$CONFIG_FILE"
-    # Export the variable
     export "$var_name=$var_value"
 }
 
@@ -81,56 +108,42 @@ load_env_vars
 
 # Check if environment variables are set
 if [ -z "$ALPHA_VANTAGE_API_KEY" ]; then
-    echo "ALPHA_VANTAGE_API_KEY is not set. Please enter your Alpha Vantage API key:"
+    log_message "ALPHA_VANTAGE_API_KEY is not set. Please enter your Alpha Vantage API key:"
     read -r api_key
     save_env_var "ALPHA_VANTAGE_API_KEY" "$api_key"
-    echo "API key saved to $CONFIG_FILE"
+    log_message "API key saved to $CONFIG_FILE"
 fi
 
-if [ -z "$FLASK_SECRET_KEY" ]; then
-    echo "FLASK_SECRET_KEY is not set. Generating a random key..."
-    secret_key=$(python3 -c "import secrets; print(secrets.token_hex(32))")
-    save_env_var "FLASK_SECRET_KEY" "$secret_key"
-    echo "Flask secret key saved to $CONFIG_FILE"
+# Set Flask environment variables
+export FLASK_APP=schwab_trader
+export FLASK_DEBUG=1  # Using FLASK_DEBUG instead of deprecated FLASK_ENV
+
+# Initialize/upgrade the database
+log_message "Initializing/upgrading the database..."
+if [ -f "create_db.py" ]; then
+    python create_db.py
 fi
 
-# Verify environment variables are set
-echo "Current environment variables:"
-echo "ALPHA_VANTAGE_API_KEY: ${ALPHA_VANTAGE_API_KEY:0:4}..."  # Show first 4 chars only
-echo "FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:0:4}..."  # Show first 4 chars only
+# Start the Flask server
+log_message "Starting Flask server..."
+flask run --host=0.0.0.0 --port=5000 2>&1 | tee -a logs/server.log
 
-# Kill any existing Chrome instances on port 9222
-pkill -f "chrome.*remote-debugging-port=9222"
+# If the server crashes, log the error
+if [ $? -ne 0 ]; then
+    log_message "Error: Server crashed. Check logs/server.log for details."
+    exit 1
+fi
 
-# Start Chrome in debug mode
-google-chrome --remote-debugging-port=9222 --user-data-dir=/tmp/chrome-profile &
-
-# Start the FastAPI server
-python3 main.py
-
-# Deactivate virtual environment when done
-deactivate
-
-# Start Chrome in debug mode
-google-chrome --remote-debugging-port=9222 &
-
-# Start Django server
-python manage.py runserver &
-
-# Wait for servers to start
-sleep 5
-
-# Open the dashboard in Chrome
-google-chrome http://localhost:8000 &
-
-# Function to handle import process
-function handle_import() {
-    # Start Selenium-controlled Chrome for Schwab import
-    python manage.py runscript schwab_import
+# Trap script exit and cleanup
+cleanup() {
+    log_message "Shutting down..."
+    kill_flask_server
+    if [ -n "$VIRTUAL_ENV" ]; then
+        deactivate
+    fi
 }
 
-# Export the function so it can be used by the Django view
-export -f handle_import
+trap cleanup EXIT
 
 # Keep the script running
 wait 

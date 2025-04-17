@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, jsonify, request
-from flask_login import login_required
+from flask import Blueprint, render_template, jsonify, request, make_response
 from datetime import datetime, timedelta
 import random
 import pandas as pd
 import os
 from werkzeug.utils import secure_filename
+import traceback
 
 bp = Blueprint('compare', __name__, url_prefix='/compare')
 
@@ -17,18 +17,66 @@ def allowed_file(filename):
 def parse_portfolio_file(file, filename):
     """Parse the uploaded portfolio file and return the portfolio data."""
     try:
-        if filename.endswith('.csv'):
-            df = pd.read_csv(file)
-        else:  # Excel files
-            df = pd.read_excel(file)
+        # Read the raw file contents first
+        raw_contents = file.read()
+        print("Raw file type:", type(raw_contents))
+        
+        # Try to decode and print the first few lines
+        try:
+            decoded_contents = raw_contents.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                decoded_contents = raw_contents.decode('latin-1')
+            except:
+                decoded_contents = raw_contents.decode('utf-8', errors='ignore')
+        
+        print("First 500 characters of file:")
+        print(decoded_contents[:500])
+        
+        # Convert the decoded contents to a StringIO object for pandas
+        from io import StringIO
+        csv_buffer = StringIO(decoded_contents)
+        
+        # Read with pandas, printing each step
+        print("Reading CSV file...")
+        df = pd.read_csv(csv_buffer)
+        print("CSV read complete")
+        print("Initial columns:", list(df.columns))
+        
+        # Print the first few rows of raw data
+        print("\nFirst few rows of data:")
+        print(df.head())
+        
+        # Check exact column names and types
+        print("\nColumn info:")
+        print(df.info())
+        
+        # Required columns
+        required_columns = ['Symbol', 'Qty (Quantity)', 'Price']
+        
+        # Print exact comparison of what we're looking for vs what we have
+        print("\nLooking for these columns:", required_columns)
+        print("Available columns:", list(df.columns))
+        
+        # Check each column with detailed debugging
+        for required_col in required_columns:
+            if required_col in df.columns:
+                print(f"Found column: {required_col}")
+            else:
+                print(f"Missing column: {required_col}")
+                print(f"Similar columns:", [col for col in df.columns if required_col.lower() in col.lower()])
+        
+        # Check for missing columns
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            error_msg = f"Missing required columns: {', '.join(missing_columns)}"
+            print(f"Error: {error_msg}")
+            return None, error_msg
             
-        # Validate required columns
-        required_columns = ['Symbol', 'Quantity', 'Price']
-        if not all(col in df.columns for col in required_columns):
-            return None, "Missing required columns. File must contain: Symbol, Quantity, Price"
-            
+        # If we get here, we have all required columns
         # Calculate total value for each position
-        df['Value'] = df['Quantity'] * df['Price']
+        df['Value'] = df['Qty (Quantity)'].astype(float) * df['Price'].astype(float)
         total_value = df['Value'].sum()
         
         return {
@@ -36,46 +84,64 @@ def parse_portfolio_file(file, filename):
             'total_value': total_value,
             'timestamp': datetime.now().isoformat()
         }, None
+        
     except Exception as e:
+        print(f"Exception in parse_portfolio_file:")
+        traceback.print_exc()
         return None, f"Error parsing file: {str(e)}"
 
 @bp.route('/')
-@login_required
-def portfolio_comparison():
+def view():
     return render_template('compare.html')
 
 @bp.route('/api/data')
-@login_required
 def get_comparison_data():
     data = generate_mock_portfolio_data()
     return jsonify(data)
 
 @bp.route('/api/import', methods=['POST'])
-@login_required
 def import_portfolio():
-    if 'file' not in request.files:
-        return jsonify({'success': False, 'error': 'No file uploaded'})
+    """Handle portfolio import."""
+    try:
+        print("\n=== Starting new import request ===")
         
-    file = request.files['file']
-    if file.filename == '':
-        return jsonify({'success': False, 'error': 'No file selected'})
+        if 'file' not in request.files:
+            print("No file in request.files")
+            print("Form data:", request.form)
+            print("Files:", request.files)
+            return jsonify({'success': False, 'error': 'No file uploaded'})
+            
+        file = request.files['file']
+        print(f"Received file: {file.filename}")
         
-    if not allowed_file(file.filename):
-        return jsonify({'success': False, 'error': 'Invalid file type. Allowed types: CSV, Excel'})
+        if file.filename == '':
+            print("Empty filename")
+            return jsonify({'success': False, 'error': 'No file selected'})
+            
+        if not allowed_file(file.filename):
+            print(f"Invalid file type: {file.filename}")
+            return jsonify({'success': False, 'error': 'Invalid file type. Allowed types: CSV, Excel'})
+            
+        portfolio_name = request.form.get('name', 'My Portfolio')
+        print(f"Portfolio name: {portfolio_name}")
         
-    portfolio_name = request.form.get('name', 'My Portfolio')
-    portfolio_data, error = parse_portfolio_file(file, file.filename)
-    
-    if error:
-        return jsonify({'success': False, 'error': error})
+        portfolio_data, error = parse_portfolio_file(file, file.filename)
         
-    # TODO: Save portfolio data to database
-    # For now, we'll just return success
-    return jsonify({
-        'success': True,
-        'message': f'Portfolio "{portfolio_name}" imported successfully',
-        'data': portfolio_data
-    })
+        if error:
+            print(f"Import failed: {error}")
+            return jsonify({'success': False, 'error': error})
+            
+        print("Import successful!")
+        return jsonify({
+            'success': True,
+            'message': f'Portfolio "{portfolio_name}" imported successfully',
+            'data': portfolio_data
+        })
+        
+    except Exception as e:
+        print("Unexpected error in import_portfolio:")
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': f'Error processing file: {str(e)}'})
 
 # Mock data for demonstration
 def generate_mock_portfolio_data():

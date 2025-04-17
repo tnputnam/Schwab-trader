@@ -186,6 +186,10 @@ document.addEventListener('DOMContentLoaded', function() {
         const fileInput = document.getElementById('portfolioFile');
         const portfolioName = document.getElementById('portfolioName').value;
         
+        console.log('Import button clicked');
+        console.log('File selected:', fileInput.files[0]?.name);
+        console.log('Portfolio name:', portfolioName);
+        
         if (!fileInput.files.length) {
             importStatus.innerHTML = '<div class="alert alert-danger">Please select a file to import</div>';
             return;
@@ -202,24 +206,32 @@ document.addEventListener('DOMContentLoaded', function() {
         
         importButton.disabled = true;
         importProgress.classList.remove('d-none');
-        importStatus.innerHTML = '';
+        importStatus.innerHTML = '<div class="alert alert-info">Importing portfolio...</div>';
         
-        fetch('/api/compare/import', {
+        fetch('/compare/api/import', {
             method: 'POST',
             body: formData
         })
-        .then(response => response.json())
+        .then(response => {
+            console.log('Response status:', response.status);
+            return response.json().catch(error => {
+                console.error('Error parsing JSON:', error);
+                throw new Error('Failed to parse response');
+            });
+        })
         .then(data => {
+            console.log('Response data:', data);
             if (data.success) {
                 importStatus.innerHTML = '<div class="alert alert-success">Portfolio imported successfully!</div>';
                 setTimeout(() => {
                     location.reload();
                 }, 1500);
             } else {
-                importStatus.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+                importStatus.innerHTML = `<div class="alert alert-danger">${data.error || 'Unknown error occurred'}</div>`;
             }
         })
         .catch(error => {
+            console.error('Import error:', error);
             importStatus.innerHTML = '<div class="alert alert-danger">Error importing portfolio. Please try again.</div>';
         })
         .finally(() => {

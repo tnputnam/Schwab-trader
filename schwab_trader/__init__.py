@@ -3,7 +3,6 @@ import os
 import logging
 from datetime import datetime
 from flask import Flask
-from flask_login import LoginManager
 from flask_caching import Cache
 from schwab_trader.database import init_db, db
 
@@ -15,7 +14,6 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 # Initialize extensions
-login_manager = LoginManager()
 cache = Cache()
 
 def create_app(test_config=None):
@@ -36,7 +34,6 @@ def create_app(test_config=None):
     
     # Initialize extensions
     init_db(app)
-    login_manager.init_app(app)
     cache.init_app(app)
     
     # Register blueprints
@@ -47,12 +44,6 @@ def create_app(test_config=None):
     app.register_blueprint(compare.bp)
     app.register_blueprint(portfolio.bp)
     app.register_blueprint(bp)
-    
-    # Set up user loader
-    @login_manager.user_loader
-    def load_user(user_id):
-        from schwab_trader.models import User
-        return User.query.get(int(user_id))
     
     logger.info('Schwab Trader startup')
     return app
