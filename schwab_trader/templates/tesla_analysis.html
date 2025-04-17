@@ -21,6 +21,11 @@
         background: #f8f9fa;
         padding: 15px;
         border-radius: 4px;
+        transition: transform 0.2s ease;
+    }
+    .metric-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
     }
     .metric-label {
         font-size: 12px;
@@ -44,6 +49,10 @@
     .news-item {
         padding: 10px;
         border-bottom: 1px solid #dee2e6;
+        transition: background-color 0.2s ease;
+    }
+    .news-item:hover {
+        background-color: #f8f9fa;
     }
     .news-item:last-child {
         border-bottom: none;
@@ -80,12 +89,104 @@
         font-size: 18px;
         font-weight: bold;
     }
+    .timeframe-selector {
+        margin-bottom: 20px;
+    }
+    .timeframe-btn {
+        margin-right: 10px;
+    }
+    .loading {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid rgba(0,0,0,.1);
+        border-radius: 50%;
+        border-top-color: #007bff;
+        animation: spin 1s ease-in-out infinite;
+        margin-left: 10px;
+    }
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+    .error-message {
+        color: #dc3545;
+        margin-top: 10px;
+        padding: 10px;
+        background: #f8d7da;
+        border-radius: 4px;
+    }
+    .api-status {
+        margin-bottom: 20px;
+        padding: 10px;
+        border-radius: 4px;
+        background: #e9ecef;
+    }
+    .api-status.connected {
+        background: #d4edda;
+        color: #155724;
+    }
+    .api-status.error {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    .stock-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 20px;
+    }
+    .action-button {
+        padding: 8px 16px;
+        border-radius: 4px;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    }
+    .add-watchlist {
+        background: #007bff;
+        color: white;
+    }
+    .set-alert {
+        background: #28a745;
+        color: white;
+    }
+    .view-details {
+        background: #6c757d;
+        color: white;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container">
     <h1>Tesla (TSLA) Analysis Dashboard</h1>
+    
+    <div class="api-status" id="api-status">
+        <i class="bi bi-info-circle"></i> Checking API connection...
+    </div>
+    
+    <div class="stock-actions">
+        <button class="action-button add-watchlist" onclick="addToWatchlist('TSLA')">
+            <i class="bi bi-plus-circle"></i> Add to Watchlist
+        </button>
+        <button class="action-button set-alert" onclick="setPriceAlert('TSLA')">
+            <i class="bi bi-bell"></i> Set Price Alert
+        </button>
+        <button class="action-button view-details" onclick="viewStockDetails('TSLA')">
+            <i class="bi bi-info-circle"></i> View Details
+        </button>
+    </div>
+    
+    <div class="timeframe-selector">
+        <button class="btn btn-outline-primary timeframe-btn" data-timeframe="1d">1D</button>
+        <button class="btn btn-outline-primary timeframe-btn" data-timeframe="5d">5D</button>
+        <button class="btn btn-outline-primary timeframe-btn" data-timeframe="1m">1M</button>
+        <button class="btn btn-outline-primary timeframe-btn" data-timeframe="3m">3M</button>
+        <button class="btn btn-outline-primary timeframe-btn" data-timeframe="1y">1Y</button>
+        <button class="btn btn-outline-primary timeframe-btn" data-timeframe="5y">5Y</button>
+    </div>
     
     <div class="panel">
         <h2>Current Metrics</h2>
@@ -198,142 +299,262 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    // Initialize charts
-    const priceChart = new Chart(document.getElementById('price-chart'), {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Price',
-                data: [],
-                borderColor: 'rgb(75, 192, 192)',
-                tension: 0.1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false
-        }
-    });
+    let charts = {};
+    let currentTimeframe = '1m';
+    let isLoading = false;
 
-    const volumeChart = new Chart(document.getElementById('volume-chart'), {
-        type: 'bar',
-        data: {
-            labels: [],
-            datasets: [{
-                label: 'Volume',
-                data: [],
-                backgroundColor: 'rgba(54, 162, 235, 0.5)'
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false
+    async function checkAPIStatus() {
+        try {
+            const response = await fetch('/api/alpha_vantage/status');
+            const data = await response.json();
+            
+            const statusElement = document.getElementById('api-status');
+            if (data.status === 'success') {
+                statusElement.className = 'api-status connected';
+                statusElement.innerHTML = `<i class="bi bi-check-circle"></i> Alpha Vantage API Connected`;
+            } else {
+                statusElement.className = 'api-status error';
+                statusElement.innerHTML = `<i class="bi bi-exclamation-circle"></i> Alpha Vantage API Error: ${data.message}`;
+            }
+        } catch (error) {
+            const statusElement = document.getElementById('api-status');
+            statusElement.className = 'api-status error';
+            statusElement.innerHTML = `<i class="bi bi-exclamation-circle"></i> Alpha Vantage API Error: ${error.message}`;
         }
-    });
+    }
 
-    const indicatorsChart = new Chart(document.getElementById('indicators-chart'), {
-        type: 'line',
-        data: {
-            labels: [],
-            datasets: [
-                {
+    async function fetchTeslaData() {
+        if (isLoading) return;
+        
+        isLoading = true;
+        const loadingElement = document.getElementById('loading');
+        const errorElement = document.getElementById('error-message');
+        
+        loadingElement.style.display = 'inline-block';
+        errorElement.style.display = 'none';
+        
+        try {
+            const response = await fetch(`/api/alpha_vantage/tesla?timeframe=${currentTimeframe}`);
+            if (!response.ok) throw new Error('Failed to fetch data');
+            
+            const data = await response.json();
+            
+            if (data.status === 'success') {
+                updateMetrics(data.metrics);
+                updateCharts(data.chartData);
+                updateNews(data.news);
+            } else {
+                throw new Error(data.message || 'Unknown error occurred');
+            }
+        } catch (error) {
+            console.error('Error fetching Tesla data:', error);
+            errorElement.textContent = error.message;
+            errorElement.style.display = 'block';
+        } finally {
+            isLoading = false;
+            loadingElement.style.display = 'none';
+        }
+    }
+
+    function updateMetrics(metrics) {
+        document.getElementById('current-price').textContent = `$${metrics.current_price.toFixed(2)}`;
+        document.getElementById('today-change').textContent = `${metrics.price_change.toFixed(2)}%`;
+        document.getElementById('today-change').className = `metric-value ${metrics.price_change >= 0 ? 'positive' : 'negative'}`;
+        document.getElementById('market-cap').textContent = `$${(metrics.market_cap / 1e9).toFixed(2)}B`;
+        document.getElementById('pe-ratio').textContent = metrics.pe_ratio.toFixed(2);
+        document.getElementById('volume').textContent = `${(metrics.volume / 1e6).toFixed(1)}M`;
+        document.getElementById('high-52').textContent = `$${metrics.high_52.toFixed(2)}`;
+        document.getElementById('low-52').textContent = `$${metrics.low_52.toFixed(2)}`;
+        document.getElementById('beta').textContent = metrics.beta.toFixed(2);
+        
+        // Volume metrics
+        document.getElementById('avg-volume').textContent = `${(metrics.avg_volume / 1e6).toFixed(1)}M`;
+        document.getElementById('today-volume').textContent = `${(metrics.today_volume / 1e6).toFixed(1)}M`;
+        document.getElementById('volume-change').textContent = `${metrics.volume_change.toFixed(1)}%`;
+        document.getElementById('volume-correlation').textContent = metrics.volume_correlation.toFixed(2);
+        
+        // Technical indicators
+        document.getElementById('rsi').textContent = metrics.rsi.toFixed(2);
+        document.getElementById('macd').textContent = metrics.macd.toFixed(2);
+        document.getElementById('bollinger').textContent = metrics.bollinger.toFixed(2);
+        document.getElementById('ma-50').textContent = `$${metrics.ma_50.toFixed(2)}`;
+        document.getElementById('ma-200').textContent = `$${metrics.ma_200.toFixed(2)}`;
+    }
+
+    function updateCharts(chartData) {
+        // Price chart
+        const priceCtx = document.getElementById('price-chart').getContext('2d');
+        if (charts.price) charts.price.destroy();
+        charts.price = new Chart(priceCtx, {
+            type: 'line',
+            data: {
+                labels: chartData.dates,
+                datasets: [{
                     label: 'Price',
-                    data: [],
-                    borderColor: 'rgb(75, 192, 192)'
-                },
-                {
-                    label: 'MA50',
-                    data: [],
-                    borderColor: 'rgb(255, 99, 132)'
-                },
-                {
-                    label: 'MA200',
-                    data: [],
-                    borderColor: 'rgb(255, 205, 86)'
+                    data: chartData.prices,
+                    borderColor: 'rgb(75, 192, 192)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: false
+                    }
                 }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false
-        }
-    });
+            }
+        });
 
-    // Function to update metrics
-    function updateMetrics(data) {
-        document.getElementById('current-price').textContent = `$${data.price.toFixed(2)}`;
-        document.getElementById('today-change').textContent = `${data.change >= 0 ? '+' : ''}${data.change.toFixed(2)}%`;
-        document.getElementById('today-change').className = `metric-value ${data.change >= 0 ? 'positive' : 'negative'}`;
-        document.getElementById('market-cap').textContent = `$${(data.marketCap / 1e9).toFixed(2)}B`;
-        document.getElementById('pe-ratio').textContent = data.peRatio.toFixed(2);
-        document.getElementById('volume').textContent = `${(data.volume / 1e6).toFixed(2)}M`;
-        document.getElementById('high-52').textContent = `$${data.high52.toFixed(2)}`;
-        document.getElementById('low-52').textContent = `$${data.low52.toFixed(2)}`;
-        document.getElementById('beta').textContent = data.beta.toFixed(2);
+        // Volume chart
+        const volumeCtx = document.getElementById('volume-chart').getContext('2d');
+        if (charts.volume) charts.volume.destroy();
+        charts.volume = new Chart(volumeCtx, {
+            type: 'bar',
+            data: {
+                labels: chartData.dates,
+                datasets: [{
+                    label: 'Volume',
+                    data: chartData.volumes,
+                    backgroundColor: 'rgba(255, 99, 132, 0.5)'
+                }]
+            },
+            options: {
+                responsive: true
+            }
+        });
+
+        // Indicators chart
+        const indicatorsCtx = document.getElementById('indicators-chart').getContext('2d');
+        if (charts.indicators) charts.indicators.destroy();
+        charts.indicators = new Chart(indicatorsCtx, {
+            type: 'line',
+            data: {
+                labels: chartData.dates,
+                datasets: [
+                    {
+                        label: 'RSI',
+                        data: chartData.rsi,
+                        borderColor: 'rgb(255, 99, 132)',
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'MACD',
+                        data: chartData.macd,
+                        borderColor: 'rgb(54, 162, 235)',
+                        yAxisID: 'y1'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'RSI'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'MACD'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                }
+            }
+        });
     }
 
-    // Function to update volume metrics
-    function updateVolumeMetrics(data) {
-        document.getElementById('avg-volume').textContent = `${(data.avgVolume / 1e6).toFixed(2)}M`;
-        document.getElementById('today-volume').textContent = `${(data.todayVolume / 1e6).toFixed(2)}M`;
-        document.getElementById('volume-change').textContent = `${data.volumeChange >= 0 ? '+' : ''}${data.volumeChange.toFixed(2)}%`;
-        document.getElementById('volume-correlation').textContent = data.volumeCorrelation.toFixed(2);
-    }
-
-    // Function to update technical indicators
-    function updateIndicators(data) {
-        document.getElementById('rsi').textContent = data.rsi.toFixed(2);
-        document.getElementById('macd').textContent = data.macd.toFixed(2);
-        document.getElementById('bollinger').textContent = data.bollinger.toFixed(2);
-        document.getElementById('ma-50').textContent = `$${data.ma50.toFixed(2)}`;
-        document.getElementById('ma-200').textContent = `$${data.ma200.toFixed(2)}`;
-    }
-
-    // Function to update news
     function updateNews(news) {
         const container = document.getElementById('news-container');
         container.innerHTML = news.map(item => `
             <div class="news-item">
                 <div class="news-title">${item.title}</div>
                 <div class="news-source">${item.source}</div>
-                <div class="news-date">${item.date}</div>
+                <div class="news-date">${new Date(item.published).toLocaleString()}</div>
+                <a href="${item.link}" target="_blank">Read more</a>
             </div>
         `).join('');
     }
 
-    // Fetch and update data
-    async function updateData() {
+    // Action functions
+    async function addToWatchlist(symbol) {
         try {
-            const response = await fetch('/api/tesla_analysis');
-            const data = await response.json();
+            const response = await fetch('/api/watchlist/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol })
+            });
             
-            updateMetrics(data.metrics);
-            updateVolumeMetrics(data.volume);
-            updateIndicators(data.indicators);
-            updateNews(data.news);
-            
-            // Update charts
-            priceChart.data.labels = data.priceChart.labels;
-            priceChart.data.datasets[0].data = data.priceChart.data;
-            priceChart.update();
-            
-            volumeChart.data.labels = data.volumeChart.labels;
-            volumeChart.data.datasets[0].data = data.volumeChart.data;
-            volumeChart.update();
-            
-            indicatorsChart.data.labels = data.indicatorsChart.labels;
-            indicatorsChart.data.datasets[0].data = data.indicatorsChart.price;
-            indicatorsChart.data.datasets[1].data = data.indicatorsChart.ma50;
-            indicatorsChart.data.datasets[2].data = data.indicatorsChart.ma200;
-            indicatorsChart.update();
+            if (response.ok) {
+                alert(`${symbol} added to watchlist successfully!`);
+            } else {
+                throw new Error('Failed to add to watchlist');
+            }
         } catch (error) {
-            console.error('Error updating data:', error);
+            console.error('Error adding to watchlist:', error);
+            alert('Failed to add to watchlist: ' + error.message);
         }
     }
 
-    // Update data every minute
-    updateData();
-    setInterval(updateData, 60000);
+    async function setPriceAlert(symbol) {
+        const price = prompt('Enter price alert value:');
+        if (!price) return;
+        
+        try {
+            const response = await fetch('/api/alerts/set', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol, price: parseFloat(price) })
+            });
+            
+            if (response.ok) {
+                alert(`Price alert set for ${symbol} at $${price}`);
+            } else {
+                throw new Error('Failed to set price alert');
+            }
+        } catch (error) {
+            console.error('Error setting price alert:', error);
+            alert('Failed to set price alert: ' + error.message);
+        }
+    }
+
+    function viewStockDetails(symbol) {
+        window.location.href = `/stock/${symbol}`;
+    }
+
+    // Event listeners
+    document.querySelectorAll('.timeframe-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentTimeframe = btn.dataset.timeframe;
+            document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            fetchTeslaData();
+        });
+    });
+    
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+        checkAPIStatus();
+        fetchTeslaData();
+        document.querySelector(`.timeframe-btn[data-timeframe="${currentTimeframe}"]`).classList.add('active');
+    });
+    
+    // Auto-refresh every 5 minutes
+    setInterval(fetchTeslaData, 300000);
 </script>
 {% endblock %} 
