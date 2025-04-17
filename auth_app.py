@@ -772,22 +772,22 @@ def analyze_volatility():
 
 @app.route('/portfolio')
 def portfolio():
-    """Display portfolio page"""
+    """Display the portfolio page"""
     return render_template('portfolio.html')
 
 @app.route('/news')
 def news():
-    """Display news page"""
+    """Display the news page"""
     return render_template('news.html')
 
 @app.route('/trading')
 def trading():
-    """Display trading page"""
+    """Display the trading page"""
     return render_template('trading.html')
 
 @app.route('/compare')
 def compare():
-    """Display compare page"""
+    """Display the compare page"""
     return render_template('compare.html')
 
 @app.route('/volume_analysis')
@@ -815,25 +815,72 @@ def volatile_stocks():
     """Display the volatile stocks page"""
     return render_template('volatile_stocks.html')
 
-@app.route('/portfolio')
-def portfolio():
-    """Display the portfolio page"""
-    return render_template('portfolio.html')
+@app.route('/test_alpha_vantage', methods=['GET'])
+def test_alpha_vantage():
+    """Test page for Alpha Vantage API"""
+    return render_template('test_alpha_vantage.html')
 
-@app.route('/news')
-def news():
-    """Display the news page"""
-    return render_template('news.html')
-
-@app.route('/trading')
-def trading():
-    """Display the trading page"""
-    return render_template('trading.html')
-
-@app.route('/compare')
-def compare():
-    """Display the compare page"""
-    return render_template('compare.html')
+@app.route('/api/test_alpha_vantage', methods=['POST'])
+def test_alpha_vantage_api():
+    """Test Alpha Vantage API endpoint"""
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol', 'AAPL')
+        
+        logger.info(f"Testing Alpha Vantage API for symbol: {symbol}")
+        
+        # Get API key
+        api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        if not api_key:
+            return jsonify({
+                'status': 'error',
+                'message': 'Alpha Vantage API key not found in environment'
+            }), 400
+        
+        # Test different endpoints
+        endpoints = {
+            'TIME_SERIES_DAILY': f"https://www.alphavantage.co/query?function=TIME_SERIES_DAILY&symbol={symbol}&outputsize=full&apikey={api_key}",
+            'GLOBAL_QUOTE': f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={api_key}",
+            'SYMBOL_SEARCH': f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={symbol}&apikey={api_key}"
+        }
+        
+        results = {}
+        for endpoint, url in endpoints.items():
+            try:
+                logger.info(f"Testing {endpoint} endpoint")
+                response = requests.get(url, timeout=10)
+                logger.info(f"Response status: {response.status_code}")
+                logger.info(f"Response content: {response.text[:500]}")
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    results[endpoint] = {
+                        'status': 'success',
+                        'data': data
+                    }
+                else:
+                    results[endpoint] = {
+                        'status': 'error',
+                        'message': f"HTTP Error: {response.status_code}",
+                        'response': response.text
+                    }
+            except Exception as e:
+                results[endpoint] = {
+                    'status': 'error',
+                    'message': str(e)
+                }
+        
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error testing Alpha Vantage API: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
 
 @app.route('/dashboard/api/run_backtest', methods=['POST'])
 def run_backtest():
@@ -882,6 +929,7 @@ def run_backtest():
                         try:
                             response = requests.get(url, timeout=10)
                             logger.info(f"Alpha Vantage response status: {response.status_code}")
+                            logger.info(f"Alpha Vantage response content: {response.text[:200]}")
                             
                             if response.status_code == 200:
                                 break

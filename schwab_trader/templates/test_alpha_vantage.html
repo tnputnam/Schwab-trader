@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Vantage API Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .result-box {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Alpha Vantage API Test</h1>
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Test Configuration</h5>
+                        <div class="mb-3">
+                            <label for="symbol" class="form-label">Symbol</label>
+                            <input type="text" class="form-control" id="symbol" value="AAPL">
+                        </div>
+                        <button class="btn btn-primary" onclick="testAPI()">Test API</button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">API Key Status</h5>
+                        <div id="apiKeyStatus" class="alert alert-info">
+                            Checking API key...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <h3>Test Results</h3>
+                <div id="results">
+                    <!-- Results will be displayed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Check API key status
+        function checkApiKey() {
+            fetch('/api/test_alpha_vantage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol: 'AAPL' })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const statusDiv = document.getElementById('apiKeyStatus');
+                if (data.status === 'error' && data.message.includes('API key')) {
+                    statusDiv.className = 'alert alert-danger';
+                    statusDiv.textContent = 'API key not found or invalid';
+                } else {
+                    statusDiv.className = 'alert alert-success';
+                    statusDiv.textContent = 'API key is configured';
+                }
+            })
+            .catch(error => {
+                document.getElementById('apiKeyStatus').className = 'alert alert-danger';
+                document.getElementById('apiKeyStatus').textContent = 'Error checking API key';
+            });
+        }
+
+        // Test API endpoints
+        function testAPI() {
+            const symbol = document.getElementById('symbol').value;
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="alert alert-info">Testing API endpoints...</div>';
+
+            fetch('/api/test_alpha_vantage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol: symbol })
+            })
+            .then(response => response.json())
+            .then(data => {
+                resultsDiv.innerHTML = '';
+                
+                if (data.status === 'error') {
+                    resultsDiv.innerHTML = `
+                        <div class="alert alert-danger">
+                            <h4>Error</h4>
+                            <pre>${data.message}</pre>
+                        </div>
+                    `;
+                    return;
+                }
+
+                Object.entries(data.results).forEach(([endpoint, result]) => {
+                    const resultBox = document.createElement('div');
+                    resultBox.className = `result-box ${result.status === 'success' ? 'success' : 'error'}`;
+                    
+                    let content = `<h4>${endpoint}</h4>`;
+                    if (result.status === 'success') {
+                        content += `<pre>${JSON.stringify(result.data, null, 2)}</pre>`;
+                    } else {
+                        content += `<div class="alert alert-danger">
+                            <strong>Error:</strong> ${result.message}
+                            ${result.response ? `<pre>${result.response}</pre>` : ''}
+                        </div>`;
+                    }
+                    
+                    resultBox.innerHTML = content;
+                    resultsDiv.appendChild(resultBox);
+                });
+            })
+            .catch(error => {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <h4>Error</h4>
+                        <pre>${error.message}</pre>
+                    </div>
+                `;
+            });
+        }
+
+        // Check API key status on page load
+        checkApiKey();
+    </script>
+</body>
+</html> 
