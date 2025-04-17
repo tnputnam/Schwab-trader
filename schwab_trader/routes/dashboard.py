@@ -2,6 +2,8 @@ from flask import Blueprint, render_template, jsonify, request, session
 import yfinance as yf
 from datetime import datetime, timedelta
 import logging
+import os
+import requests
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -11,6 +13,26 @@ handler = logging.FileHandler('logs/dashboard_{}.log'.format(datetime.now().strf
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
 logger.setLevel(logging.INFO)
+
+class AlphaVantageAPI:
+    def __init__(self):
+        self.api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        self.base_url = 'https://www.alphavantage.co/query'
+        
+    def get_intraday_data(self, symbol, interval='5min'):
+        """Get intraday data for a symbol."""
+        params = {
+            'function': 'TIME_SERIES_INTRADAY',
+            'symbol': symbol,
+            'interval': interval,
+            'apikey': self.api_key,
+            'outputsize': 'full'
+        }
+        response = requests.get(self.base_url, params=params)
+        return response.json()
+
+# Initialize Alpha Vantage API
+alpha_vantage = AlphaVantageAPI()
 
 @bp.route('/')
 def index():
@@ -191,39 +213,79 @@ def run_tesla_analysis():
     """Run Tesla volume analysis."""
     try:
         logger.info("Running Tesla volume analysis")
-        # Get Tesla data
-        tesla = yf.Ticker("TSLA")
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=30)
-        hist = tesla.history(start=start_date, end=end_date)
         
-        if hist.empty:
-            return jsonify({'status': 'error', 'message': 'No data available'}), 404
-        
-        # Calculate volume metrics
-        current_volume = hist['Volume'].iloc[-1]
-        avg_volume = hist['Volume'].mean()
-        volume_change = ((current_volume - avg_volume) / avg_volume) * 100
-        volume_ratio = current_volume / avg_volume
-        
-        # Calculate price metrics
-        current_price = hist['Close'].iloc[-1]
-        price_change = ((current_price - hist['Close'].iloc[0]) / hist['Close'].iloc[0]) * 100
-        
-        return jsonify({
-            'status': 'success',
-            'metrics': {
-                'currentVolume': current_volume,
-                'avgVolume': avg_volume,
-                'volumeChange': volume_change,
-                'volumeRatio': volume_ratio,
-                'currentPrice': current_price,
-                'priceChange': price_change
-            }
-        })
+        try:
+            # Get Tesla data from Alpha Vantage
+            data = alpha_vantage.get_intraday_data('TSLA', interval='5min')
+            
+            if 'Time Series (5min)' not in data:
+                logger.error(f"Error in Alpha Vantage response: {data}")
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to fetch Tesla stock data. Please try again later.'
+                }), 500
+            
+            time_series = data['Time Series (5min)']
+            
+            # Convert time series to list for easier processing
+            volumes = []
+            prices = []
+            timestamps = sorted(time_series.keys(), reverse=True)
+            
+            # Get last 100 data points (about 8 hours of 5-min data)
+            for timestamp in timestamps[:100]:
+                entry = time_series[timestamp]
+                volumes.append(float(entry['5. volume']))
+                prices.append(float(entry['4. close']))
+            
+            if not volumes or not prices:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'No data available for Tesla stock'
+                }), 404
+            
+            # Calculate volume metrics
+            current_volume = volumes[0]  # Most recent volume
+            avg_volume = sum(volumes) / len(volumes)
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+            
+            # Calculate price metrics
+            current_price = prices[0]  # Most recent price
+            prev_price = prices[-1]  # Oldest price in our window
+            price_change = ((current_price - prev_price) / prev_price) * 100
+            
+            # Check for volume signals
+            signal = None
+            if volume_ratio > 1.5:  # 50% above average volume
+                signal = {
+                    'time': datetime.now().strftime('%H:%M:%S'),
+                    'type': 'High Volume',
+                    'message': f'Volume is {volume_ratio:.2f}x above average'
+                }
+            
+            logger.info("Tesla analysis completed successfully")
+            return jsonify({
+                'status': 'success',
+                'metrics': {
+                    'volumeRatio': volume_ratio,
+                    'priceChange': price_change
+                },
+                'signal': signal
+            })
+            
+        except Exception as e:
+            logger.error(f"Error fetching Tesla data: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to fetch Tesla stock data. Please try again later.'
+            }), 500
+            
     except Exception as e:
-        logger.error(f"Error running Tesla analysis: {str(e)}")
-        return jsonify({'status': 'error', 'message': str(e)}), 500
+        logger.error(f"Error in Tesla analysis: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': 'An unexpected error occurred'
+        }), 500
 
 @bp.route('/api/run_backtest', methods=['POST'])
 def run_backtest():
