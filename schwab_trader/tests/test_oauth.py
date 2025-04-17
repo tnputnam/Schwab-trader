@@ -21,7 +21,7 @@ CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
 CLIENT_SECRET = "xzuIIEWzAs7nQd5A"
 
 # Updated with your new ngrok URL
-REDIRECT_URI = "https://db50-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
+REDIRECT_URI = "https://9273-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app/callback"
 
 # Fixed URLs to use api.schwabapi.com
 AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"  # Fixed domain
@@ -37,6 +37,7 @@ def after_request(response):
 
 @app.route('/')
 def index():
+    print("Index route accessed!")  # Debug print
     return """
     <h1>Schwab OAuth Test</h1>
     <p>Authorization URL: {}</p>
@@ -47,6 +48,7 @@ def index():
 
 @app.route('/login')
 def login():
+    print("Login route accessed!")  # Debug print
     schwab = OAuth2Session(
         CLIENT_ID,
         redirect_uri=REDIRECT_URI,
@@ -57,8 +59,7 @@ def login():
         response_type="code"  # Explicitly setting response_type
     )
     
-    # Debug print
-    print(f"Generated Authorization URL: {authorization_url}")
+    print(f"Generated Authorization URL: {authorization_url}")  # Debug print
     
     # Store state for later validation
     session['oauth_state'] = state
@@ -66,6 +67,7 @@ def login():
 
 @app.route('/callback')
 def callback():
+    print("Callback route accessed!")  # Debug print
     try:
         schwab = OAuth2Session(
             CLIENT_ID,
@@ -73,8 +75,7 @@ def callback():
             state=session.get('oauth_state')
         )
         
-        # Debug print
-        print(f"Callback URL: {request.url}")
+        print(f"Callback URL: {request.url}")  # Debug print
         
         token = schwab.fetch_token(
             TOKEN_URL,
@@ -95,7 +96,7 @@ def callback():
         })
         
     except Exception as e:
-        print(f"Error in callback: {str(e)}")
+        print(f"Error in callback: {str(e)}")  # Debug print
         return jsonify({
             "success": False,
             "error": str(e)
@@ -104,7 +105,8 @@ def callback():
 if __name__ == '__main__':
     # For development only
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+    print("Starting Flask app...")  # Debug print
     print(f"Using Authorization URL: {AUTHORIZATION_BASE_URL}")
     print(f"Using Token URL: {TOKEN_URL}")
     print(f"Using Scopes: {SCOPES}")
-    app.run(port=5000, debug=True)  # Changed port to 5000 
+    app.run(host='0.0.0.0', port=5000, debug=True)  # Changed port to 5000 
