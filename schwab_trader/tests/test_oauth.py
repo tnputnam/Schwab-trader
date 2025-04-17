@@ -5,6 +5,8 @@ import webbrowser
 import logging
 import json
 from urllib.parse import urlparse, parse_qs, unquote
+import base64
+import requests
 
 # Set up detailed logging
 logging.basicConfig(level=logging.DEBUG)
@@ -14,17 +16,25 @@ class SchwabOAuthTest:
     def __init__(self):
         # Your OAuth2 settings
         self.client_id = "1wzwOrhivb2PkR1UCAUVTKYqC4MTNYlj"
+        # Add your client secret here
+        self.client_secret = input("Enter your client secret: ").strip()
         self.auth_url = "https://api.schwabapi.com/v1/oauth/authorize"
         self.token_url = "https://api.schwabapi.com/v1/oauth/token"
         self.redirect_uri = "https://developer.schwab.com/oauth2-redirect.html"
         self.scope = ["readonly"]
         
-        # Initialize OAuth session with debug
+        # Initialize OAuth session
         self.oauth = OAuth2Session(
             client_id=self.client_id,
             redirect_uri=self.redirect_uri,
             scope=self.scope
         )
+    
+    def get_basic_auth_header(self):
+        """Create Basic Auth header from client_id and client_secret"""
+        credentials = f"{self.client_id}:{self.client_secret}"
+        encoded = base64.b64encode(credentials.encode()).decode()
+        return f"Basic {encoded}"
     
     def clean_url(self, url):
         """Clean the URL by removing any unwanted characters"""
@@ -64,48 +74,61 @@ class SchwabOAuthTest:
     def test_oauth_flow(self):
         try:
             # Get authorization URL
-            authorization_url, state = self.oauth.authorization_url(
-                self.auth_url
-            )
+            authorization_url, state = self.oauth.authorization_url(self.auth_url)
             
             print("\nSchwab OAuth Test")
             print("================")
             print(f"\n1. Opening authorization URL in your browser...")
             print(f"URL: {authorization_url}")
             
-            # Open the URL in browser
             webbrowser.open(authorization_url)
             
-            # Wait for user to authorize and get the callback URL
             print("\n2. After authorizing, copy the full callback URL from your browser")
-            print("   NOTE: If you see an @ symbol at the start, please remove it before pasting")
-            callback_url = input("Enter the callback URL: ").strip()
+            callback_url = input("Enter the callback URL (without @ symbol): ").strip()
             
-            # Parse and clean the callback URL
-            params, clean_callback_url = self.parse_callback_url(callback_url)
+            # Parse the callback URL
+            parsed = urlparse(callback_url)
+            params = parse_qs(parsed.query)
+            code = params.get('code', [None])[0]
             
-            print("\nAuthorization Code Details:")
-            if 'code' in params:
-                code = params['code'][0]
-                print(f"Code: {code}")
-                print(f"Code length: {len(code)}")
-            
-            try:
-                print("\nAttempting to exchange code for token...")
-                token = self.oauth.fetch_token(
-                    token_url=self.token_url,
-                    authorization_response=clean_callback_url,
-                    client_id=self.client_id,
-                    include_client_id=True
-                )
+            if not code:
+                print("Error: No authorization code found in callback URL")
+                return
                 
-                print("\nToken exchange successful!")
-                print(f"Token type: {token.get('token_type', 'N/A')}")
-                print(f"Access token length: {len(token.get('access_token', ''))}")
+            print("\nExchanging code for token...")
+            
+            # Prepare token request
+            data = {
+                'grant_type': 'authorization_code',
+                'code': code,
+                'redirect_uri': self.redirect_uri
+            }
+            
+            headers = {
+                'Authorization': self.get_basic_auth_header(),
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'Accept': 'application/json'
+            }
+            
+            # Make token request
+            print("\nMaking token request...")
+            response = requests.post(
+                self.token_url,
+                data=data,
+                headers=headers
+            )
+            
+            print(f"\nToken Response Status: {response.status_code}")
+            print(f"Response Headers: {dict(response.headers)}")
+            print(f"Response Body: {response.text}")
+            
+            if response.status_code == 200:
+                token = response.json()
+                print("\nSuccessfully obtained token!")
                 
                 # Try to get accounts
                 print("\nAttempting to get accounts...")
-                response = self.oauth.get(
+                accounts_response = requests.get(
                     "https://api.schwabapi.com/v1/accounts",
                     headers={
                         "Authorization": f"Bearer {token['access_token']}",
@@ -113,21 +136,17 @@ class SchwabOAuthTest:
                     }
                 )
                 
-                print(f"\nAccount API Response:")
-                print(f"Status code: {response.status_code}")
-                print(f"Response body: {response.text}")
-                
-            except Exception as token_error:
-                print(f"\nError during token exchange:")
-                print(f"Error type: {type(token_error).__name__}")
-                print(f"Error message: {str(token_error)}")
+                print(f"\nAccounts Response:")
+                print(f"Status: {accounts_response.status_code}")
+                print(f"Body: {accounts_response.text}")
+            else:
+                print(f"\nError getting token: {response.text}")
                 
         except Exception as e:
-            print(f"\nGeneral error:")
-            print(f"Error type: {type(e).__name__}")
-            print(f"Error message: {str(e)}")
+            print(f"\nError during OAuth flow:")
+            print(f"Type: {type(e).__name__}")
+            print(f"Message: {str(e)}")
 
 if __name__ == "__main__":
-    # Run the test
     tester = SchwabOAuthTest()
     tester.test_oauth_flow() 
