@@ -31,6 +31,15 @@ class Config:
     # Portfolio Updater
     PORTFOLIO_UPDATE_INTERVAL = 5  # minutes
 
+    # Schwab API Configuration
+    SCHWAB_CLIENT_ID = os.getenv('SCHWAB_CLIENT_ID')
+    SCHWAB_CLIENT_SECRET = os.getenv('SCHWAB_CLIENT_SECRET')
+    SCHWAB_REDIRECT_URI = os.getenv('SCHWAB_REDIRECT_URI', 'http://localhost:5000/auth/callback')
+    SCHWAB_AUTH_URL = "https://api.schwabapi.com/v1/oauth/authorize"
+    SCHWAB_TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
+    SCHWAB_API_BASE_URL = "https://api.schwabapi.com/v1"
+    SCHWAB_SCOPES = ["readonly", "trade"]
+
 class TestConfig(Config):
     """Testing configuration."""
     TESTING = True
