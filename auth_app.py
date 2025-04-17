@@ -833,6 +833,85 @@ def compare():
     """Display the compare page"""
     return render_template('compare.html')
 
+@app.route('/dashboard/api/run_backtest', methods=['POST'])
+def run_backtest():
+    """Run backtest for specified symbols and date range"""
+    try:
+        data = request.get_json()
+        symbols = [s.strip() for s in data['symbols'].split(',')]
+        start_date = data['startDate']
+        end_date = data['endDate']
+        
+        # Initialize strategy tester
+        tester = StrategyTester()
+        
+        # Test strategies
+        results = []
+        strategies = {
+            'Moving Average Crossover': moving_average_crossover_strategy,
+            'RSI': rsi_strategy,
+            'Bollinger Bands': bollinger_bands_strategy,
+            'MACD': macd_strategy,
+            'Volume': volume_strategy
+        }
+        
+        for symbol in symbols:
+            try:
+                # First verify the symbol is valid and has data
+                stock = yf.Ticker(symbol)
+                hist = stock.history(start=start_date, end=end_date)
+                
+                if hist.empty:
+                    logger.warning(f"No data found for {symbol} in the specified date range")
+                    continue
+                    
+                for strategy_name, strategy in strategies.items():
+                    try:
+                        result = tester.backtest_strategy(strategy, [symbol], start_date, end_date)
+                        results.append({
+                            'symbol': symbol,
+                            'strategy': strategy_name,
+                            'initialPrice': result['portfolio_value'][0],
+                            'finalPrice': result['portfolio_value'][-1],
+                            'totalReturn': result['metrics']['total_return'],
+                            'sharpeRatio': result['metrics']['sharpe_ratio'],
+                            'maxDrawdown': result['metrics']['max_drawdown'],
+                            'numTrades': result['metrics']['num_trades']
+                        })
+                    except Exception as e:
+                        logger.error(f"Error backtesting {strategy_name} for {symbol}: {str(e)}")
+                        results.append({
+                            'symbol': symbol,
+                            'strategy': strategy_name,
+                            'error': str(e)
+                        })
+                        continue
+            except Exception as e:
+                logger.error(f"Error processing {symbol}: {str(e)}")
+                results.append({
+                    'symbol': symbol,
+                    'error': f"Failed to process symbol: {str(e)}"
+                })
+                continue
+        
+        if not results:
+            return jsonify({
+                'status': 'error',
+                'message': 'No valid results found for any symbols'
+            }), 400
+        
+        return jsonify({
+            'status': 'success',
+            'results': results
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in backtest: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
 if __name__ == '__main__':
     # For development only
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'

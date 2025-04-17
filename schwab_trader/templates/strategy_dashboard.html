@@ -136,6 +136,9 @@
             }
             
             try {
+                const resultsDiv = document.getElementById('backtestResults');
+                resultsDiv.innerHTML = '<div class="alert alert-info">Running backtest... Please wait.</div>';
+                
                 const response = await fetch('/dashboard/api/run_backtest', {
                     method: 'POST',
                     headers: {
@@ -150,28 +153,44 @@
                 const data = await response.json();
                 
                 if (data.status === 'success') {
-                    const resultsDiv = document.getElementById('backtestResults');
-                    let html = '<table class="table"><thead><tr><th>Symbol</th><th>Initial Price</th><th>Final Price</th><th>Total Return</th></tr></thead><tbody>';
+                    let html = '<div class="table-responsive"><table class="table table-striped"><thead><tr><th>Symbol</th><th>Strategy</th><th>Initial Price</th><th>Final Price</th><th>Total Return</th><th>Sharpe Ratio</th><th>Max Drawdown</th><th># Trades</th><th>Status</th></tr></thead><tbody>';
                     
                     data.results.forEach(result => {
-                        html += `
-                            <tr>
-                                <td>${result.symbol}</td>
-                                <td>$${result.initialPrice.toFixed(2)}</td>
-                                <td>$${result.finalPrice.toFixed(2)}</td>
-                                <td class="${result.totalReturn >= 0 ? 'text-success' : 'text-danger'}">${result.totalReturn.toFixed(2)}%</td>
-                            </tr>
-                        `;
+                        if (result.error) {
+                            html += `
+                                <tr class="table-warning">
+                                    <td>${result.symbol}</td>
+                                    <td>${result.strategy || '-'}</td>
+                                    <td colspan="6">Error: ${result.error}</td>
+                                    <td><span class="badge bg-danger">Failed</span></td>
+                                </tr>
+                            `;
+                        } else {
+                            html += `
+                                <tr>
+                                    <td>${result.symbol}</td>
+                                    <td>${result.strategy}</td>
+                                    <td>$${result.initialPrice.toFixed(2)}</td>
+                                    <td>$${result.finalPrice.toFixed(2)}</td>
+                                    <td class="${result.totalReturn >= 0 ? 'text-success' : 'text-danger'}">${result.totalReturn.toFixed(2)}%</td>
+                                    <td>${result.sharpeRatio.toFixed(2)}</td>
+                                    <td class="text-danger">${result.maxDrawdown.toFixed(2)}%</td>
+                                    <td>${result.numTrades}</td>
+                                    <td><span class="badge bg-success">Success</span></td>
+                                </tr>
+                            `;
+                        }
                     });
                     
-                    html += '</tbody></table>';
+                    html += '</tbody></table></div>';
                     resultsDiv.innerHTML = html;
                 } else {
-                    alert('Error running backtest: ' + data.message);
+                    resultsDiv.innerHTML = `<div class="alert alert-danger">Error: ${data.message}</div>`;
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Error running backtest');
+                const resultsDiv = document.getElementById('backtestResults');
+                resultsDiv.innerHTML = `<div class="alert alert-danger">Error running backtest: ${error.message}</div>`;
             }
         }
 
