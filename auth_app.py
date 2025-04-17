@@ -101,21 +101,14 @@ def callback():
             'Authorization': f"Bearer {token_data['access_token']}",
             'X-Authorization': f"Bearer {token_data['access_token']}",
             'Schwab-Client-Correlid': client_correlid,
-            'Origin': REDIRECT_URI.rsplit('/', 1)[0],
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            'Origin': REDIRECT_URI.rsplit('/', 1)[0]
         }
         
-        # First get the accounts list
+        # First get the account numbers
         accounts_response = requests.get(
-            'https://api.schwabapi.com/v1/accounts',
-            headers=api_headers,
-            params={'fields': 'positions,balances'},
-            verify=True
+            'https://api.schwabapi.com/v1/accounts/accountNumbers',
+            headers=api_headers
         )
-        logger.debug(f"Accounts response status: {accounts_response.status_code}")
-        logger.debug(f"Accounts response headers: {dict(accounts_response.headers)}")
-        logger.debug(f"Accounts response body: {accounts_response.text}")
         
         if accounts_response.status_code == 200:
             accounts_data = accounts_response.json()
@@ -123,28 +116,31 @@ def callback():
             
             # Try to get positions and portfolio for each account
             results = []
-            for account in accounts_data.get('accounts', []):
-                account_id = account.get('accountId')
-                if account_id:
-                    # Get positions
-                    positions_response = requests.get(
-                        f'https://api.schwabapi.com/v1/accounts/{account_id}/positions',
-                        headers=api_headers
-                    )
-                    logger.debug(f"Positions response for {account_id}: {positions_response.status_code}")
-                    
-                    # Get portfolio
-                    portfolio_response = requests.get(
-                        f'https://api.schwabapi.com/v1/accounts/{account_id}/portfolio',
-                        headers=api_headers
-                    )
-                    logger.debug(f"Portfolio response for {account_id}: {portfolio_response.status_code}")
-                    
-                    results.append({
-                        'account_id': account_id,
-                        'positions': positions_response.json() if positions_response.status_code == 200 else None,
-                        'portfolio': portfolio_response.json() if portfolio_response.status_code == 200 else None
-                    })
+            for account_number in accounts_data.get('accountNumbers', []):
+                # Get account details
+                account_response = requests.get(
+                    f'https://api.schwabapi.com/v1/accounts/{account_number}',
+                    headers=api_headers
+                )
+                
+                # Get positions
+                positions_response = requests.get(
+                    f'https://api.schwabapi.com/v1/accounts/{account_number}/positions',
+                    headers=api_headers
+                )
+                
+                # Get portfolio
+                portfolio_response = requests.get(
+                    f'https://api.schwabapi.com/v1/accounts/{account_number}/portfolio',
+                    headers=api_headers
+                )
+                
+                results.append({
+                    'account_number': account_number,
+                    'account_details': account_response.json() if account_response.status_code == 200 else None,
+                    'positions': positions_response.json() if positions_response.status_code == 200 else None,
+                    'portfolio': portfolio_response.json() if portfolio_response.status_code == 200 else None
+                })
             
             return jsonify({
                 "success": True,
