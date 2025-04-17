@@ -1,17 +1,6 @@
-import os
-import sys
-from requests_oauthlib import OAuth2Session
-import webbrowser
-import logging
-import json
-from urllib.parse import urlparse, parse_qs, unquote
-import base64
-import requests
 from flask import Flask, session, redirect, request, jsonify
-
-# Set up detailed logging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
+from requests_oauthlib import OAuth2Session
+import os
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'  # Required for session management
@@ -83,4 +72,4 @@ def callback():
 if __name__ == '__main__':
     # For development only
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
-    app.run(port=5000) 
+    app.run(port=5000)
