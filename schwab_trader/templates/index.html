@@ -13,6 +13,7 @@
         .container {
             max-width: 1400px;
             margin: 0 auto;
+            padding-top: 70px; /* Add padding to account for fixed nav */
         }
         .header {
             background: white;
@@ -33,12 +34,16 @@
             border-radius: 8px;
             box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             flex-wrap: wrap;
-            position: sticky;
+            position: fixed;
             top: 0;
+            left: 0;
+            right: 0;
             z-index: 1000;
+            margin: 0;
+            padding: 10px 20px;
         }
         .nav-tab {
-            padding: 10px 20px;
+            padding: 8px 16px;
             background: #f8f9fa;
             border: 1px solid #dee2e6;
             border-radius: 4px;
@@ -47,6 +52,8 @@
             color: #495057;
             transition: all 0.3s ease;
             white-space: nowrap;
+            text-decoration: none;
+            display: inline-block;
         }
         .nav-tab:hover {
             background: #007bff;
@@ -140,16 +147,16 @@
         </div>
 
         <div class="nav-tabs">
-            <button class="nav-tab active" onclick="showDashboard('overview')">Overview</button>
-            <button class="nav-tab" onclick="showDashboard('volume')">Volume Trading</button>
-            <button class="nav-tab" onclick="showDashboard('auto')">Auto Trading</button>
-            <button class="nav-tab" onclick="window.location.href='/strategy_dashboard'">Strategy Dashboard</button>
-            <button class="nav-tab" onclick="window.location.href='/tesla_analysis'">Tesla Analysis</button>
-            <button class="nav-tab" onclick="window.location.href='/volatile_stocks'">Volatile Stocks</button>
-            <button class="nav-tab" onclick="window.location.href='/portfolio'">Portfolio</button>
-            <button class="nav-tab" onclick="window.location.href='/news'">News</button>
-            <button class="nav-tab" onclick="window.location.href='/trading'">Trading</button>
-            <button class="nav-tab" onclick="window.location.href='/compare'">Compare</button>
+            <a href="/dashboard/" class="nav-tab active">Overview</a>
+            <a href="/dashboard/volume_analysis" class="nav-tab">Volume Trading</a>
+            <a href="/dashboard/auto_trading" class="nav-tab">Auto Trading</a>
+            <a href="/dashboard/strategy_dashboard" class="nav-tab">Strategy Dashboard</a>
+            <a href="/dashboard/tesla_analysis" class="nav-tab">Tesla Analysis</a>
+            <a href="/dashboard/volatile_stocks" class="nav-tab">Volatile Stocks</a>
+            <a href="/dashboard/portfolio" class="nav-tab">Portfolio</a>
+            <a href="/dashboard/news" class="nav-tab">News</a>
+            <a href="/dashboard/trading" class="nav-tab">Trading</a>
+            <a href="/dashboard/compare" class="nav-tab">Compare</a>
         </div>
 
         <div id="overview" class="dashboard-content active">
@@ -204,21 +211,19 @@
     </div>
 
     <script>
-        function showDashboard(dashboardId) {
-            // Hide all dashboard contents
-            document.querySelectorAll('.dashboard-content').forEach(content => {
-                content.classList.remove('active');
-            });
+        // Set active tab based on current URL
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentPath = window.location.pathname;
+            const navTabs = document.querySelectorAll('.nav-tab');
             
-            // Show selected dashboard
-            document.getElementById(dashboardId).classList.add('active');
-            
-            // Update active tab
-            document.querySelectorAll('.nav-tab').forEach(tab => {
-                tab.classList.remove('active');
+            navTabs.forEach(tab => {
+                if (tab.getAttribute('href') === currentPath) {
+                    tab.classList.add('active');
+                } else {
+                    tab.classList.remove('active');
+                }
             });
-            event.target.classList.add('active');
-        }
+        });
 
         // Function to update market data
         async function updateMarketData() {

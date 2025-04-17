@@ -788,6 +788,51 @@ def compare():
     """Display compare page"""
     return render_template('compare.html')
 
+@app.route('/volume_analysis')
+def volume_analysis():
+    """Display the volume analysis page"""
+    return render_template('volume_analysis.html')
+
+@app.route('/auto_trading')
+def auto_trading():
+    """Display the auto trading page"""
+    return render_template('auto_trading.html')
+
+@app.route('/strategy_dashboard')
+def strategy_dashboard():
+    """Display the strategy dashboard page"""
+    return render_template('strategy_dashboard.html')
+
+@app.route('/tesla_analysis')
+def tesla_analysis():
+    """Display the Tesla analysis page"""
+    return render_template('tesla_analysis.html')
+
+@app.route('/volatile_stocks')
+def volatile_stocks():
+    """Display the volatile stocks page"""
+    return render_template('volatile_stocks.html')
+
+@app.route('/portfolio')
+def portfolio():
+    """Display the portfolio page"""
+    return render_template('portfolio.html')
+
+@app.route('/news')
+def news():
+    """Display the news page"""
+    return render_template('news.html')
+
+@app.route('/trading')
+def trading():
+    """Display the trading page"""
+    return render_template('trading.html')
+
+@app.route('/compare')
+def compare():
+    """Display the compare page"""
+    return render_template('compare.html')
+
 if __name__ == '__main__':
     # For development only
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
