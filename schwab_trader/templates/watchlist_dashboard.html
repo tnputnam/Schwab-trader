@@ -4,203 +4,33 @@
 {% block title %}Watchlist Dashboard{% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
-    {{ components.tab_navigation([
-        {'id': 'stocks', 'label': 'Stocks'},
-        {'id': 'crypto', 'label': 'Crypto'},
-        {'id': 'etfs', 'label': 'ETFs'}
-    ]) }}
-
-    <div id="stocks" class="tab-content active">
-        <div class="watchlist-section">
-            <div class="add-form card">
-                <h3>Add to Watchlist</h3>
-                <div class="form-group">
-                    <label for="stock-symbol">Symbol</label>
-                    <input type="text" id="stock-symbol" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label for="stock-category">Category</label>
-                    <select id="stock-category" class="form-control">
-                        <option value="tech">Technology</option>
-                        <option value="finance">Finance</option>
-                        <option value="healthcare">Healthcare</option>
-                        <option value="energy">Energy</option>
-                        <option value="consumer">Consumer</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="stock-notes">Notes</label>
-                    <textarea id="stock-notes" class="form-control" rows="3" placeholder="Add any notes about this stock"></textarea>
-                </div>
-                <button id="add-stock" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add Stock
-                </button>
-            </div>
-
-            <div class="watchlist-filters card">
-                <h3>Filters</h3>
-                <div class="filter-group">
-                    <label for="filter-category">Category</label>
-                    <select id="filter-category" class="form-control">
-                        <option value="all">All Categories</option>
-                        <option value="tech">Technology</option>
-                        <option value="finance">Finance</option>
-                        <option value="healthcare">Healthcare</option>
-                        <option value="energy">Energy</option>
-                        <option value="consumer">Consumer</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="filter-sort">Sort By</label>
-                    <select id="filter-sort" class="form-control">
-                        <option value="symbol">Symbol</option>
-                        <option value="price">Price</option>
-                        <option value="change">Change</option>
-                        <option value="volume">Volume</option>
-                    </select>
-                </div>
-                <button id="apply-filters" class="btn btn-primary">
-                    <i class="bi bi-funnel"></i> Apply Filters
-                </button>
-            </div>
-
-            <div class="watchlist-grid">
-                <div id="stocksList">
-                    <!-- Stocks will be loaded here -->
-                </div>
-            </div>
+<div class="container">
+    <div class="watchlist-section">
+        <h2>Your Watchlist</h2>
+        <div class="watchlist-grid">
+            {% for stock in watchlist %}
+                {{ components.stock_card({
+                    'symbol': stock.symbol,
+                    'price': stock.price,
+                    'volume': stock.volume,
+                    'change': stock.change,
+                    'market_cap': stock.market_cap
+                }) }}
+            {% endfor %}
         </div>
     </div>
 
-    <div id="crypto" class="tab-content">
-        <div class="watchlist-section">
-            <div class="add-form card">
-                <h3>Add Crypto</h3>
-                <div class="form-group">
-                    <label for="crypto-symbol">Symbol</label>
-                    <input type="text" id="crypto-symbol" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label for="crypto-category">Category</label>
-                    <select id="crypto-category" class="form-control">
-                        <option value="bitcoin">Bitcoin</option>
-                        <option value="ethereum">Ethereum</option>
-                        <option value="defi">DeFi</option>
-                        <option value="nft">NFT</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="crypto-notes">Notes</label>
-                    <textarea id="crypto-notes" class="form-control" rows="3" placeholder="Add any notes about this crypto"></textarea>
-                </div>
-                <button id="add-crypto" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add Crypto
-                </button>
+    <div class="add-to-watchlist">
+        <h2>Add to Watchlist</h2>
+        <form id="add-watchlist-form" class="watchlist-form">
+            <div class="form-group">
+                <label for="symbol">Symbol</label>
+                <input type="text" id="symbol" name="symbol" required>
             </div>
-
-            <div class="watchlist-filters card">
-                <h3>Filters</h3>
-                <div class="filter-group">
-                    <label for="crypto-filter-category">Category</label>
-                    <select id="crypto-filter-category" class="form-control">
-                        <option value="all">All Categories</option>
-                        <option value="bitcoin">Bitcoin</option>
-                        <option value="ethereum">Ethereum</option>
-                        <option value="defi">DeFi</option>
-                        <option value="nft">NFT</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="crypto-filter-sort">Sort By</label>
-                    <select id="crypto-filter-sort" class="form-control">
-                        <option value="symbol">Symbol</option>
-                        <option value="price">Price</option>
-                        <option value="change">Change</option>
-                        <option value="volume">Volume</option>
-                    </select>
-                </div>
-                <button id="crypto-apply-filters" class="btn btn-primary">
-                    <i class="bi bi-funnel"></i> Apply Filters
-                </button>
-            </div>
-
-            <div class="watchlist-grid">
-                <div id="cryptoList">
-                    <!-- Crypto will be loaded here -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="etfs" class="tab-content">
-        <div class="watchlist-section">
-            <div class="add-form card">
-                <h3>Add ETF</h3>
-                <div class="form-group">
-                    <label for="etf-symbol">Symbol</label>
-                    <input type="text" id="etf-symbol" class="form-control" required>
-                </div>
-                <div class="form-group">
-                    <label for="etf-category">Category</label>
-                    <select id="etf-category" class="form-control">
-                        <option value="index">Index</option>
-                        <option value="sector">Sector</option>
-                        <option value="bond">Bond</option>
-                        <option value="commodity">Commodity</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="etf-notes">Notes</label>
-                    <textarea id="etf-notes" class="form-control" rows="3" placeholder="Add any notes about this ETF"></textarea>
-                </div>
-                <button id="add-etf" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add ETF
-                </button>
-            </div>
-
-            <div class="watchlist-filters card">
-                <h3>Filters</h3>
-                <div class="filter-group">
-                    <label for="etf-filter-category">Category</label>
-                    <select id="etf-filter-category" class="form-control">
-                        <option value="all">All Categories</option>
-                        <option value="index">Index</option>
-                        <option value="sector">Sector</option>
-                        <option value="bond">Bond</option>
-                        <option value="commodity">Commodity</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="etf-filter-sort">Sort By</label>
-                    <select id="etf-filter-sort" class="form-control">
-                        <option value="symbol">Symbol</option>
-                        <option value="price">Price</option>
-                        <option value="change">Change</option>
-                        <option value="volume">Volume</option>
-                    </select>
-                </div>
-                <button id="etf-apply-filters" class="btn btn-primary">
-                    <i class="bi bi-funnel"></i> Apply Filters
-                </button>
-            </div>
-
-            <div class="watchlist-grid">
-                <div id="etfsList">
-                    <!-- ETFs will be loaded here -->
-                </div>
-            </div>
-        </div>
+            <button type="submit" class="btn btn-primary">Add to Watchlist</button>
+        </form>
     </div>
 </div>
-
-{{ components.api_status() }}
 {% endblock %}
 
 {% block extra_js %}

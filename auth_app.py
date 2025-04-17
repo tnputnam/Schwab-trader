@@ -39,6 +39,9 @@ app = Flask(__name__,
 CORS(app)
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_key_123')
 
+# Load configuration
+app.config.from_object('schwab_trader.config.Config')
+
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///schwab_trader.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -63,6 +66,61 @@ class ConnectionManager:
             socketio.emit('message', message, room=sid)
 
 manager = ConnectionManager()
+
+# Schwab OAuth routes
+@app.route('/auth/schwab')
+def schwab_auth():
+    """Start the Schwab OAuth flow."""
+    try:
+        schwab = SchwabOAuth()
+        auth_url = schwab.get_authorization_url()
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Error starting Schwab auth: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/auth/callback')
+def schwab_callback():
+    """Handle the OAuth callback from Schwab."""
+    try:
+        schwab = SchwabOAuth()
+        token = schwab.fetch_token(request.url)
+        
+        if token:
+            # Store the token in the session
+            session['schwab_token'] = token
+            
+            # Get user's accounts
+            accounts = schwab.get_accounts()
+            if accounts:
+                session['schwab_accounts'] = accounts
+                return redirect(url_for('dashboard'))
+            else:
+                return jsonify({
+                    'status': 'error',
+                    'message': 'Failed to get accounts'
+                }), 500
+        else:
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to get token'
+            }), 500
+    except Exception as e:
+        logger.error(f"Error in Schwab callback: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@app.route('/auth/logout')
+def schwab_logout():
+    """Log out from Schwab."""
+    session.pop('schwab_token', None)
+    session.pop('schwab_accounts', None)
+    return redirect(url_for('index'))
 
 # WebSocket event handlers
 @socketio.on('connect')
@@ -116,97 +174,82 @@ def login():
 
 @app.route('/dashboard')
 def dashboard():
-    """Display the dashboard page"""
-    return render_template('index.html')
+    """Display the main dashboard page"""
+    if 'schwab_token' not in session:
+        return redirect(url_for('schwab_auth'))
+    return render_template('market_dashboard.html')
+
+@app.route('/dashboard/strategies')
+def strategies_dashboard():
+    """Display the strategies dashboard page"""
+    if 'schwab_token' not in session:
+        return redirect(url_for('schwab_auth'))
+    return render_template('strategy_dashboard.html')
+
+@app.route('/dashboard/analysis')
+def analysis_dashboard():
+    """Display the analysis dashboard page"""
+    if 'schwab_token' not in session:
+        return redirect(url_for('schwab_auth'))
+    return render_template('analysis_dashboard.html')
+
+@app.route('/dashboard/alerts')
+def alerts_dashboard():
+    """Display the alerts dashboard page"""
+    if 'schwab_token' not in session:
+        return redirect(url_for('schwab_auth'))
+    return render_template('alerts_dashboard.html')
+
+@app.route('/dashboard/watchlist')
+def watchlist_dashboard():
+    """Display the watchlist dashboard page"""
+    if 'schwab_token' not in session:
+        return redirect(url_for('schwab_auth'))
+    return render_template('watchlist_dashboard.html')
 
 @app.route('/portfolio')
 def portfolio():
     """Display the portfolio page"""
+    if 'schwab_token' not in session:
+        return redirect(url_for('schwab_auth'))
+        
     try:
-        # Create a mock portfolio for now - this should be replaced with actual data from your database
+        schwab = SchwabOAuth()
+        accounts = session.get('schwab_accounts', [])
+        
+        if not accounts:
+            accounts = schwab.get_accounts()
+            if accounts:
+                session['schwab_accounts'] = accounts
+        
+        positions = []
+        for account in accounts:
+            account_positions = schwab.get_positions(account['accountNumber'])
+            if account_positions:
+                positions.extend(account_positions)
+        
+        # Calculate portfolio totals
+        total_value = sum(pos['marketValue'] for pos in positions)
+        total_change = sum(pos.get('currentDayProfitLoss', 0) for pos in positions)
+        total_change_percent = (total_change / (total_value - total_change)) * 100 if total_value > 0 else 0
+        
         portfolio = {
             'updated_at': datetime.now(),
-            'total_value': 100000.00,
-            'cash_value': 25000.00,
-            'day_change': 1500.00,
-            'day_change_percent': 1.5,
-            'total_gain': 10000.00,
-            'total_gain_percent': 10.0
+            'total_value': total_value,
+            'cash_value': sum(acc.get('currentBalances', {}).get('cashBalance', 0) for acc in accounts),
+            'day_change': total_change,
+            'day_change_percent': total_change_percent,
+            'total_gain': sum(pos.get('unrealizedProfitLoss', 0) for pos in positions),
+            'total_gain_percent': sum(pos.get('unrealizedProfitLossPercentage', 0) for pos in positions)
         }
         
-        # Mock positions data
-        positions = [
-            {
-                'symbol': 'AAPL',
-                'description': 'Apple Inc.',
-                'quantity': 100,
-                'price': 150.00,
-                'market_value': 15000.00,
-                'day_change_dollar': 300.00,
-                'day_change_percent': 2.0,
-                'cost_basis': 14000.00,
-                'security_type': 'Stock',
-                'sector': 'Technology',
-                'industry': 'Consumer Electronics',
-                'pe_ratio': 25.5,
-                'market_cap': 2500000000000.00,
-                'dividend_yield': 0.65,
-                'eps': 5.89,
-                'beta': 1.2,
-                'volume': 80000000
-            },
-            {
-                'symbol': 'MSFT',
-                'description': 'Microsoft Corporation',
-                'quantity': 50,
-                'price': 300.00,
-                'market_value': 15000.00,
-                'day_change_dollar': 150.00,
-                'day_change_percent': 1.0,
-                'cost_basis': 14500.00,
-                'security_type': 'Stock',
-                'sector': 'Technology',
-                'industry': 'Software',
-                'pe_ratio': 30.2,
-                'market_cap': 2000000000000.00,
-                'dividend_yield': 0.85,
-                'eps': 9.65,
-                'beta': 0.95,
-                'volume': 25000000
-            }
-        ]
-        
-        # Calculate sector allocation
-        sector_data = {}
-        for position in positions:
-            sector = position['sector']
-            value = position['market_value']
-            sector_data[sector] = sector_data.get(sector, 0) + value
-        
-        sector_labels = list(sector_data.keys())
-        sector_values = list(sector_data.values())
-        
-        # Calculate asset type allocation
-        asset_type_data = {}
-        for position in positions:
-            asset_type = position['security_type']
-            value = position['market_value']
-            asset_type_data[asset_type] = asset_type_data.get(asset_type, 0) + value
-        
-        asset_type_labels = list(asset_type_data.keys())
-        asset_type_values = list(asset_type_data.values())
-        
-        return render_template('portfolio.html',
+        return render_template('portfolio_dashboard.html',
                              portfolio=SimpleNamespace(**portfolio),
-                             positions=positions,
-                             sector_labels=sector_labels,
-                             sector_values=sector_values,
-                             asset_type_labels=asset_type_labels,
-                             asset_type_values=asset_type_values)
+                             positions=positions)
                              
     except Exception as e:
-        flash(f'Error loading portfolio: {str(e)}', 'danger')
-        return render_template('portfolio.html',
+        logger.error(f"Error loading portfolio: {str(e)}")
+        return render_template('portfolio_dashboard.html',
                              portfolio=SimpleNamespace(updated_at=datetime.now(),
                                                      total_value=0.00,
                                                      cash_value=0.00,
@@ -214,11 +257,7 @@ def portfolio():
                                                      day_change_percent=0.00,
                                                      total_gain=0.00,
                                                      total_gain_percent=0.00),
-                             positions=[],
-                             sector_labels=[],
-                             sector_values=[],
-                             asset_type_labels=[],
-                             asset_type_values=[])
+                             positions=[])
 
 @app.route('/news')
 def news():
@@ -228,7 +267,9 @@ def news():
 @app.route('/trading')
 def trading():
     """Display the trading page"""
-    return render_template('trading.html')
+    if 'schwab_token' not in session:
+        return redirect(url_for('schwab_auth'))
+    return render_template('trading_dashboard.html')
 
 @app.route('/compare')
 def compare():
@@ -238,15 +279,15 @@ def compare():
 @app.route('/volume_analysis')
 def volume_analysis():
     """Display the volume analysis page"""
-    return render_template('volume_analysis.html')
+    return render_template('tesla_dashboard.html')
 
 @app.route('/dashboard/api/paper_trade', methods=['POST'])
 def paper_trade():
     """Run paper trading with selected strategy"""
+    if 'schwab_token' not in session:
+        return jsonify({'status': 'error', 'message': 'Not authenticated'}), 401
+        
     try:
-        if 'access_token' not in session:
-            return jsonify({'status': 'error', 'message': 'Not authenticated'}), 401
-            
         data = request.get_json()
         if not data or 'strategy' not in data or 'symbols' not in data:
             return jsonify({'status': 'error', 'message': 'Missing required parameters'}), 400
@@ -266,7 +307,7 @@ def paper_trade():
             
         # Initialize strategy tester and sync with Schwab account
         tester = StrategyTester()
-        tester.sync_with_schwab(session['access_token'])
+        tester.sync_with_schwab(session['schwab_token'])
         
         # Run paper trading
         try:

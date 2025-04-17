@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% import "components.html" as components %}
 
 {% block title %}Portfolio Dashboard{% endblock %}
 
@@ -260,6 +261,43 @@
 {% endblock %}
 
 {% block content %}
+<div class="container">
+    <div class="portfolio-summary">
+        <h2>Portfolio Summary</h2>
+        <div class="summary-cards">
+            <div class="summary-card">
+                <h3>Total Value</h3>
+                <p>${{ portfolio.total_value|round(2) }}</p>
+            </div>
+            <div class="summary-card">
+                <h3>Cash Balance</h3>
+                <p>${{ portfolio.cash_value|round(2) }}</p>
+            </div>
+            <div class="summary-card">
+                <h3>Today's Change</h3>
+                <p class="{{ 'positive' if portfolio.day_change >= 0 else 'negative' }}">
+                    {{ '+' if portfolio.day_change >= 0 }}{{ portfolio.day_change|round(2) }} ({{ portfolio.day_change_percent|round(2) }}%)
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="positions-section">
+        <h2>Your Positions</h2>
+        <div class="positions-grid">
+            {% for position in positions %}
+                {{ components.stock_card({
+                    'symbol': position.symbol,
+                    'price': position.currentPrice,
+                    'volume': position.volume,
+                    'change': position.currentDayProfitLossPercentage,
+                    'market_cap': position.marketValue
+                }) }}
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
 <div class="dashboard-container">
     <h1>Portfolio Dashboard</h1>
     

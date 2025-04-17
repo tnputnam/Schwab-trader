@@ -223,9 +223,17 @@
 
     <div class="quick-actions">
         <div class="action-card">
+            <h3>Market Overview</h3>
+            <p>View real-time market data and trends.</p>
+            <a href="{{ url_for('dashboard') }}" class="action-button">
+                <i class="bi bi-graph-up"></i> View Market
+            </a>
+        </div>
+
+        <div class="action-card">
             <h3>Portfolio & Watchlist</h3>
             <p>View your positions, track performance, and manage your watchlist.</p>
-            <a href="{{ url_for('portfolio_dashboard') }}" class="action-button">
+            <a href="{{ url_for('portfolio') }}" class="action-button">
                 <i class="bi bi-briefcase"></i> Go to Portfolio
             </a>
         </div>
@@ -233,7 +241,7 @@
         <div class="action-card">
             <h3>Trading Dashboard</h3>
             <p>Execute trades manually or set up automated trading strategies.</p>
-            <a href="{{ url_for('trading_dashboard') }}" class="action-button">
+            <a href="{{ url_for('trading') }}" class="action-button">
                 <i class="bi bi-graph-up"></i> Start Trading
             </a>
         </div>
@@ -241,8 +249,40 @@
         <div class="action-card">
             <h3>Tesla Dashboard</h3>
             <p>Access detailed analysis and trading tools for Tesla (TSLA).</p>
-            <a href="{{ url_for('tesla_dashboard') }}" class="action-button">
+            <a href="{{ url_for('volume_analysis') }}" class="action-button">
                 <i class="bi bi-lightning-charge"></i> View Tesla
+            </a>
+        </div>
+
+        <div class="action-card">
+            <h3>Strategy Dashboard</h3>
+            <p>Configure and monitor your trading strategies.</p>
+            <a href="{{ url_for('strategies_dashboard') }}" class="action-button">
+                <i class="bi bi-gear"></i> View Strategies
+            </a>
+        </div>
+
+        <div class="action-card">
+            <h3>Analysis Dashboard</h3>
+            <p>Access advanced market analysis tools.</p>
+            <a href="{{ url_for('analysis_dashboard') }}" class="action-button">
+                <i class="bi bi-bar-chart"></i> View Analysis
+            </a>
+        </div>
+
+        <div class="action-card">
+            <h3>Alerts Dashboard</h3>
+            <p>Manage your price and volume alerts.</p>
+            <a href="{{ url_for('alerts_dashboard') }}" class="action-button">
+                <i class="bi bi-bell"></i> View Alerts
+            </a>
+        </div>
+
+        <div class="action-card">
+            <h3>Watchlist Dashboard</h3>
+            <p>Track and manage your watchlist.</p>
+            <a href="{{ url_for('watchlist_dashboard') }}" class="action-button">
+                <i class="bi bi-eye"></i> View Watchlist
             </a>
         </div>
     </div>
