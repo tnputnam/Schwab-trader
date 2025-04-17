@@ -11,6 +11,7 @@ from example_strategies import (
     rsi_strategy,
     bollinger_bands_strategy
 )
+import yfinance as yf
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -18,6 +19,9 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
+
+# Configure server name for ngrok
+app.config['SERVER_NAME'] = 'fff5-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.app'
 
 # Your Schwab API credentials
 CLIENT_ID = "nuXZreDmdJzAsb4XGU24pArjpkJPltXB"
@@ -174,7 +178,8 @@ def dashboard():
         'cash_available': current_balances.get('cashAvailableForTrading', 0),
         'total_value': current_balances.get('liquidationValue', 0),
         'long_market_value': current_balances.get('longMarketValue', 0),
-        'positions': positions
+        'positions': positions,
+        'market_data_url': url_for('get_market_data', _external=True)
     }
     
     return render_template('dashboard.html', account=account_info)
@@ -218,6 +223,89 @@ def strategy_dashboard():
     if 'access_token' not in session:
         return redirect(url_for('login'))
     return render_template('strategy_dashboard.html')
+
+@app.route('/api/market_data')
+def get_market_data():
+    """Get real-time market data for positions"""
+    if 'access_token' not in session:
+        logger.error("No access token in session")
+        return jsonify({'error': 'Not authenticated'}), 401
+        
+    positions = session.get('positions', [])
+    logger.debug(f"Positions from session: {positions}")
+    
+    if not positions:
+        logger.warning("No positions found in session")
+        return jsonify({'error': 'No positions found'}), 404
+        
+    market_data = {}
+    
+    for position in positions:
+        symbol = position.get('symbol')
+        logger.debug(f"Processing position for symbol: {symbol}")
+        
+        if symbol:
+            try:
+                stock = yf.Ticker(symbol)
+                info = stock.info
+                logger.debug(f"YFinance info for {symbol}: {info}")
+                
+                # Get historical data for technical indicators
+                hist = stock.history(period="1mo", interval="1d")
+                logger.debug(f"Historical data shape for {symbol}: {hist.shape}")
+                
+                # Calculate technical indicators
+                hist['SMA_20'] = hist['Close'].rolling(window=20).mean()
+                hist['SMA_50'] = hist['Close'].rolling(window=50).mean()
+                
+                # Calculate RSI
+                delta = hist['Close'].diff()
+                gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                rs = gain / loss
+                hist['RSI'] = 100 - (100 / (1 + rs))
+                
+                # Calculate Bollinger Bands
+                hist['BB_middle'] = hist['Close'].rolling(window=20).mean()
+                hist['BB_std'] = hist['Close'].rolling(window=20).std()
+                hist['BB_upper'] = hist['BB_middle'] + (hist['BB_std'] * 2)
+                hist['BB_lower'] = hist['BB_middle'] - (hist['BB_std'] * 2)
+                
+                # Format historical data for chart
+                chart_data = {
+                    'dates': hist.index.strftime('%Y-%m-%d').tolist(),
+                    'close': hist['Close'].tolist(),
+                    'sma_20': hist['SMA_20'].tolist(),
+                    'sma_50': hist['SMA_50'].tolist(),
+                    'bb_upper': hist['BB_upper'].tolist(),
+                    'bb_lower': hist['BB_lower'].tolist(),
+                    'rsi': hist['RSI'].tolist()
+                }
+                
+                market_data[symbol] = {
+                    'current_price': info.get('regularMarketPrice', 0),
+                    'change': info.get('regularMarketChange', 0),
+                    'change_percent': info.get('regularMarketChangePercent', 0),
+                    'volume': info.get('regularMarketVolume', 0),
+                    'high': info.get('regularMarketDayHigh', 0),
+                    'low': info.get('regularMarketDayLow', 0),
+                    'bid': info.get('bid', 0),
+                    'ask': info.get('ask', 0),
+                    'bid_size': info.get('bidSize', 0),
+                    'ask_size': info.get('askSize', 0),
+                    'fifty_two_week_high': info.get('fiftyTwoWeekHigh', 0),
+                    'fifty_two_week_low': info.get('fiftyTwoWeekLow', 0),
+                    'pe_ratio': info.get('trailingPE', 0),
+                    'market_cap': info.get('marketCap', 0),
+                    'chart_data': chart_data
+                }
+                logger.debug(f"Market data for {symbol}: {market_data[symbol]}")
+            except Exception as e:
+                logger.error(f"Error getting market data for {symbol}: {str(e)}")
+                market_data[symbol] = {'error': str(e)}
+    
+    logger.debug(f"Final market data response: {market_data}")
+    return jsonify(market_data)
 
 if __name__ == '__main__':
     # For development only

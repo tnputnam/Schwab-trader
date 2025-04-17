@@ -82,17 +82,21 @@
                                     <tr>
                                         <th>Symbol</th>
                                         <th>Quantity</th>
-                                        <th>Average Price</th>
-                                        <th>Market Value</th>
+                                        <th>Avg Price</th>
+                                        <th>Current Price</th>
+                                        <th>Change</th>
+                                        <th>Value</th>
                                     </tr>
                                 </thead>
-                                <tbody>
+                                <tbody id="positionsTable">
                                     {% for position in account.positions %}
-                                        <tr>
+                                        <tr data-symbol="{{ position.symbol }}">
                                             <td>{{ position.symbol }}</td>
                                             <td>{{ position.quantity }}</td>
                                             <td>${{ "%.2f"|format(position.averagePrice) }}</td>
-                                            <td>${{ "%.2f"|format(position.marketValue) }}</td>
+                                            <td class="current-price">Loading...</td>
+                                            <td class="change">Loading...</td>
+                                            <td class="value">Loading...</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
@@ -105,6 +109,36 @@
             </div>
         </div>
         
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Market Data</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="marketData">
+                            <!-- Market data will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Technical Analysis</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="technicalAnalysis">
+                            <!-- Technical analysis charts will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row mt-4">
             <div class="col-12">
                 <div class="card">
@@ -130,68 +164,78 @@
             }).format(value);
         }
 
-        // Function to update dashboard data
-        async function updateDashboard() {
-            try {
-                // Fetch portfolio data
-                const portfolioResponse = await fetch('/api/portfolio');
-                const portfolioData = await portfolioResponse.json();
-                
-                // Update portfolio metrics
-                document.getElementById('totalValue').textContent = formatCurrency(portfolioData.total_value);
-                document.getElementById('openPositions').textContent = portfolioData.positions.length;
-                
-                // Update recent trades
-                const recentTradesBody = document.getElementById('recentTrades');
-                recentTradesBody.innerHTML = portfolioData.recent_trades.map(trade => `
-                    <tr>
-                        <td>${trade.symbol}</td>
-                        <td>${trade.type}</td>
-                        <td>${trade.quantity}</td>
-                        <td>${formatCurrency(trade.price)}</td>
-                        <td class="${trade.pl >= 0 ? 'text-success' : 'text-danger'}">
-                            ${formatCurrency(trade.pl)}
-                        </td>
-                    </tr>
-                `).join('');
-
-                // Update current positions
-                const currentPositionsBody = document.getElementById('currentPositions');
-                currentPositionsBody.innerHTML = portfolioData.positions.map(position => `
-                    <tr>
-                        <td>${position.symbol}</td>
-                        <td>${position.quantity}</td>
-                        <td>${formatCurrency(position.avg_price)}</td>
-                        <td>${formatCurrency(position.current_price)}</td>
-                        <td class="${position.pl >= 0 ? 'text-success' : 'text-danger'}">
-                            ${formatCurrency(position.pl)}
-                        </td>
-                    </tr>
-                `).join('');
-
-                // Update portfolio chart
-                updatePortfolioChart(portfolioData.history);
-            } catch (error) {
-                console.error('Error updating dashboard:', error);
-            }
+        // Function to format percentage
+        function formatPercent(value) {
+            return new Intl.NumberFormat('en-US', {
+                style: 'percent',
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            }).format(value / 100);
         }
 
-        // Function to update portfolio chart
-        function updatePortfolioChart(history) {
-            const ctx = document.getElementById('portfolioChart').getContext('2d');
+        // Function to format large numbers
+        function formatLargeNumber(value) {
+            if (value >= 1e12) return (value / 1e12).toFixed(2) + 'T';
+            if (value >= 1e9) return (value / 1e9).toFixed(2) + 'B';
+            if (value >= 1e6) return (value / 1e6).toFixed(2) + 'M';
+            if (value >= 1e3) return (value / 1e3).toFixed(2) + 'K';
+            return value.toFixed(2);
+        }
+
+        // Function to create price chart
+        function createPriceChart(symbol, chartData) {
+            const ctx = document.createElement('canvas');
+            ctx.id = `${symbol}-price-chart`;
+            
             new Chart(ctx, {
                 type: 'line',
                 data: {
-                    labels: history.map(h => h.date),
-                    datasets: [{
-                        label: 'Portfolio Value',
-                        data: history.map(h => h.value),
-                        borderColor: 'rgb(75, 192, 192)',
-                        tension: 0.1
-                    }]
+                    labels: chartData.dates,
+                    datasets: [
+                        {
+                            label: 'Price',
+                            data: chartData.close,
+                            borderColor: 'rgb(75, 192, 192)',
+                            tension: 0.1
+                        },
+                        {
+                            label: 'SMA 20',
+                            data: chartData.sma_20,
+                            borderColor: 'rgb(255, 99, 132)',
+                            borderDash: [5, 5],
+                            tension: 0.1
+                        },
+                        {
+                            label: 'SMA 50',
+                            data: chartData.sma_50,
+                            borderColor: 'rgb(54, 162, 235)',
+                            borderDash: [5, 5],
+                            tension: 0.1
+                        },
+                        {
+                            label: 'BB Upper',
+                            data: chartData.bb_upper,
+                            borderColor: 'rgba(75, 192, 192, 0.5)',
+                            borderDash: [2, 2],
+                            tension: 0.1
+                        },
+                        {
+                            label: 'BB Lower',
+                            data: chartData.bb_lower,
+                            borderColor: 'rgba(75, 192, 192, 0.5)',
+                            borderDash: [2, 2],
+                            tension: 0.1
+                        }
+                    ]
                 },
                 options: {
                     responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${symbol} Price Chart`
+                        }
+                    },
                     scales: {
                         y: {
                             beginAtZero: false
@@ -199,11 +243,186 @@
                     }
                 }
             });
+            
+            return ctx;
         }
 
-        // Update dashboard every 5 seconds
-        updateDashboard();
-        setInterval(updateDashboard, 5000);
+        // Function to create RSI chart
+        function createRSIChart(symbol, chartData) {
+            const ctx = document.createElement('canvas');
+            ctx.id = `${symbol}-rsi-chart`;
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: chartData.dates,
+                    datasets: [{
+                        label: 'RSI',
+                        data: chartData.rsi,
+                        borderColor: 'rgb(153, 102, 255)',
+                        tension: 0.1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${symbol} RSI`
+                        }
+                    },
+                    scales: {
+                        y: {
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+            
+            return ctx;
+        }
+
+        // Function to update market data
+        async function updateMarketData() {
+            try {
+                console.log('Fetching market data...');
+                const marketDataUrl = '{{ account.market_data_url }}';
+                console.log('Market data URL:', marketDataUrl);
+                
+                const response = await fetch(marketDataUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const marketData = await response.json();
+                console.log('Received market data:', marketData);
+                
+                if (Object.keys(marketData).length === 0) {
+                    console.warn('No market data received');
+                    return;
+                }
+                
+                // Update positions table
+                Object.entries(marketData).forEach(([symbol, data]) => {
+                    console.log(`Processing data for ${symbol}:`, data);
+                    const row = document.querySelector(`tr[data-symbol="${symbol}"]`);
+                    if (row) {
+                        const currentPriceCell = row.querySelector('.current-price');
+                        const changeCell = row.querySelector('.change');
+                        const valueCell = row.querySelector('.value');
+                        
+                        if (data.error) {
+                            console.error(`Error for ${symbol}:`, data.error);
+                            currentPriceCell.textContent = 'Error';
+                            changeCell.textContent = 'Error';
+                            valueCell.textContent = 'Error';
+                        } else {
+                            currentPriceCell.textContent = formatCurrency(data.current_price);
+                            changeCell.textContent = `${formatCurrency(data.change)} (${formatPercent(data.change_percent)})`;
+                            changeCell.className = `change ${data.change >= 0 ? 'text-success' : 'text-danger'}`;
+                            
+                            // Calculate position value
+                            const quantity = parseFloat(row.querySelector('td:nth-child(2)').textContent);
+                            const value = quantity * data.current_price;
+                            valueCell.textContent = formatCurrency(value);
+                        }
+                    } else {
+                        console.warn(`No row found for symbol ${symbol}`);
+                    }
+                });
+                
+                // Update market data cards
+                const marketDataContainer = document.getElementById('marketData');
+                if (!marketDataContainer) {
+                    console.error('Market data container not found');
+                    return;
+                }
+                
+                marketDataContainer.innerHTML = Object.entries(marketData)
+                    .map(([symbol, data]) => {
+                        console.log(`Creating market data card for ${symbol}`);
+                        return `
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">${symbol}</h5>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <p class="card-text">
+                                                    Price: ${formatCurrency(data.current_price)}<br>
+                                                    Change: <span class="${data.change >= 0 ? 'text-success' : 'text-danger'}">
+                                                        ${formatCurrency(data.change)} (${formatPercent(data.change_percent)})
+                                                    </span><br>
+                                                    Volume: ${data.volume.toLocaleString()}<br>
+                                                    High: ${formatCurrency(data.high)}<br>
+                                                    Low: ${formatCurrency(data.low)}
+                                                </p>
+                                            </div>
+                                            <div class="col-md-6">
+                                                <p class="card-text">
+                                                    Bid: ${formatCurrency(data.bid)} (${data.bid_size})<br>
+                                                    Ask: ${formatCurrency(data.ask)} (${data.ask_size})<br>
+                                                    52W High: ${formatCurrency(data.fifty_two_week_high)}<br>
+                                                    52W Low: ${formatCurrency(data.fifty_two_week_low)}<br>
+                                                    P/E: ${data.pe_ratio.toFixed(2)}<br>
+                                                    Market Cap: ${formatLargeNumber(data.market_cap)}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                
+                // Update technical analysis charts
+                const technicalAnalysisContainer = document.getElementById('technicalAnalysis');
+                if (!technicalAnalysisContainer) {
+                    console.error('Technical analysis container not found');
+                    return;
+                }
+                
+                technicalAnalysisContainer.innerHTML = Object.entries(marketData)
+                    .map(([symbol, data]) => {
+                        console.log(`Creating technical analysis charts for ${symbol}`);
+                        return `
+                            <div class="col-md-6 mb-3">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h5 class="card-title">${symbol} Technical Analysis</h5>
+                                        <div class="row">
+                                            <div class="col-12 mb-3">
+                                                ${createPriceChart(symbol, data.chart_data).outerHTML}
+                                            </div>
+                                            <div class="col-12">
+                                                ${createRSIChart(symbol, data.chart_data).outerHTML}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+            } catch (error) {
+                console.error('Error updating market data:', error);
+                // Show error message to user
+                const marketDataContainer = document.getElementById('marketData');
+                if (marketDataContainer) {
+                    marketDataContainer.innerHTML = `
+                        <div class="col-12">
+                            <div class="alert alert-danger" role="alert">
+                                Error fetching market data: ${error.message}
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // Update market data every 5 seconds
+        console.log('Starting market data updates...');
+        updateMarketData();
+        setInterval(updateMarketData, 5000);
     </script>
 </body>
 </html> 
