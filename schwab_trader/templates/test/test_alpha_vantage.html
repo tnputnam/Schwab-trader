@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Alpha Vantage API Test{% endblock %}
+
+{% block extra_css %}
+<style>
+    .test-section {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .test-section h2 {
+        margin-top: 0;
+        margin-bottom: 20px;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    .form-group input, .form-group select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+    .btn-primary {
+        background-color: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .btn-primary:hover {
+        background-color: #0056b3;
+    }
+    .results {
+        margin-top: 20px;
+        padding: 15px;
+        background: #f8f9fa;
+        border-radius: 4px;
+        white-space: pre-wrap;
+        font-family: monospace;
+    }
+    .error {
+        color: #dc3545;
+    }
+    .success {
+        color: #28a745;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="test-section">
+    <h2>Alpha Vantage API Test</h2>
+    <div class="form-group">
+        <label for="symbol">Symbol</label>
+        <input type="text" id="symbol" placeholder="AAPL">
+    </div>
+    <div class="form-group">
+        <label for="function">Function</label>
+        <select id="function">
+            <option value="TIME_SERIES_DAILY">Daily Time Series</option>
+            <option value="GLOBAL_QUOTE">Global Quote</option>
+            <option value="SYMBOL_SEARCH">Symbol Search</option>
+        </select>
+    </div>
+    <button class="btn-primary" onclick="testAPI()">Test API</button>
+    <div id="results" class="results" style="display: none;"></div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function testAPI() {
+        const symbol = document.getElementById('symbol').value;
+        const functionName = document.getElementById('function').value;
+        const resultsDiv = document.getElementById('results');
+
+        try {
+            const response = await fetch('/api/test_alpha_vantage', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    symbol: symbol,
+                    function: functionName
+                })
+            });
+
+            const data = await response.json();
+            resultsDiv.style.display = 'block';
+            
+            if (data.status === 'success') {
+                resultsDiv.className = 'results success';
+                resultsDiv.textContent = JSON.stringify(data.data, null, 2);
+            } else {
+                resultsDiv.className = 'results error';
+                resultsDiv.textContent = data.message;
+            }
+        } catch (error) {
+            resultsDiv.style.display = 'block';
+            resultsDiv.className = 'results error';
+            resultsDiv.textContent = 'Error: ' + error.message;
+        }
+    }
+</script>
+{% endblock %} 

@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request, session
+from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for
 import yfinance as yf
 from datetime import datetime, timedelta
 import logging
@@ -56,6 +56,9 @@ def volume_analysis():
 @bp.route('/strategy_dashboard')
 def strategy_dashboard():
     """Display the strategy dashboard view."""
+    logger.info("Accessing strategy dashboard")
+    if 'access_token' not in session:
+        return redirect(url_for('auth.login'))
     return render_template('strategy_dashboard.html')
 
 @bp.route('/api/market_data')
@@ -323,3 +326,83 @@ def run_backtest():
     except Exception as e:
         logger.error(f"Error running backtest: {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500 
+
+@bp.route('/api/search_symbols', methods=['POST'])
+def search_symbols():
+    """Search for symbols or company names"""
+    try:
+        data = request.get_json()
+        query = data.get('query', '').strip().upper()
+        
+        if not query:
+            return jsonify({
+                'status': 'error',
+                'message': 'Search query is required'
+            }), 400
+        
+        # Try Alpha Vantage first
+        try:
+            api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+            if not api_key:
+                raise Exception("Alpha Vantage API key not found")
+            
+            url = f"https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords={query}&apikey={api_key}"
+            response = requests.get(url, timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                if 'bestMatches' in data:
+                    results = []
+                    for match in data['bestMatches']:
+                        results.append({
+                            'symbol': match['1. symbol'],
+                            'name': match['2. name'],
+                            'type': match['3. type'],
+                            'region': match['4. region']
+                        })
+                    return jsonify({
+                        'status': 'success',
+                        'results': results
+                    })
+        except Exception as e:
+            logger.warning(f"Alpha Vantage search failed: {str(e)}")
+        
+        # Fallback to yfinance
+        try:
+            # Get list of major stocks
+            major_stocks = ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD', 'INTC', 'QCOM']
+            results = []
+            
+            for symbol in major_stocks:
+                try:
+                    stock = yf.Ticker(symbol)
+                    info = stock.info
+                    name = info.get('longName', '')
+                    
+                    if query in symbol or query in name.upper():
+                        results.append({
+                            'symbol': symbol,
+                            'name': name,
+                            'type': info.get('quoteType', ''),
+                            'region': info.get('region', '')
+                        })
+                except:
+                    continue
+            
+            return jsonify({
+                'status': 'success',
+                'results': results
+            })
+        except Exception as e:
+            logger.error(f"yfinance search failed: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Failed to search symbols'
+            }), 500
+            
+    except Exception as e:
+        logger.error(f"Error in symbol search: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500 

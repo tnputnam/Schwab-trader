@@ -1,5 +1,6 @@
 from flask import Flask, session, redirect, request, jsonify, url_for, render_template
 from requests_oauthlib import OAuth2Session
+from flask_socketio import SocketIO, emit
 import os
 import logging
 import base64
@@ -21,6 +22,8 @@ from example_strategies import (
 import numpy as np
 import pandas as pd
 import time
+import asyncio
+from typing import List
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,6 +35,64 @@ app = Flask(__name__,
 )
 CORS(app)
 app.secret_key = 'your-secret-key-here'
+socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Store active WebSocket connections
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections = set()
+
+    def connect(self, sid):
+        self.active_connections.add(sid)
+
+    def disconnect(self, sid):
+        self.active_connections.discard(sid)
+
+    def broadcast(self, message):
+        for sid in self.active_connections:
+            socketio.emit('message', message, room=sid)
+
+manager = ConnectionManager()
+
+# WebSocket event handlers
+@socketio.on('connect')
+def handle_connect():
+    manager.connect(request.sid)
+    logger.info(f"Client connected: {request.sid}")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    manager.disconnect(request.sid)
+    logger.info(f"Client disconnected: {request.sid}")
+
+@socketio.on('subscribe')
+def handle_subscribe(data):
+    symbols = data.get('symbols', [])
+    if symbols:
+        logger.info(f"Client {request.sid} subscribed to symbols: {symbols}")
+        # Start monitoring these symbols
+        asyncio.create_task(monitor_symbols(symbols))
+
+# Background task to monitor symbols
+async def monitor_symbols(symbols: List[str]):
+    while True:
+        try:
+            for symbol in symbols:
+                stock = yf.Ticker(symbol)
+                data = stock.history(period="1d", interval="1m")
+                if not data.empty:
+                    latest = data.iloc[-1]
+                    message = {
+                        'symbol': symbol,
+                        'price': latest['Close'],
+                        'volume': latest['Volume'],
+                        'timestamp': datetime.now().isoformat()
+                    }
+                    manager.broadcast(message)
+            await asyncio.sleep(60)  # Update every minute
+        except Exception as e:
+            logger.error(f"Error monitoring symbols: {str(e)}")
+            await asyncio.sleep(60)  # Wait before retrying
 
 # Simple test route
 @app.route('/test')
@@ -1333,6 +1394,248 @@ def search_symbols():
             'status': 'error',
             'message': str(e)
         }), 500
+
+# Portfolio Management
+@app.route('/api/portfolio', methods=['GET'])
+def get_portfolio():
+    """Get current portfolio holdings"""
+    try:
+        if 'access_token' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+            
+        # Get portfolio data from Schwab API
+        headers = {
+            'Authorization': f'Bearer {session["access_token"]}',
+            'Accept': 'application/json'
+        }
+        response = requests.get('https://api.schwabapi.com/v1/accounts', headers=headers)
+        response.raise_for_status()
+        
+        accounts = response.json()
+        portfolio = []
+        
+        for account in accounts:
+            # Get positions for each account
+            positions_response = requests.get(
+                f'https://api.schwabapi.com/v1/accounts/{account["accountNumber"]}/positions',
+                headers=headers
+            )
+            positions_response.raise_for_status()
+            positions = positions_response.json()
+            
+            portfolio.extend(positions)
+            
+        return jsonify({
+            'status': 'success',
+            'data': portfolio
+        })
+    except Exception as e:
+        logger.error(f"Error getting portfolio: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Trading Endpoints
+@app.route('/api/trade', methods=['POST'])
+def place_trade():
+    """Place a trade order"""
+    try:
+        if 'access_token' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+            
+        data = request.get_json()
+        symbol = data.get('symbol')
+        quantity = data.get('quantity')
+        order_type = data.get('order_type', 'MARKET')
+        side = data.get('side', 'BUY')
+        
+        if not all([symbol, quantity]):
+            return jsonify({'error': 'Missing required parameters'}), 400
+            
+        # Place order through Schwab API
+        headers = {
+            'Authorization': f'Bearer {session["access_token"]}',
+            'Content-Type': 'application/json'
+        }
+        
+        order_data = {
+            'orderType': order_type,
+            'session': 'NORMAL',
+            'duration': 'DAY',
+            'orderStrategyType': 'SINGLE',
+            'orderLegCollection': [{
+                'instruction': side,
+                'quantity': quantity,
+                'instrument': {
+                    'symbol': symbol,
+                    'assetType': 'EQUITY'
+                }
+            }]
+        }
+        
+        response = requests.post(
+            'https://api.schwabapi.com/v1/accounts/orders',
+            headers=headers,
+            json=order_data
+        )
+        response.raise_for_status()
+        
+        return jsonify({
+            'status': 'success',
+            'data': response.json()
+        })
+    except Exception as e:
+        logger.error(f"Error placing trade: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Watchlist Management
+@app.route('/api/watchlist', methods=['GET', 'POST', 'DELETE'])
+def manage_watchlist():
+    """Manage watchlist items"""
+    try:
+        if 'access_token' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+            
+        if request.method == 'GET':
+            # Get watchlist from database or session
+            watchlist = session.get('watchlist', [])
+            return jsonify({
+                'status': 'success',
+                'data': watchlist
+            })
+            
+        elif request.method == 'POST':
+            data = request.get_json()
+            symbol = data.get('symbol')
+            
+            if not symbol:
+                return jsonify({'error': 'Symbol is required'}), 400
+                
+            watchlist = session.get('watchlist', [])
+            if symbol not in watchlist:
+                watchlist.append(symbol)
+                session['watchlist'] = watchlist
+                
+            return jsonify({
+                'status': 'success',
+                'data': watchlist
+            })
+            
+        elif request.method == 'DELETE':
+            data = request.get_json()
+            symbol = data.get('symbol')
+            
+            if not symbol:
+                return jsonify({'error': 'Symbol is required'}), 400
+                
+            watchlist = session.get('watchlist', [])
+            if symbol in watchlist:
+                watchlist.remove(symbol)
+                session['watchlist'] = watchlist
+                
+            return jsonify({
+                'status': 'success',
+                'data': watchlist
+            })
+            
+    except Exception as e:
+        logger.error(f"Error managing watchlist: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Alerts System
+@app.route('/api/alerts', methods=['GET', 'POST', 'DELETE'])
+def manage_alerts():
+    """Manage price alerts"""
+    try:
+        if 'access_token' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+            
+        if request.method == 'GET':
+            alerts = session.get('alerts', [])
+            return jsonify({
+                'status': 'success',
+                'data': alerts
+            })
+            
+        elif request.method == 'POST':
+            data = request.get_json()
+            symbol = data.get('symbol')
+            price = data.get('price')
+            condition = data.get('condition', 'ABOVE')
+            
+            if not all([symbol, price]):
+                return jsonify({'error': 'Symbol and price are required'}), 400
+                
+            alerts = session.get('alerts', [])
+            alert = {
+                'symbol': symbol,
+                'price': price,
+                'condition': condition,
+                'created_at': datetime.now().isoformat()
+            }
+            alerts.append(alert)
+            session['alerts'] = alerts
+            
+            # Start monitoring this alert
+            asyncio.create_task(monitor_alert(alert))
+            
+            return jsonify({
+                'status': 'success',
+                'data': alert
+            })
+            
+        elif request.method == 'DELETE':
+            data = request.get_json()
+            alert_id = data.get('id')
+            
+            if not alert_id:
+                return jsonify({'error': 'Alert ID is required'}), 400
+                
+            alerts = session.get('alerts', [])
+            alerts = [a for a in alerts if a.get('id') != alert_id]
+            session['alerts'] = alerts
+            
+            return jsonify({
+                'status': 'success',
+                'data': alerts
+            })
+            
+    except Exception as e:
+        logger.error(f"Error managing alerts: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+# Background task to monitor alerts
+async def monitor_alert(alert):
+    while True:
+        try:
+            stock = yf.Ticker(alert['symbol'])
+            data = stock.history(period="1d", interval="1m")
+            if not data.empty:
+                latest_price = data.iloc[-1]['Close']
+                
+                if alert['condition'] == 'ABOVE' and latest_price > alert['price']:
+                    manager.broadcast({
+                        'type': 'alert',
+                        'data': {
+                            'symbol': alert['symbol'],
+                            'price': latest_price,
+                            'condition': alert['condition'],
+                            'trigger_price': alert['price']
+                        }
+                    })
+                elif alert['condition'] == 'BELOW' and latest_price < alert['price']:
+                    manager.broadcast({
+                        'type': 'alert',
+                        'data': {
+                            'symbol': alert['symbol'],
+                            'price': latest_price,
+                            'condition': alert['condition'],
+                            'trigger_price': alert['price']
+                        }
+                    })
+                    
+            await asyncio.sleep(60)  # Check every minute
+        except Exception as e:
+            logger.error(f"Error monitoring alert: {str(e)}")
+            await asyncio.sleep(60)  # Wait before retrying
 
 if __name__ == '__main__':
     # Print all registered routes

@@ -1,256 +1,575 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Trading Dashboard</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
-        }
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding-top: 70px; /* Add padding to account for fixed nav */
-        }
-        .header {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .nav-tabs {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            flex-wrap: wrap;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1000;
-            margin: 0;
-            padding: 10px 20px;
-        }
-        .nav-tab {
-            padding: 8px 16px;
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            cursor: pointer;
-            font-weight: bold;
-            color: #495057;
-            transition: all 0.3s ease;
-            white-space: nowrap;
-            text-decoration: none;
-            display: inline-block;
-        }
-        .nav-tab:hover {
-            background: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        .nav-tab.active {
-            background: #007bff;
-            color: white;
-            border-color: #007bff;
-        }
-        .dashboard-content {
-            display: none;
-        }
-        .dashboard-content.active {
-            display: block;
-        }
-        .quick-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-        .stat-card {
-            background: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .stat-card .label {
-            font-size: 14px;
-            color: #666;
-            margin-bottom: 5px;
-        }
-        .stat-card .value {
-            font-size: 24px;
-            font-weight: bold;
-        }
-        .stat-card .value.positive {
-            color: #28a745;
-        }
-        .stat-card .value.negative {
-            color: #dc3545;
-        }
-        .market-overview {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        .market-overview h2 {
-            margin-top: 0;
-        }
-        .market-stats {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 15px;
-        }
-        .market-stat {
-            text-align: center;
-        }
-        .market-stat .label {
-            font-size: 12px;
-            color: #666;
-        }
-        .market-stat .value {
-            font-size: 18px;
-            font-weight: bold;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Trading Dashboard</h1>
-            <div class="quick-stats">
-                <div class="stat-card">
-                    <div class="label">Total Portfolio Value</div>
-                    <div class="value" id="total-portfolio">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Today's P/L</div>
-                    <div class="value" id="today-pl">$0.00</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Active Positions</div>
-                    <div class="value" id="active-positions">0</div>
-                </div>
+{% extends "base.html" %}
+
+{% block title %}Trading Dashboard{% endblock %}
+
+{% block extra_css %}
+<style>
+    .dashboard-content {
+        display: none;
+    }
+    .dashboard-content.active {
+        display: block;
+    }
+    .quick-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    .stat-card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .stat-card .label {
+        font-size: 14px;
+        color: #666;
+        margin-bottom: 5px;
+    }
+    .stat-card .value {
+        font-size: 24px;
+        font-weight: bold;
+    }
+    .stat-card .value.positive {
+        color: #28a745;
+    }
+    .stat-card .value.negative {
+        color: #dc3545;
+    }
+    .market-overview {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .market-stats {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+    }
+    .market-stat {
+        text-align: center;
+    }
+    .market-stat .label {
+        font-size: 12px;
+        color: #666;
+    }
+    .market-stat .value {
+        font-size: 18px;
+        font-weight: bold;
+    }
+    /* Portfolio, Watchlist, and Alerts styles */
+    .portfolio-section, .watchlist-section, .alerts-section {
+        background: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .portfolio-table, .watchlist-table, .alerts-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+    .portfolio-table th, .watchlist-table th, .alerts-table th {
+        background: #f8f9fa;
+        padding: 10px;
+        text-align: left;
+        border-bottom: 2px solid #dee2e6;
+    }
+    .portfolio-table td, .watchlist-table td, .alerts-table td {
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .action-button {
+        padding: 5px 10px;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        margin-right: 5px;
+    }
+    .action-button:hover {
+        background: #0056b3;
+    }
+    .action-button.danger {
+        background: #dc3545;
+    }
+    .action-button.danger:hover {
+        background: #c82333;
+    }
+    .alert-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px;
+        border-bottom: 1px solid #dee2e6;
+    }
+    .alert-item:last-child {
+        border-bottom: none;
+    }
+    .alert-info {
+        flex-grow: 1;
+    }
+    .alert-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .form-group {
+        margin-bottom: 15px;
+    }
+    .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+    }
+    .form-group input, .form-group select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+    }
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.5);
+        z-index: 1000;
+    }
+    .modal-content {
+        background: white;
+        width: 400px;
+        margin: 100px auto;
+        padding: 20px;
+        border-radius: 8px;
+    }
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+    .close-button {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="header">
+        <h1>Trading Dashboard</h1>
+        <div class="quick-stats">
+            <div class="stat-card">
+                <div class="label">Total Portfolio Value</div>
+                <div class="value" id="total-portfolio">$0.00</div>
             </div>
-        </div>
-
-        <div class="nav-tabs">
-            <a href="/dashboard/" class="nav-tab active">Overview</a>
-            <a href="/dashboard/volume_analysis" class="nav-tab">Volume Trading</a>
-            <a href="/dashboard/auto_trading" class="nav-tab">Auto Trading</a>
-            <a href="/dashboard/strategy_dashboard" class="nav-tab">Strategy Dashboard</a>
-            <a href="/dashboard/tesla_analysis" class="nav-tab">Tesla Analysis</a>
-            <a href="/dashboard/volatile_stocks" class="nav-tab">Volatile Stocks</a>
-            <a href="/dashboard/portfolio" class="nav-tab">Portfolio</a>
-            <a href="/dashboard/news" class="nav-tab">News</a>
-            <a href="/dashboard/trading" class="nav-tab">Trading</a>
-            <a href="/dashboard/compare" class="nav-tab">Compare</a>
-        </div>
-
-        <div id="overview" class="dashboard-content active">
-            <div class="market-overview">
-                <h2>Market Overview</h2>
-                <div class="market-stats">
-                    <div class="market-stat">
-                        <div class="label">S&P 500</div>
-                        <div class="value" id="sp500">0.00%</div>
-                    </div>
-                    <div class="market-stat">
-                        <div class="label">NASDAQ</div>
-                        <div class="value" id="nasdaq">0.00%</div>
-                    </div>
-                    <div class="market-stat">
-                        <div class="label">DOW</div>
-                        <div class="value" id="dow">0.00%</div>
-                    </div>
-                    <div class="market-stat">
-                        <div class="label">VIX</div>
-                        <div class="value" id="vix">0.00</div>
-                    </div>
-                </div>
+            <div class="stat-card">
+                <div class="label">Today's P/L</div>
+                <div class="value" id="today-pl">$0.00</div>
             </div>
-            <div class="quick-stats">
-                <div class="stat-card">
-                    <div class="label">Best Performing</div>
-                    <div class="value" id="best-performer">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Worst Performing</div>
-                    <div class="value" id="worst-performer">-</div>
-                </div>
-                <div class="stat-card">
-                    <div class="label">Total Trades Today</div>
-                    <div class="value" id="total-trades">0</div>
-                </div>
+            <div class="stat-card">
+                <div class="label">Active Positions</div>
+                <div class="value" id="active-positions">0</div>
             </div>
-        </div>
-
-        <div id="tesla" class="dashboard-content">
-            <iframe src="/tesla_trading" style="width: 100%; height: 800px; border: none;"></iframe>
-        </div>
-
-        <div id="auto" class="dashboard-content">
-            <iframe src="/auto_trading" style="width: 100%; height: 800px; border: none;"></iframe>
-        </div>
-
-        <div id="volume" class="dashboard-content">
-            <iframe src="/volume_analysis" style="width: 100%; height: 800px; border: none;"></iframe>
         </div>
     </div>
 
-    <script>
-        // Set active tab based on current URL
-        document.addEventListener('DOMContentLoaded', function() {
-            const currentPath = window.location.pathname;
-            const navTabs = document.querySelectorAll('.nav-tab');
-            
-            navTabs.forEach(tab => {
-                if (tab.getAttribute('href') === currentPath) {
-                    tab.classList.add('active');
-                } else {
-                    tab.classList.remove('active');
-                }
-            });
-        });
+    <div class="nav-tabs">
+        <a href="#overview" class="nav-tab active">Overview</a>
+        <a href="#portfolio" class="nav-tab">Portfolio</a>
+        <a href="#watchlist" class="nav-tab">Watchlist</a>
+        <a href="#alerts" class="nav-tab">Alerts</a>
+        <a href="#strategies" class="nav-tab">Strategies</a>
+        <a href="#trading" class="nav-tab">Trading</a>
+        <a href="#news" class="nav-tab">News</a>
+    </div>
 
-        // Function to update market data
-        async function updateMarketData() {
-            try {
-                const response = await fetch('/api/market_data');
-                const data = await response.json();
-                
-                document.getElementById('sp500').textContent = `${data.sp500.toFixed(2)}%`;
-                document.getElementById('nasdaq').textContent = `${data.nasdaq.toFixed(2)}%`;
-                document.getElementById('dow').textContent = `${data.dow.toFixed(2)}%`;
-                document.getElementById('vix').textContent = data.vix.toFixed(2);
-                
-                document.getElementById('best-performer').textContent = data.bestPerformer;
-                document.getElementById('worst-performer').textContent = data.worstPerformer;
-                document.getElementById('total-trades').textContent = data.totalTrades;
-                
-                document.getElementById('total-portfolio').textContent = `$${data.totalPortfolio.toFixed(2)}`;
-                document.getElementById('today-pl').textContent = `$${data.todayPL.toFixed(2)}`;
-                document.getElementById('active-positions').textContent = data.activePositions;
-            } catch (error) {
-                console.error('Error updating market data:', error);
+    <div id="overview" class="dashboard-content active">
+        <div class="market-overview">
+            <h2>Market Overview</h2>
+            <div class="market-stats">
+                <div class="market-stat">
+                    <div class="label">S&P 500</div>
+                    <div class="value" id="sp500">0.00%</div>
+                </div>
+                <div class="market-stat">
+                    <div class="label">NASDAQ</div>
+                    <div class="value" id="nasdaq">0.00%</div>
+                </div>
+                <div class="market-stat">
+                    <div class="label">DOW</div>
+                    <div class="value" id="dow">0.00%</div>
+                </div>
+                <div class="market-stat">
+                    <div class="label">VIX</div>
+                    <div class="value" id="vix">0.00</div>
+                </div>
+            </div>
+        </div>
+        <div class="quick-stats">
+            <div class="stat-card">
+                <div class="label">Best Performing</div>
+                <div class="value" id="best-performer">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Worst Performing</div>
+                <div class="value" id="worst-performer">-</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Total Trades Today</div>
+                <div class="value" id="total-trades">0</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="portfolio" class="dashboard-content">
+        <div class="portfolio-section">
+            <h2>Portfolio</h2>
+            <table class="portfolio-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Quantity</th>
+                        <th>Avg. Price</th>
+                        <th>Current Price</th>
+                        <th>P/L</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="portfolio-body">
+                    <!-- Portfolio items will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="watchlist" class="dashboard-content">
+        <div class="watchlist-section">
+            <h2>Watchlist</h2>
+            <div class="form-group">
+                <input type="text" id="watchlist-symbol" placeholder="Enter symbol">
+                <button class="action-button" onclick="addToWatchlist()">Add</button>
+            </div>
+            <table class="watchlist-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        <th>Current Price</th>
+                        <th>Change</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="watchlist-body">
+                    <!-- Watchlist items will be populated here -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="alerts" class="dashboard-content">
+        <div class="alerts-section">
+            <h2>Price Alerts</h2>
+            <button class="action-button" onclick="showAddAlertModal()">Add Alert</button>
+            <div id="alerts-list">
+                <!-- Alerts will be populated here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Alert Modal -->
+    <div id="addAlertModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Price Alert</h3>
+                <button class="close-button" onclick="hideAddAlertModal()">&times;</button>
+            </div>
+            <div class="form-group">
+                <label for="alert-symbol">Symbol</label>
+                <input type="text" id="alert-symbol" required>
+            </div>
+            <div class="form-group">
+                <label for="alert-price">Price</label>
+                <input type="number" id="alert-price" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="alert-condition">Condition</label>
+                <select id="alert-condition">
+                    <option value="ABOVE">Above</option>
+                    <option value="BELOW">Below</option>
+                </select>
+            </div>
+            <button class="action-button" onclick="addAlert()">Create Alert</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+    // Set active tab based on URL hash
+    document.addEventListener('DOMContentLoaded', function() {
+        const hash = window.location.hash || '#overview';
+        const navTabs = document.querySelectorAll('.nav-tab');
+        const contents = document.querySelectorAll('.dashboard-content');
+        
+        navTabs.forEach(tab => {
+            if (tab.getAttribute('href') === hash) {
+                tab.classList.add('active');
+            } else {
+                tab.classList.remove('active');
             }
-        }
+        });
+        
+        contents.forEach(content => {
+            if (content.id === hash.substring(1)) {
+                content.classList.add('active');
+            } else {
+                content.classList.remove('active');
+            }
+        });
+    });
 
-        // Update market data every minute
-        setInterval(updateMarketData, 60000);
-        updateMarketData(); // Initial update
-    </script>
-</body>
-</html> 
+    // WebSocket connection
+    const socket = io();
+    
+    socket.on('connect', () => {
+        console.log('Connected to WebSocket server');
+    });
+
+    socket.on('message', (data) => {
+        if (data.type === 'alert') {
+            showAlertNotification(data.data);
+        }
+    });
+
+    // Portfolio functions
+    async function loadPortfolio() {
+        try {
+            const response = await fetch('/api/portfolio');
+            const data = await response.json();
+            const tbody = document.getElementById('portfolio-body');
+            tbody.innerHTML = '';
+
+            data.data.forEach(position => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${position.symbol}</td>
+                    <td>${position.quantity}</td>
+                    <td>$${position.averagePrice.toFixed(2)}</td>
+                    <td>$${position.currentPrice.toFixed(2)}</td>
+                    <td class="${position.pl >= 0 ? 'positive' : 'negative'}">
+                        $${position.pl.toFixed(2)}
+                    </td>
+                    <td>
+                        <button class="action-button" onclick="placeTrade('${position.symbol}', 'SELL')">Sell</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('Error loading portfolio:', error);
+        }
+    }
+
+    // Watchlist functions
+    async function loadWatchlist() {
+        try {
+            const response = await fetch('/api/watchlist');
+            const data = await response.json();
+            const tbody = document.getElementById('watchlist-body');
+            tbody.innerHTML = '';
+
+            data.data.forEach(item => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${item.symbol}</td>
+                    <td>$${item.currentPrice.toFixed(2)}</td>
+                    <td class="${item.change >= 0 ? 'positive' : 'negative'}">
+                        ${item.change.toFixed(2)}%
+                    </td>
+                    <td>
+                        <button class="action-button" onclick="placeTrade('${item.symbol}', 'BUY')">Buy</button>
+                        <button class="action-button danger" onclick="removeFromWatchlist('${item.symbol}')">Remove</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        } catch (error) {
+            console.error('Error loading watchlist:', error);
+        }
+    }
+
+    async function addToWatchlist() {
+        const symbol = document.getElementById('watchlist-symbol').value.toUpperCase();
+        if (!symbol) return;
+
+        try {
+            const response = await fetch('/api/watchlist', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol })
+            });
+            
+            if (response.ok) {
+                loadWatchlist();
+                document.getElementById('watchlist-symbol').value = '';
+            }
+        } catch (error) {
+            console.error('Error adding to watchlist:', error);
+        }
+    }
+
+    async function removeFromWatchlist(symbol) {
+        try {
+            const response = await fetch('/api/watchlist', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol })
+            });
+            
+            if (response.ok) {
+                loadWatchlist();
+            }
+        } catch (error) {
+            console.error('Error removing from watchlist:', error);
+        }
+    }
+
+    // Alerts functions
+    async function loadAlerts() {
+        try {
+            const response = await fetch('/api/alerts');
+            const data = await response.json();
+            const alertsList = document.getElementById('alerts-list');
+            alertsList.innerHTML = '';
+
+            data.data.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = 'alert-item';
+                alertDiv.innerHTML = `
+                    <div class="alert-info">
+                        <strong>${alert.symbol}</strong> - ${alert.condition} $${alert.price}
+                    </div>
+                    <div class="alert-actions">
+                        <button class="action-button danger" onclick="deleteAlert('${alert.id}')">Delete</button>
+                    </div>
+                `;
+                alertsList.appendChild(alertDiv);
+            });
+        } catch (error) {
+            console.error('Error loading alerts:', error);
+        }
+    }
+
+    function showAddAlertModal() {
+        document.getElementById('addAlertModal').style.display = 'block';
+    }
+
+    function hideAddAlertModal() {
+        document.getElementById('addAlertModal').style.display = 'none';
+    }
+
+    async function addAlert() {
+        const symbol = document.getElementById('alert-symbol').value.toUpperCase();
+        const price = parseFloat(document.getElementById('alert-price').value);
+        const condition = document.getElementById('alert-condition').value;
+
+        if (!symbol || !price) return;
+
+        try {
+            const response = await fetch('/api/alerts', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol, price, condition })
+            });
+            
+            if (response.ok) {
+                loadAlerts();
+                hideAddAlertModal();
+                document.getElementById('alert-symbol').value = '';
+                document.getElementById('alert-price').value = '';
+            }
+        } catch (error) {
+            console.error('Error adding alert:', error);
+        }
+    }
+
+    async function deleteAlert(alertId) {
+        try {
+            const response = await fetch('/api/alerts', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ id: alertId })
+            });
+            
+            if (response.ok) {
+                loadAlerts();
+            }
+        } catch (error) {
+            console.error('Error deleting alert:', error);
+        }
+    }
+
+    function showAlertNotification(alertData) {
+        const notification = document.createElement('div');
+        notification.className = 'alert-notification';
+        notification.innerHTML = `
+            <strong>${alertData.symbol}</strong> is now ${alertData.condition} $${alertData.price}
+            (Current: $${alertData.current_price})
+        `;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 5000);
+    }
+
+    // Trading functions
+    async function placeTrade(symbol, side) {
+        const quantity = prompt(`Enter quantity to ${side.toLowerCase()}:`);
+        if (!quantity) return;
+
+        try {
+            const response = await fetch('/api/trade', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ symbol, quantity, side })
+            });
+            
+            if (response.ok) {
+                loadPortfolio();
+                loadWatchlist();
+            }
+        } catch (error) {
+            console.error('Error placing trade:', error);
+        }
+    }
+
+    // Initialize data
+    document.addEventListener('DOMContentLoaded', function() {
+        loadPortfolio();
+        loadWatchlist();
+        loadAlerts();
+        updateMarketData();
+        setInterval(updateMarketData, 60000); // Update every minute
+    });
+</script>
+{% endblock %} 
