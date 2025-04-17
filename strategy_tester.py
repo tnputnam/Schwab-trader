@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import logging
 from typing import Dict, List, Callable, Any
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
+import pytz
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -18,6 +19,182 @@ class StrategyTester:
         self.cash_balance = 0
         self.initial_balance = 0
         self.trade_history = []
+        self.market_timezone = pytz.timezone('America/New_York')
+        self.volume_monitoring = {}  # Track volume data for each position
+        
+    def is_market_open(self) -> bool:
+        """Check if the market is currently open"""
+        now = datetime.now(self.market_timezone)
+        # Market hours: 9:30 AM to 4:00 PM ET
+        market_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        
+        # Check if it's a weekday
+        if now.weekday() >= 5:  # 5 is Saturday, 6 is Sunday
+            return False
+            
+        return market_open <= now <= market_close
+        
+    def is_near_market_close(self, minutes_before: int = 20) -> bool:
+        """Check if we're within X minutes of market close"""
+        now = datetime.now(self.market_timezone)
+        market_close = now.replace(hour=16, minute=0, second=0, microsecond=0)
+        time_to_close = market_close - now
+        
+        return 0 < time_to_close.total_seconds() <= (minutes_before * 60)
+        
+    def auto_sell_before_close(self) -> Dict[str, Any]:
+        """Automatically sell all positions 20 minutes before market close"""
+        if not self.is_near_market_close():
+            return {'status': 'not_time', 'message': 'Not within 20 minutes of market close'}
+            
+        if not self.positions:
+            return {'status': 'no_positions', 'message': 'No positions to sell'}
+            
+        results = {
+            'trades': [],
+            'total_profit': 0,
+            'positions_closed': []
+        }
+        
+        for symbol, position in list(self.positions.items()):
+            try:
+                # Get current price
+                stock = yf.Ticker(symbol)
+                current_price = stock.history(period='1d')['Close'].iloc[-1]
+                
+                # Calculate profit/loss
+                profit = (current_price - position['average_price']) * position['quantity']
+                
+                # Record the trade
+                trade = {
+                    'date': datetime.now(),
+                    'symbol': symbol,
+                    'action': 'SELL',
+                    'quantity': position['quantity'],
+                    'price': current_price,
+                    'profit': profit
+                }
+                
+                # Update cash balance
+                self.cash_balance += position['quantity'] * current_price
+                
+                # Remove position
+                del self.positions[symbol]
+                
+                # Record results
+                results['trades'].append(trade)
+                results['total_profit'] += profit
+                results['positions_closed'].append(symbol)
+                
+                logger.info(f"Auto-sold {symbol}: {position['quantity']} shares at ${current_price:.2f}")
+                
+            except Exception as e:
+                logger.error(f"Error auto-selling {symbol}: {str(e)}")
+                continue
+                
+        return results
+        
+    def update_volume_monitoring(self, symbol: str) -> Dict:
+        """Update volume monitoring data for a position"""
+        try:
+            stock = yf.Ticker(symbol)
+            # Get last 5 days of data for volume analysis
+            data = stock.history(period="5d", interval="1d")
+            
+            if data.empty:
+                return {}
+                
+            # Calculate volume metrics
+            current_volume = data['Volume'].iloc[-1]
+            avg_volume = data['Volume'].mean()
+            volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+            
+            # Update volume monitoring data
+            self.volume_monitoring[symbol] = {
+                'current_volume': current_volume,
+                'avg_volume': avg_volume,
+                'volume_ratio': volume_ratio,
+                'last_updated': datetime.now(self.market_timezone),
+                'volume_history': data['Volume'].to_dict()
+            }
+            
+            return self.volume_monitoring[symbol]
+            
+        except Exception as e:
+            logger.error(f"Error updating volume monitoring for {symbol}: {str(e)}")
+            return {}
+            
+    def get_volume_alerts(self, symbol: str) -> List[str]:
+        """Get alerts based on volume patterns"""
+        alerts = []
+        if symbol not in self.volume_monitoring:
+            return alerts
+            
+        volume_data = self.volume_monitoring[symbol]
+        
+        # Check for unusual volume
+        if volume_data['volume_ratio'] > 2.0:
+            alerts.append(f"High volume alert: {symbol} trading at {volume_data['volume_ratio']:.2f}x average volume")
+        elif volume_data['volume_ratio'] < 0.5:
+            alerts.append(f"Low volume alert: {symbol} trading at {volume_data['volume_ratio']:.2f}x average volume")
+            
+        return alerts
+        
+    def run_auto_trading(self, strategy: Callable, symbols: List[str], check_interval: int = 60) -> None:
+        """
+        Run auto trading with automatic position closing before market close
+        """
+        import time
+        
+        while True:
+            try:
+                # Check if market is open
+                if not self.is_market_open():
+                    logger.info("Market is closed, waiting...")
+                    time.sleep(300)  # Check every 5 minutes when market is closed
+                    continue
+                    
+                # Check if we need to auto-sell
+                if self.is_near_market_close():
+                    logger.info("Near market close, auto-selling positions...")
+                    results = self.auto_sell_before_close()
+                    logger.info(f"Auto-sell results: {results}")
+                    
+                # Update volume monitoring for all held positions
+                for symbol in self.positions:
+                    volume_data = self.update_volume_monitoring(symbol)
+                    alerts = self.get_volume_alerts(symbol)
+                    for alert in alerts:
+                        logger.info(alert)
+                    
+                # Run normal trading strategy
+                for symbol in symbols:
+                    try:
+                        stock = yf.Ticker(symbol)
+                        data = stock.history(period="1mo", interval="1d")
+                        if not data.empty:
+                            data = self.calculate_indicators(data)
+                            signal = strategy(data)
+                            
+                            if signal == 'BUY' and symbol not in self.positions:
+                                # Buy logic here
+                                pass
+                            elif signal == 'SELL' and symbol in self.positions:
+                                # Sell logic here
+                                pass
+                                
+                    except Exception as e:
+                        logger.error(f"Error trading {symbol}: {str(e)}")
+                        continue
+                        
+                # Wait for next check
+                time.sleep(check_interval)
+                
+            except Exception as e:
+                logger.error(f"Error in auto trading loop: {str(e)}")
+                time.sleep(check_interval)
+                continue
         
     def sync_with_schwab(self, token: Dict):
         """Sync with Schwab account for paper trading"""

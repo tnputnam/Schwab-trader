@@ -436,6 +436,48 @@ def tesla_analysis():
         logger.error(f"Error in Tesla analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/start_auto_trading', methods=['POST'])
+def start_auto_trading():
+    """Start auto trading with market close protection"""
+    try:
+        data = request.get_json()
+        if not data or 'strategy' not in data or 'symbols' not in data:
+            return jsonify({'error': 'Missing required parameters'}), 400
+            
+        # Get strategy function
+        strategy_name = data['strategy']
+        strategies = {
+            'moving_average_crossover': moving_average_crossover_strategy,
+            'rsi': rsi_strategy,
+            'bollinger_bands': bollinger_bands_strategy,
+            'macd': macd_strategy,
+            'volume': volume_strategy
+        }
+        
+        if strategy_name not in strategies:
+            return jsonify({'error': 'Invalid strategy'}), 400
+            
+        # Initialize strategy tester
+        tester = StrategyTester()
+        
+        # Start auto trading in a separate thread
+        import threading
+        thread = threading.Thread(
+            target=tester.run_auto_trading,
+            args=(strategies[strategy_name], data['symbols'])
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Auto trading started with market close protection'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting auto trading: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
 if __name__ == '__main__':
     # For development only
     os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
