@@ -267,93 +267,107 @@
 {% block content %}
 <div class="dashboard-container">
     {{ components.tab_navigation([
-        {'id': 'manual', 'label': 'Manual Trading'},
-        {'id': 'automated', 'label': 'Automated Trading'}
+        {'id': 'orders', 'label': 'Orders'},
+        {'id': 'positions', 'label': 'Positions'},
+        {'id': 'history', 'label': 'Trade History'}
     ]) }}
 
-    <div id="manual" class="tab-content active">
+    <div id="orders" class="tab-content active">
         <div class="trading-section">
             <div class="order-form card">
                 <h3>Place Order</h3>
-                <form id="orderForm">
-                    <div class="form-group">
-                        <label for="symbol">Symbol</label>
-                        <input type="text" id="symbol" class="form-control" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="orderType">Order Type</label>
-                        <select id="orderType" class="form-control" required>
-                            <option value="market">Market</option>
-                            <option value="limit">Limit</option>
-                            <option value="stop">Stop</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="side">Side</label>
-                        <select id="side" class="form-control" required>
-                            <option value="buy">Buy</option>
-                            <option value="sell">Sell</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="quantity">Quantity</label>
-                        <input type="number" id="quantity" class="form-control" min="1" required>
-                    </div>
-                    <div class="form-group" id="priceGroup" style="display: none;">
-                        <label for="price">Price</label>
-                        <input type="number" id="price" class="form-control" min="0" step="0.01">
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Place Order
-                    </button>
-                </form>
+                <div class="form-group">
+                    <label for="order-symbol">Symbol</label>
+                    <input type="text" id="order-symbol" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="order-type">Order Type</label>
+                    <select id="order-type" class="form-control">
+                        <option value="market">Market</option>
+                        <option value="limit">Limit</option>
+                        <option value="stop">Stop</option>
+                        <option value="stop_limit">Stop Limit</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="order-side">Side</label>
+                    <select id="order-side" class="form-control">
+                        <option value="buy">Buy</option>
+                        <option value="sell">Sell</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="order-quantity">Quantity</label>
+                    <input type="number" id="order-quantity" class="form-control" min="1" required>
+                </div>
+                <div class="form-group limit-price" style="display: none;">
+                    <label for="order-limit-price">Limit Price</label>
+                    <input type="number" id="order-limit-price" class="form-control" min="0" step="0.01">
+                </div>
+                <div class="form-group stop-price" style="display: none;">
+                    <label for="order-stop-price">Stop Price</label>
+                    <input type="number" id="order-stop-price" class="form-control" min="0" step="0.01">
+                </div>
+                <button id="place-order" class="btn btn-primary">
+                    <i class="bi bi-check-circle"></i> Place Order
+                </button>
             </div>
 
-            <div class="orders-section">
-                <div class="open-orders card">
-                    <h3>Open Orders</h3>
-                    <div id="openOrders">
-                        <!-- Open orders will be loaded here -->
-                    </div>
-                </div>
-
-                <div class="recent-trades card">
-                    <h3>Recent Trades</h3>
-                    <div id="recentTrades">
-                        <!-- Recent trades will be loaded here -->
-                    </div>
+            <div class="orders-list">
+                <h3>Open Orders</h3>
+                <div id="openOrders">
+                    <!-- Open orders will be loaded here -->
                 </div>
             </div>
         </div>
     </div>
 
-    <div id="automated" class="tab-content">
+    <div id="positions" class="tab-content">
         <div class="trading-section">
-            <div class="strategy-controls card">
-                <h3>Automated Trading Controls</h3>
-                <div class="controls">
-                    <button id="startTrading" class="btn btn-success">
-                        <i class="bi bi-play-circle"></i> Start Trading
-                    </button>
-                    <button id="stopTrading" class="btn btn-danger" disabled>
-                        <i class="bi bi-stop-circle"></i> Stop Trading
-                    </button>
-                </div>
-                <div class="status">
-                    <span id="tradingStatus" class="badge bg-secondary">Not Running</span>
+            <div class="positions-summary">
+                <div class="summary-metrics">
+                    {{ components.metric_card('Total Value', '0.00', null) }}
+                    {{ components.metric_card('Unrealized P/L', '0.00', null) }}
+                    {{ components.metric_card('Realized P/L', '0.00', null) }}
                 </div>
             </div>
 
-            <div class="performance-metrics">
-                {{ components.metric_card('Total Trades', '0', null) }}
-                {{ components.metric_card('Win Rate', '0%', null) }}
-                {{ components.metric_card('Profit/Loss', '$0.00', null) }}
-                {{ components.metric_card('Average Return', '0%', null) }}
+            <div class="positions-list">
+                <h3>Current Positions</h3>
+                <div id="positionsList">
+                    <!-- Positions will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="history" class="tab-content">
+        <div class="trading-section">
+            <div class="history-filters card">
+                <h3>Trade History Filters</h3>
+                <div class="filter-group">
+                    <label for="history-timeframe">Timeframe</label>
+                    <select id="history-timeframe" class="form-control">
+                        <option value="1d">Today</option>
+                        <option value="5d">Last 5 Days</option>
+                        <option value="1m">Last Month</option>
+                        <option value="3m">Last 3 Months</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="history-symbol">Symbol</label>
+                    <input type="text" id="history-symbol" class="form-control" placeholder="Filter by symbol">
+                </div>
+                <button id="history-apply" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
             </div>
 
-            <div class="performance-charts">
-                {{ components.chart_container('equity-chart', 'Equity Curve') }}
-                {{ components.chart_container('returns-chart', 'Daily Returns') }}
+            <div class="history-list">
+                <h3>Trade History</h3>
+                <div id="tradeHistory">
+                    <!-- Trade history will be loaded here -->
+                </div>
             </div>
         </div>
     </div>
@@ -364,10 +378,71 @@
 
 {% block extra_js %}
 <script>
-    let equityChart;
-    let returnsChart;
+    // Order Form Functions
+    function updateOrderForm() {
+        const orderType = document.getElementById('order-type').value;
+        const limitPriceGroup = document.querySelector('.limit-price');
+        const stopPriceGroup = document.querySelector('.stop-price');
 
-    // Manual Trading Functions
+        if (orderType === 'limit' || orderType === 'stop_limit') {
+            limitPriceGroup.style.display = 'block';
+        } else {
+            limitPriceGroup.style.display = 'none';
+        }
+
+        if (orderType === 'stop' || orderType === 'stop_limit') {
+            stopPriceGroup.style.display = 'block';
+        } else {
+            stopPriceGroup.style.display = 'none';
+        }
+    }
+
+    function placeOrder() {
+        const symbol = document.getElementById('order-symbol').value;
+        const orderType = document.getElementById('order-type').value;
+        const side = document.getElementById('order-side').value;
+        const quantity = document.getElementById('order-quantity').value;
+        const limitPrice = document.getElementById('order-limit-price').value;
+        const stopPrice = document.getElementById('order-stop-price').value;
+
+        if (!symbol || !quantity) {
+            showToast('Please fill in all required fields', 'error');
+            return;
+        }
+
+        const orderData = {
+            symbol: symbol,
+            type: orderType,
+            side: side,
+            quantity: quantity
+        };
+
+        if (limitPrice) orderData.limit_price = limitPrice;
+        if (stopPrice) orderData.stop_price = stopPrice;
+
+        fetch('/api/trading/orders', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(orderData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Order placed successfully', 'success');
+                loadOpenOrders();
+            } else {
+                showToast(data.message || 'Error placing order', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error placing order:', error);
+            showToast('Error placing order', 'error');
+        });
+    }
+
+    // Open Orders Functions
     function loadOpenOrders() {
         const container = document.getElementById('openOrders');
         container.innerHTML = '{{ components.loading_message() }}';
@@ -393,31 +468,6 @@
             });
     }
 
-    function loadRecentTrades() {
-        const container = document.getElementById('recentTrades');
-        container.innerHTML = '{{ components.loading_message() }}';
-
-        fetch('/api/trading/trades')
-            .then(response => response.json())
-            .then(data => {
-                container.innerHTML = '';
-                
-                if (data.trades.length === 0) {
-                    container.innerHTML = '<div class="empty-state">No recent trades</div>';
-                    return;
-                }
-
-                data.trades.forEach(trade => {
-                    const tradeElement = createTradeElement(trade);
-                    container.appendChild(tradeElement);
-                });
-            })
-            .catch(error => {
-                console.error('Error loading recent trades:', error);
-                container.innerHTML = '{{ components.error_message("Error loading recent trades. Please try again.") }}';
-            });
-    }
-
     function createOrderElement(order) {
         const element = document.createElement('div');
         element.className = 'order-item';
@@ -425,7 +475,8 @@
         element.innerHTML = `
             <div class="order-header">
                 <span class="order-symbol">${order.symbol}</span>
-                <span class="order-type ${order.side}">${order.side.toUpperCase()} ${order.type.toUpperCase()}</span>
+                <span class="order-type">${order.type.toUpperCase()}</span>
+                <span class="order-side ${order.side}">${order.side.toUpperCase()}</span>
             </div>
             <div class="order-details">
                 <div class="detail">
@@ -451,6 +502,142 @@
         return element;
     }
 
+    function cancelOrder(orderId) {
+        fetch(`/api/trading/orders/${orderId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Order cancelled successfully', 'success');
+                loadOpenOrders();
+            } else {
+                showToast(data.message || 'Error cancelling order', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error cancelling order:', error);
+            showToast('Error cancelling order', 'error');
+        });
+    }
+
+    // Positions Functions
+    function loadPositions() {
+        const container = document.getElementById('positionsList');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        fetch('/api/trading/positions')
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.positions.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No positions</div>';
+                    return;
+                }
+
+                data.positions.forEach(position => {
+                    const positionElement = createPositionElement(position);
+                    container.appendChild(positionElement);
+                });
+
+                updatePositionMetrics(data.summary);
+            })
+            .catch(error => {
+                console.error('Error loading positions:', error);
+                container.innerHTML = '{{ components.error_message("Error loading positions. Please try again.") }}';
+            });
+    }
+
+    function createPositionElement(position) {
+        const element = document.createElement('div');
+        element.className = 'position-item';
+        
+        element.innerHTML = `
+            <div class="position-header">
+                <span class="position-symbol">${position.symbol}</span>
+                <span class="position-quantity">${position.quantity} shares</span>
+            </div>
+            <div class="position-details">
+                <div class="detail">
+                    <span class="label">Avg. Price</span>
+                    <span class="value">$${position.avg_price.toFixed(2)}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Current Price</span>
+                    <span class="value">$${position.current_price.toFixed(2)}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">P/L</span>
+                    <span class="value ${position.pl >= 0 ? 'positive' : 'negative'}">
+                        ${position.pl >= 0 ? '+' : ''}$${position.pl.toFixed(2)}
+                    </span>
+                </div>
+            </div>
+            <div class="position-actions">
+                <button class="btn btn-sm btn-primary" onclick="closePosition('${position.symbol}')">
+                    <i class="bi bi-x-circle"></i> Close Position
+                </button>
+            </div>
+        `;
+        
+        return element;
+    }
+
+    function updatePositionMetrics(summary) {
+        document.querySelector('[data-metric="Total Value"]').textContent = `$${summary.total_value.toFixed(2)}`;
+        document.querySelector('[data-metric="Unrealized P/L"]').textContent = `$${summary.unrealized_pl.toFixed(2)}`;
+        document.querySelector('[data-metric="Realized P/L"]').textContent = `$${summary.realized_pl.toFixed(2)}`;
+    }
+
+    function closePosition(symbol) {
+        fetch(`/api/trading/positions/${symbol}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Position closed successfully', 'success');
+                loadPositions();
+            } else {
+                showToast(data.message || 'Error closing position', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error closing position:', error);
+            showToast('Error closing position', 'error');
+        });
+    }
+
+    // Trade History Functions
+    function loadTradeHistory() {
+        const container = document.getElementById('tradeHistory');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        const timeframe = document.getElementById('history-timeframe').value;
+        const symbol = document.getElementById('history-symbol').value;
+
+        fetch(`/api/trading/history?timeframe=${timeframe}&symbol=${symbol}`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.trades.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No trade history</div>';
+                    return;
+                }
+
+                data.trades.forEach(trade => {
+                    const tradeElement = createTradeElement(trade);
+                    container.appendChild(tradeElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading trade history:', error);
+                container.innerHTML = '{{ components.error_message("Error loading trade history. Please try again.") }}';
+            });
+    }
+
     function createTradeElement(trade) {
         const element = document.createElement('div');
         element.className = 'trade-item';
@@ -459,6 +646,7 @@
             <div class="trade-header">
                 <span class="trade-symbol">${trade.symbol}</span>
                 <span class="trade-side ${trade.side}">${trade.side.toUpperCase()}</span>
+                <span class="trade-time">${new Date(trade.timestamp).toLocaleString()}</span>
             </div>
             <div class="trade-details">
                 <div class="detail">
@@ -476,176 +664,20 @@
                     </span>
                 </div>
             </div>
-            <div class="trade-time">
-                ${new Date(trade.timestamp).toLocaleString()}
-            </div>
         `;
         
         return element;
     }
 
-    // Automated Trading Functions
-    function loadTradingStatus() {
-        fetch('/api/trading/status')
-            .then(response => response.json())
-            .then(data => {
-                const statusElement = document.getElementById('tradingStatus');
-                const startButton = document.getElementById('startTrading');
-                const stopButton = document.getElementById('stopTrading');
-
-                if (data.running) {
-                    statusElement.className = 'badge bg-success';
-                    statusElement.textContent = 'Running';
-                    startButton.disabled = true;
-                    stopButton.disabled = false;
-                } else {
-                    statusElement.className = 'badge bg-secondary';
-                    statusElement.textContent = 'Not Running';
-                    startButton.disabled = false;
-                    stopButton.disabled = true;
-                }
-            })
-            .catch(error => {
-                console.error('Error loading trading status:', error);
-                showToast('Error loading trading status', 'error');
-            });
-    }
-
-    function loadPerformanceMetrics() {
-        fetch('/api/trading/performance')
-            .then(response => response.json())
-            .then(data => {
-                document.querySelector('[data-metric="Total Trades"]').textContent = data.total_trades;
-                document.querySelector('[data-metric="Win Rate"]').textContent = `${data.win_rate}%`;
-                document.querySelector('[data-metric="Profit/Loss"]').textContent = `$${data.profit_loss.toFixed(2)}`;
-                document.querySelector('[data-metric="Average Return"]').textContent = `${data.avg_return}%`;
-            })
-            .catch(error => {
-                console.error('Error loading performance metrics:', error);
-                showToast('Error loading performance metrics', 'error');
-            });
-    }
-
-    function updateEquityChart(data) {
-        const ctx = document.getElementById('equity-chart').getContext('2d');
-        
-        if (equityChart) {
-            equityChart.destroy();
-        }
-        
-        equityChart = new Chart(ctx, createChartConfig('line', {
-            labels: data.dates,
-            datasets: [{
-                label: 'Equity',
-                data: data.equity,
-                borderColor: '#0d6efd',
-                tension: 0.1
-            }]
-        }));
-    }
-
-    function updateReturnsChart(data) {
-        const ctx = document.getElementById('returns-chart').getContext('2d');
-        
-        if (returnsChart) {
-            returnsChart.destroy();
-        }
-        
-        returnsChart = new Chart(ctx, createChartConfig('bar', {
-            labels: data.dates,
-            datasets: [{
-                label: 'Returns',
-                data: data.returns,
-                backgroundColor: data.returns.map(r => r >= 0 ? '#198754' : '#dc3545'),
-                borderColor: data.returns.map(r => r >= 0 ? '#198754' : '#dc3545'),
-                borderWidth: 1
-            }]
-        }));
-    }
-
     // Event Listeners
-    document.getElementById('orderType').addEventListener('change', (e) => {
-        document.getElementById('priceGroup').style.display = 
-            e.target.value === 'market' ? 'none' : 'block';
-    });
-
-    document.getElementById('orderForm').addEventListener('submit', (e) => {
-        e.preventDefault();
-        
-        const order = {
-            symbol: document.getElementById('symbol').value,
-            type: document.getElementById('orderType').value,
-            side: document.getElementById('side').value,
-            quantity: parseInt(document.getElementById('quantity').value),
-            price: document.getElementById('orderType').value === 'market' ? 
-                null : parseFloat(document.getElementById('price').value)
-        };
-        
-        fetch('/api/trading/orders', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(order)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Order placed successfully');
-                loadOpenOrders();
-                document.getElementById('orderForm').reset();
-            } else {
-                showToast('Error: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error placing order:', error);
-            showToast('Error placing order', 'error');
-        });
-    });
-
-    document.getElementById('startTrading').addEventListener('click', () => {
-        fetch('/api/trading/start', {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Automated trading started');
-                loadTradingStatus();
-            } else {
-                showToast('Error: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error starting trading:', error);
-            showToast('Error starting trading', 'error');
-        });
-    });
-
-    document.getElementById('stopTrading').addEventListener('click', () => {
-        fetch('/api/trading/stop', {
-            method: 'POST'
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Automated trading stopped');
-                loadTradingStatus();
-            } else {
-                showToast('Error: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error stopping trading:', error);
-            showToast('Error stopping trading', 'error');
-        });
-    });
+    document.getElementById('order-type').addEventListener('change', updateOrderForm);
+    document.getElementById('place-order').addEventListener('click', placeOrder);
+    document.getElementById('history-apply').addEventListener('click', loadTradeHistory);
 
     // Initial Load
+    updateOrderForm();
     loadOpenOrders();
-    loadRecentTrades();
-    loadTradingStatus();
-    loadPerformanceMetrics();
+    loadPositions();
+    loadTradeHistory();
 </script>
 {% endblock %} 

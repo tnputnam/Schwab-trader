@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% import "components.html" as components %}
+
+{% block title %}Alerts Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    {{ components.tab_navigation([
+        {'id': 'active', 'label': 'Active Alerts'},
+        {'id': 'history', 'label': 'Alert History'}
+    ]) }}
+
+    <div id="active" class="tab-content active">
+        <div class="alerts-section">
+            <div class="alert-form card">
+                <h3>Create Alert</h3>
+                <div class="form-group">
+                    <label for="alert-symbol">Symbol</label>
+                    <input type="text" id="alert-symbol" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="alert-type">Alert Type</label>
+                    <select id="alert-type" class="form-control">
+                        <option value="price">Price</option>
+                        <option value="volume">Volume</option>
+                        <option value="change">Price Change</option>
+                        <option value="rsi">RSI</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="alert-condition">Condition</label>
+                    <select id="alert-condition" class="form-control">
+                        <option value="above">Above</option>
+                        <option value="below">Below</option>
+                        <option value="crosses">Crosses</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="alert-value">Value</label>
+                    <input type="number" id="alert-value" class="form-control" min="0" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label for="alert-notification">Notification</label>
+                    <select id="alert-notification" class="form-control">
+                        <option value="email">Email</option>
+                        <option value="sms">SMS</option>
+                        <option value="both">Both</option>
+                    </select>
+                </div>
+                <button id="create-alert" class="btn btn-primary">
+                    <i class="bi bi-bell-plus"></i> Create Alert
+                </button>
+            </div>
+
+            <div class="alerts-list">
+                <h3>Active Alerts</h3>
+                <div id="activeAlerts">
+                    <!-- Active alerts will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="history" class="tab-content">
+        <div class="alerts-section">
+            <div class="history-filters card">
+                <h3>Alert History Filters</h3>
+                <div class="filter-group">
+                    <label for="history-timeframe">Timeframe</label>
+                    <select id="history-timeframe" class="form-control">
+                        <option value="1d">Today</option>
+                        <option value="5d">Last 5 Days</option>
+                        <option value="1m">Last Month</option>
+                        <option value="3m">Last 3 Months</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="history-symbol">Symbol</label>
+                    <input type="text" id="history-symbol" class="form-control" placeholder="Filter by symbol">
+                </div>
+                <div class="filter-group">
+                    <label for="history-type">Alert Type</label>
+                    <select id="history-type" class="form-control">
+                        <option value="all">All Types</option>
+                        <option value="price">Price</option>
+                        <option value="volume">Volume</option>
+                        <option value="change">Price Change</option>
+                        <option value="rsi">RSI</option>
+                    </select>
+                </div>
+                <button id="history-apply" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
+            </div>
+
+            <div class="history-list">
+                <h3>Alert History</h3>
+                <div id="alertHistory">
+                    <!-- Alert history will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ components.api_status() }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Alert Form Functions
+    function createAlert() {
+        const symbol = document.getElementById('alert-symbol').value;
+        const type = document.getElementById('alert-type').value;
+        const condition = document.getElementById('alert-condition').value;
+        const value = document.getElementById('alert-value').value;
+        const notification = document.getElementById('alert-notification').value;
+
+        if (!symbol || !value) {
+            showToast('Please fill in all required fields', 'error');
+            return;
+        }
+
+        const alertData = {
+            symbol: symbol,
+            type: type,
+            condition: condition,
+            value: value,
+            notification: notification
+        };
+
+        fetch('/api/alerts', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(alertData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Alert created successfully', 'success');
+                loadActiveAlerts();
+            } else {
+                showToast(data.message || 'Error creating alert', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error creating alert:', error);
+            showToast('Error creating alert', 'error');
+        });
+    }
+
+    // Active Alerts Functions
+    function loadActiveAlerts() {
+        const container = document.getElementById('activeAlerts');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        fetch('/api/alerts/active')
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.alerts.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No active alerts</div>';
+                    return;
+                }
+
+                data.alerts.forEach(alert => {
+                    const alertElement = createAlertElement(alert);
+                    container.appendChild(alertElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading active alerts:', error);
+                container.innerHTML = '{{ components.error_message("Error loading active alerts. Please try again.") }}';
+            });
+    }
+
+    function createAlertElement(alert) {
+        const element = document.createElement('div');
+        element.className = 'alert-item';
+        
+        element.innerHTML = `
+            <div class="alert-header">
+                <span class="alert-symbol">${alert.symbol}</span>
+                <span class="alert-type">${alert.type.toUpperCase()}</span>
+            </div>
+            <div class="alert-details">
+                <div class="detail">
+                    <span class="label">Condition</span>
+                    <span class="value">${alert.condition} ${alert.value}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Created</span>
+                    <span class="value">${new Date(alert.created_at).toLocaleString()}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Notification</span>
+                    <span class="value">${alert.notification.toUpperCase()}</span>
+                </div>
+            </div>
+            <div class="alert-actions">
+                <button class="btn btn-sm btn-danger" onclick="deleteAlert('${alert.id}')">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+            </div>
+        `;
+        
+        return element;
+    }
+
+    function deleteAlert(alertId) {
+        fetch(`/api/alerts/${alertId}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Alert deleted successfully', 'success');
+                loadActiveAlerts();
+            } else {
+                showToast(data.message || 'Error deleting alert', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting alert:', error);
+            showToast('Error deleting alert', 'error');
+        });
+    }
+
+    // Alert History Functions
+    function loadAlertHistory() {
+        const container = document.getElementById('alertHistory');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        const timeframe = document.getElementById('history-timeframe').value;
+        const symbol = document.getElementById('history-symbol').value;
+        const type = document.getElementById('history-type').value;
+
+        fetch(`/api/alerts/history?timeframe=${timeframe}&symbol=${symbol}&type=${type}`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.alerts.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No alert history</div>';
+                    return;
+                }
+
+                data.alerts.forEach(alert => {
+                    const alertElement = createHistoryAlertElement(alert);
+                    container.appendChild(alertElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading alert history:', error);
+                container.innerHTML = '{{ components.error_message("Error loading alert history. Please try again.") }}';
+            });
+    }
+
+    function createHistoryAlertElement(alert) {
+        const element = document.createElement('div');
+        element.className = 'alert-item';
+        
+        element.innerHTML = `
+            <div class="alert-header">
+                <span class="alert-symbol">${alert.symbol}</span>
+                <span class="alert-type">${alert.type.toUpperCase()}</span>
+                <span class="alert-status ${alert.triggered ? 'triggered' : 'expired'}">
+                    ${alert.triggered ? 'Triggered' : 'Expired'}
+                </span>
+            </div>
+            <div class="alert-details">
+                <div class="detail">
+                    <span class="label">Condition</span>
+                    <span class="value">${alert.condition} ${alert.value}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Created</span>
+                    <span class="value">${new Date(alert.created_at).toLocaleString()}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Triggered</span>
+                    <span class="value">${new Date(alert.triggered_at).toLocaleString()}</span>
+                </div>
+            </div>
+        `;
+        
+        return element;
+    }
+
+    // Event Listeners
+    document.getElementById('create-alert').addEventListener('click', createAlert);
+    document.getElementById('history-apply').addEventListener('click', loadAlertHistory);
+
+    // Initial Load
+    loadActiveAlerts();
+    loadAlertHistory();
+</script>
+{% endblock %} 

@@ -1,0 +1,607 @@
+{% extends "base.html" %}
+{% import "components.html" as components %}
+
+{% block title %}Watchlist Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    {{ components.tab_navigation([
+        {'id': 'stocks', 'label': 'Stocks'},
+        {'id': 'crypto', 'label': 'Crypto'},
+        {'id': 'etfs', 'label': 'ETFs'}
+    ]) }}
+
+    <div id="stocks" class="tab-content active">
+        <div class="watchlist-section">
+            <div class="add-form card">
+                <h3>Add to Watchlist</h3>
+                <div class="form-group">
+                    <label for="stock-symbol">Symbol</label>
+                    <input type="text" id="stock-symbol" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="stock-category">Category</label>
+                    <select id="stock-category" class="form-control">
+                        <option value="tech">Technology</option>
+                        <option value="finance">Finance</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="energy">Energy</option>
+                        <option value="consumer">Consumer</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="stock-notes">Notes</label>
+                    <textarea id="stock-notes" class="form-control" rows="3" placeholder="Add any notes about this stock"></textarea>
+                </div>
+                <button id="add-stock" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Add Stock
+                </button>
+            </div>
+
+            <div class="watchlist-filters card">
+                <h3>Filters</h3>
+                <div class="filter-group">
+                    <label for="filter-category">Category</label>
+                    <select id="filter-category" class="form-control">
+                        <option value="all">All Categories</option>
+                        <option value="tech">Technology</option>
+                        <option value="finance">Finance</option>
+                        <option value="healthcare">Healthcare</option>
+                        <option value="energy">Energy</option>
+                        <option value="consumer">Consumer</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="filter-sort">Sort By</label>
+                    <select id="filter-sort" class="form-control">
+                        <option value="symbol">Symbol</option>
+                        <option value="price">Price</option>
+                        <option value="change">Change</option>
+                        <option value="volume">Volume</option>
+                    </select>
+                </div>
+                <button id="apply-filters" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
+            </div>
+
+            <div class="watchlist-grid">
+                <div id="stocksList">
+                    <!-- Stocks will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="crypto" class="tab-content">
+        <div class="watchlist-section">
+            <div class="add-form card">
+                <h3>Add Crypto</h3>
+                <div class="form-group">
+                    <label for="crypto-symbol">Symbol</label>
+                    <input type="text" id="crypto-symbol" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="crypto-category">Category</label>
+                    <select id="crypto-category" class="form-control">
+                        <option value="bitcoin">Bitcoin</option>
+                        <option value="ethereum">Ethereum</option>
+                        <option value="defi">DeFi</option>
+                        <option value="nft">NFT</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="crypto-notes">Notes</label>
+                    <textarea id="crypto-notes" class="form-control" rows="3" placeholder="Add any notes about this crypto"></textarea>
+                </div>
+                <button id="add-crypto" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Add Crypto
+                </button>
+            </div>
+
+            <div class="watchlist-filters card">
+                <h3>Filters</h3>
+                <div class="filter-group">
+                    <label for="crypto-filter-category">Category</label>
+                    <select id="crypto-filter-category" class="form-control">
+                        <option value="all">All Categories</option>
+                        <option value="bitcoin">Bitcoin</option>
+                        <option value="ethereum">Ethereum</option>
+                        <option value="defi">DeFi</option>
+                        <option value="nft">NFT</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="crypto-filter-sort">Sort By</label>
+                    <select id="crypto-filter-sort" class="form-control">
+                        <option value="symbol">Symbol</option>
+                        <option value="price">Price</option>
+                        <option value="change">Change</option>
+                        <option value="volume">Volume</option>
+                    </select>
+                </div>
+                <button id="crypto-apply-filters" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
+            </div>
+
+            <div class="watchlist-grid">
+                <div id="cryptoList">
+                    <!-- Crypto will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="etfs" class="tab-content">
+        <div class="watchlist-section">
+            <div class="add-form card">
+                <h3>Add ETF</h3>
+                <div class="form-group">
+                    <label for="etf-symbol">Symbol</label>
+                    <input type="text" id="etf-symbol" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label for="etf-category">Category</label>
+                    <select id="etf-category" class="form-control">
+                        <option value="index">Index</option>
+                        <option value="sector">Sector</option>
+                        <option value="bond">Bond</option>
+                        <option value="commodity">Commodity</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="etf-notes">Notes</label>
+                    <textarea id="etf-notes" class="form-control" rows="3" placeholder="Add any notes about this ETF"></textarea>
+                </div>
+                <button id="add-etf" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Add ETF
+                </button>
+            </div>
+
+            <div class="watchlist-filters card">
+                <h3>Filters</h3>
+                <div class="filter-group">
+                    <label for="etf-filter-category">Category</label>
+                    <select id="etf-filter-category" class="form-control">
+                        <option value="all">All Categories</option>
+                        <option value="index">Index</option>
+                        <option value="sector">Sector</option>
+                        <option value="bond">Bond</option>
+                        <option value="commodity">Commodity</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="etf-filter-sort">Sort By</label>
+                    <select id="etf-filter-sort" class="form-control">
+                        <option value="symbol">Symbol</option>
+                        <option value="price">Price</option>
+                        <option value="change">Change</option>
+                        <option value="volume">Volume</option>
+                    </select>
+                </div>
+                <button id="etf-apply-filters" class="btn btn-primary">
+                    <i class="bi bi-funnel"></i> Apply Filters
+                </button>
+            </div>
+
+            <div class="watchlist-grid">
+                <div id="etfsList">
+                    <!-- ETFs will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ components.api_status() }}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Stock Functions
+    function addStock() {
+        const symbol = document.getElementById('stock-symbol').value;
+        const category = document.getElementById('stock-category').value;
+        const notes = document.getElementById('stock-notes').value;
+
+        if (!symbol) {
+            showToast('Please enter a symbol', 'error');
+            return;
+        }
+
+        const stockData = {
+            symbol: symbol,
+            category: category,
+            notes: notes
+        };
+
+        fetch('/api/watchlist/stocks', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(stockData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Stock added to watchlist', 'success');
+                loadStocks();
+            } else {
+                showToast(data.message || 'Error adding stock', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error adding stock:', error);
+            showToast('Error adding stock', 'error');
+        });
+    }
+
+    function loadStocks() {
+        const container = document.getElementById('stocksList');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        const category = document.getElementById('filter-category').value;
+        const sort = document.getElementById('filter-sort').value;
+
+        fetch(`/api/watchlist/stocks?category=${category}&sort=${sort}`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.stocks.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No stocks in watchlist</div>';
+                    return;
+                }
+
+                data.stocks.forEach(stock => {
+                    const stockElement = createStockElement(stock);
+                    container.appendChild(stockElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading stocks:', error);
+                container.innerHTML = '{{ components.error_message("Error loading stocks. Please try again.") }}';
+            });
+    }
+
+    function createStockElement(stock) {
+        const element = document.createElement('div');
+        element.className = 'stock-item';
+        
+        element.innerHTML = `
+            <div class="stock-header">
+                <span class="stock-symbol">${stock.symbol}</span>
+                <span class="stock-category">${stock.category}</span>
+            </div>
+            <div class="stock-details">
+                <div class="detail">
+                    <span class="label">Price</span>
+                    <span class="value">$${stock.price.toFixed(2)}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Change</span>
+                    <span class="value ${stock.change >= 0 ? 'positive' : 'negative'}">
+                        ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
+                    </span>
+                </div>
+                <div class="detail">
+                    <span class="label">Volume</span>
+                    <span class="value">${formatNumber(stock.volume)}</span>
+                </div>
+            </div>
+            <div class="stock-notes">
+                <p>${stock.notes || 'No notes'}</p>
+            </div>
+            <div class="stock-actions">
+                <button class="btn btn-sm btn-primary" onclick="viewDetails('${stock.symbol}')">
+                    <i class="bi bi-eye"></i> View Details
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="removeStock('${stock.symbol}')">
+                    <i class="bi bi-trash"></i> Remove
+                </button>
+            </div>
+        `;
+        
+        return element;
+    }
+
+    function removeStock(symbol) {
+        fetch(`/api/watchlist/stocks/${symbol}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Stock removed from watchlist', 'success');
+                loadStocks();
+            } else {
+                showToast(data.message || 'Error removing stock', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error removing stock:', error);
+            showToast('Error removing stock', 'error');
+        });
+    }
+
+    // Crypto Functions
+    function addCrypto() {
+        const symbol = document.getElementById('crypto-symbol').value;
+        const category = document.getElementById('crypto-category').value;
+        const notes = document.getElementById('crypto-notes').value;
+
+        if (!symbol) {
+            showToast('Please enter a symbol', 'error');
+            return;
+        }
+
+        const cryptoData = {
+            symbol: symbol,
+            category: category,
+            notes: notes
+        };
+
+        fetch('/api/watchlist/crypto', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(cryptoData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Crypto added to watchlist', 'success');
+                loadCrypto();
+            } else {
+                showToast(data.message || 'Error adding crypto', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error adding crypto:', error);
+            showToast('Error adding crypto', 'error');
+        });
+    }
+
+    function loadCrypto() {
+        const container = document.getElementById('cryptoList');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        const category = document.getElementById('crypto-filter-category').value;
+        const sort = document.getElementById('crypto-filter-sort').value;
+
+        fetch(`/api/watchlist/crypto?category=${category}&sort=${sort}`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.crypto.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No crypto in watchlist</div>';
+                    return;
+                }
+
+                data.crypto.forEach(crypto => {
+                    const cryptoElement = createCryptoElement(crypto);
+                    container.appendChild(cryptoElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading crypto:', error);
+                container.innerHTML = '{{ components.error_message("Error loading crypto. Please try again.") }}';
+            });
+    }
+
+    function createCryptoElement(crypto) {
+        const element = document.createElement('div');
+        element.className = 'crypto-item';
+        
+        element.innerHTML = `
+            <div class="crypto-header">
+                <span class="crypto-symbol">${crypto.symbol}</span>
+                <span class="crypto-category">${crypto.category}</span>
+            </div>
+            <div class="crypto-details">
+                <div class="detail">
+                    <span class="label">Price</span>
+                    <span class="value">$${crypto.price.toFixed(2)}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Change</span>
+                    <span class="value ${crypto.change >= 0 ? 'positive' : 'negative'}">
+                        ${crypto.change >= 0 ? '+' : ''}${crypto.change.toFixed(2)}%
+                    </span>
+                </div>
+                <div class="detail">
+                    <span class="label">Volume</span>
+                    <span class="value">${formatNumber(crypto.volume)}</span>
+                </div>
+            </div>
+            <div class="crypto-notes">
+                <p>${crypto.notes || 'No notes'}</p>
+            </div>
+            <div class="crypto-actions">
+                <button class="btn btn-sm btn-primary" onclick="viewDetails('${crypto.symbol}')">
+                    <i class="bi bi-eye"></i> View Details
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="removeCrypto('${crypto.symbol}')">
+                    <i class="bi bi-trash"></i> Remove
+                </button>
+            </div>
+        `;
+        
+        return element;
+    }
+
+    function removeCrypto(symbol) {
+        fetch(`/api/watchlist/crypto/${symbol}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Crypto removed from watchlist', 'success');
+                loadCrypto();
+            } else {
+                showToast(data.message || 'Error removing crypto', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error removing crypto:', error);
+            showToast('Error removing crypto', 'error');
+        });
+    }
+
+    // ETF Functions
+    function addETF() {
+        const symbol = document.getElementById('etf-symbol').value;
+        const category = document.getElementById('etf-category').value;
+        const notes = document.getElementById('etf-notes').value;
+
+        if (!symbol) {
+            showToast('Please enter a symbol', 'error');
+            return;
+        }
+
+        const etfData = {
+            symbol: symbol,
+            category: category,
+            notes: notes
+        };
+
+        fetch('/api/watchlist/etfs', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(etfData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('ETF added to watchlist', 'success');
+                loadETFs();
+            } else {
+                showToast(data.message || 'Error adding ETF', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error adding ETF:', error);
+            showToast('Error adding ETF', 'error');
+        });
+    }
+
+    function loadETFs() {
+        const container = document.getElementById('etfsList');
+        container.innerHTML = '{{ components.loading_message() }}';
+
+        const category = document.getElementById('etf-filter-category').value;
+        const sort = document.getElementById('etf-filter-sort').value;
+
+        fetch(`/api/watchlist/etfs?category=${category}&sort=${sort}`)
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                
+                if (data.etfs.length === 0) {
+                    container.innerHTML = '<div class="empty-state">No ETFs in watchlist</div>';
+                    return;
+                }
+
+                data.etfs.forEach(etf => {
+                    const etfElement = createETFElement(etf);
+                    container.appendChild(etfElement);
+                });
+            })
+            .catch(error => {
+                console.error('Error loading ETFs:', error);
+                container.innerHTML = '{{ components.error_message("Error loading ETFs. Please try again.") }}';
+            });
+    }
+
+    function createETFElement(etf) {
+        const element = document.createElement('div');
+        element.className = 'etf-item';
+        
+        element.innerHTML = `
+            <div class="etf-header">
+                <span class="etf-symbol">${etf.symbol}</span>
+                <span class="etf-category">${etf.category}</span>
+            </div>
+            <div class="etf-details">
+                <div class="detail">
+                    <span class="label">Price</span>
+                    <span class="value">$${etf.price.toFixed(2)}</span>
+                </div>
+                <div class="detail">
+                    <span class="label">Change</span>
+                    <span class="value ${etf.change >= 0 ? 'positive' : 'negative'}">
+                        ${etf.change >= 0 ? '+' : ''}${etf.change.toFixed(2)}%
+                    </span>
+                </div>
+                <div class="detail">
+                    <span class="label">Volume</span>
+                    <span class="value">${formatNumber(etf.volume)}</span>
+                </div>
+            </div>
+            <div class="etf-notes">
+                <p>${etf.notes || 'No notes'}</p>
+            </div>
+            <div class="etf-actions">
+                <button class="btn btn-sm btn-primary" onclick="viewDetails('${etf.symbol}')">
+                    <i class="bi bi-eye"></i> View Details
+                </button>
+                <button class="btn btn-sm btn-danger" onclick="removeETF('${etf.symbol}')">
+                    <i class="bi bi-trash"></i> Remove
+                </button>
+            </div>
+        `;
+        
+        return element;
+    }
+
+    function removeETF(symbol) {
+        fetch(`/api/watchlist/etfs/${symbol}`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showToast('ETF removed from watchlist', 'success');
+                loadETFs();
+            } else {
+                showToast(data.message || 'Error removing ETF', 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error removing ETF:', error);
+            showToast('Error removing ETF', 'error');
+        });
+    }
+
+    // Common Functions
+    function viewDetails(symbol) {
+        window.location.href = `/stock/${symbol}`;
+    }
+
+    // Event Listeners
+    document.getElementById('add-stock').addEventListener('click', addStock);
+    document.getElementById('add-crypto').addEventListener('click', addCrypto);
+    document.getElementById('add-etf').addEventListener('click', addETF);
+    document.getElementById('apply-filters').addEventListener('click', loadStocks);
+    document.getElementById('crypto-apply-filters').addEventListener('click', loadCrypto);
+    document.getElementById('etf-apply-filters').addEventListener('click', loadETFs);
+
+    // Initial Load
+    loadStocks();
+    loadCrypto();
+    loadETFs();
+</script>
+{% endblock %} 
