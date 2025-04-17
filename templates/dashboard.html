@@ -31,99 +31,88 @@
     </nav>
 
     <div class="container mt-4">
-        <!-- Portfolio Overview -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Total Portfolio Value</h5>
-                        <h2 class="card-text" id="totalValue">$0.00</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Active Strategies</h5>
-                        <h2 class="card-text" id="activeStrategies">0</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Open Positions</h5>
-                        <h2 class="card-text" id="openPositions">0</h2>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Today's P/L</h5>
-                        <h2 class="card-text" id="dailyPL">$0.00</h2>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Portfolio Chart -->
-        <div class="row mb-4">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Portfolio Performance</h5>
-                        <canvas id="portfolioChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Trades -->
-        <div class="row">
+        <h1>Schwab Account Dashboard</h1>
+        
+        <div class="row mt-4">
             <div class="col-md-6">
                 <div class="card">
+                    <div class="card-header">
+                        <h5>Account Summary</h5>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Recent Trades</h5>
-                        <div class="table-responsive">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Symbol</th>
-                                        <th>Type</th>
-                                        <th>Quantity</th>
-                                        <th>Price</th>
-                                        <th>P/L</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recentTrades">
-                                    <!-- Will be populated by JavaScript -->
-                                </tbody>
-                            </table>
-                        </div>
+                        <table class="table">
+                            <tr>
+                                <th>Account Number:</th>
+                                <td>{{ account.account_number }}</td>
+                            </tr>
+                            <tr>
+                                <th>Account Type:</th>
+                                <td>{{ account.account_type }}</td>
+                            </tr>
+                            <tr>
+                                <th>Cash Balance:</th>
+                                <td>${{ "%.2f"|format(account.cash_balance) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Cash Available for Trading:</th>
+                                <td>${{ "%.2f"|format(account.cash_available) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Total Account Value:</th>
+                                <td>${{ "%.2f"|format(account.total_value) }}</td>
+                            </tr>
+                            <tr>
+                                <th>Long Market Value:</th>
+                                <td>${{ "%.2f"|format(account.long_market_value) }}</td>
+                            </tr>
+                        </table>
                     </div>
                 </div>
             </div>
+            
             <div class="col-md-6">
                 <div class="card">
+                    <div class="card-header">
+                        <h5>Positions</h5>
+                    </div>
                     <div class="card-body">
-                        <h5 class="card-title">Current Positions</h5>
-                        <div class="table-responsive">
+                        {% if account.positions %}
                             <table class="table">
                                 <thead>
                                     <tr>
                                         <th>Symbol</th>
                                         <th>Quantity</th>
-                                        <th>Avg. Price</th>
-                                        <th>Current Price</th>
-                                        <th>P/L</th>
+                                        <th>Average Price</th>
+                                        <th>Market Value</th>
                                     </tr>
                                 </thead>
-                                <tbody id="currentPositions">
-                                    <!-- Will be populated by JavaScript -->
+                                <tbody>
+                                    {% for position in account.positions %}
+                                        <tr>
+                                            <td>{{ position.symbol }}</td>
+                                            <td>{{ position.quantity }}</td>
+                                            <td>${{ "%.2f"|format(position.averagePrice) }}</td>
+                                            <td>${{ "%.2f"|format(position.marketValue) }}</td>
+                                        </tr>
+                                    {% endfor %}
                                 </tbody>
                             </table>
-                        </div>
+                        {% else %}
+                            <p>No positions found or positions data not available.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <a href="/test_strategies" class="btn btn-primary">Test Trading Strategies</a>
                     </div>
                 </div>
             </div>

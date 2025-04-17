@@ -1,9 +1,16 @@
-from flask import Flask, session, redirect, request, jsonify
+from flask import Flask, session, redirect, request, jsonify, url_for, render_template
 from requests_oauthlib import OAuth2Session
 import os
 import logging
 import base64
 import requests
+from datetime import datetime, timedelta
+from strategy_tester import StrategyTester
+from example_strategies import (
+    moving_average_crossover_strategy,
+    rsi_strategy,
+    bollinger_bands_strategy
+)
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -86,11 +93,11 @@ def callback():
         
         # Store token
         session['oauth_token'] = token_data
+        session['access_token'] = token_data['access_token']
         
         # Get client correlation ID from token response headers
         client_correlid = token_response.headers.get('Schwab-Client-Correlid')
         if not client_correlid:
-            # Try to get it from the token response body
             client_correlid = token_data.get('client_correlid', '')
         
         logger.debug(f"Client correlation ID: {client_correlid}")
@@ -106,81 +113,111 @@ def callback():
         
         # Get account details
         accounts_url = "https://api.schwabapi.com/trader/v1/accounts"
-        accounts_headers = {
-            "Accept": "application/json",
-            "Authorization": f"Bearer {token_data['access_token']}",
-            "X-Authorization": f"Bearer {token_data['access_token']}",
-            "Schwab-Client-Correlid": client_correlid,
-            "Origin": REDIRECT_URI.rsplit('/', 1)[0]
-        }
+        accounts_response = requests.get(accounts_url, headers=api_headers)
         
-        try:
-            accounts_response = requests.get(accounts_url, headers=accounts_headers)
-            logger.debug(f"Accounts response status: {accounts_response.status_code}")
-            logger.debug(f"Accounts response headers: {accounts_response.headers}")
-            logger.debug(f"Accounts response body: {accounts_response.text}")
-            
-            if accounts_response.status_code == 200:
-                accounts_data = accounts_response.json()
-                logger.debug(f"Accounts data: {accounts_data}")
+        if accounts_response.status_code == 200:
+            accounts_data = accounts_response.json()
+            if accounts_data and isinstance(accounts_data, list):
+                account = accounts_data[0]  # Get first account
+                session['account_data'] = account
                 
-                # Get positions and portfolio for each account
-                for account in accounts_data:  # accounts_data is a list
-                    account_number = account['securitiesAccount']['accountNumber']
-                    
-                    # Get positions
-                    positions_url = f"https://api.schwabapi.com/trader/v1/accounts/{account_number}/positions"
-                    positions_response = requests.get(positions_url, headers=accounts_headers)
-                    
-                    # Get portfolio
-                    portfolio_url = f"https://api.schwabapi.com/trader/v1/accounts/{account_number}/portfolio"
-                    portfolio_response = requests.get(portfolio_url, headers=accounts_headers)
-                    
-                    account['positions'] = positions_response.json() if positions_response.status_code == 200 else None
-                    account['portfolio'] = portfolio_response.json() if portfolio_response.status_code == 200 else None
+                # Get positions if available
+                account_number = account['securitiesAccount']['accountNumber']
+                positions_url = f"https://api.schwabapi.com/trader/v1/accounts/{account_number}/positions"
+                positions_response = requests.get(positions_url, headers=api_headers)
                 
+                if positions_response.status_code == 200:
+                    session['positions'] = positions_response.json()
+                else:
+                    session['positions'] = []
+                    logger.warning(f"Could not fetch positions: {positions_response.status_code}")
+                
+                return redirect(url_for('dashboard'))
+            else:
                 return jsonify({
-                    "success": True,
-                    "message": "Successfully authenticated with Schwab",
-                    "accounts": accounts_data
-                })
-            
-            return jsonify({
-                "success": True,
-                "message": "Successfully authenticated with Schwab",
-                "error": {
-                    "accounts_error": {
-                        "status_code": accounts_response.status_code,
-                        "response": accounts_response.json() if accounts_response.status_code != 404 else None,
-                        "headers": dict(accounts_response.headers)
-                    },
-                    "token_info": {
-                        "scope": token_data.get('scope'),
-                        "token_type": token_data.get('token_type'),
-                        "expires_in": token_data.get('expires_in'),
-                        "client_correlid": client_correlid,
-                        "access_token": token_data.get('access_token')
-                    },
-                    "debug_info": {
-                        "headers_used": accounts_headers,
-                        "token_response_headers": dict(token_response.headers)
-                    }
-                }
-            })
-            
-        except Exception as e:
-            logger.error(f"Error accessing accounts: {str(e)}")
+                    "success": False,
+                    "error": "No accounts found"
+                }), 404
+        else:
             return jsonify({
                 "success": False,
-                "error": str(e)
-            }), 500
-        
+                "error": f"Failed to get accounts: {accounts_response.status_code}"
+            }), accounts_response.status_code
+            
     except Exception as e:
         logger.error(f"Error in callback: {str(e)}")
         return jsonify({
             "success": False,
             "error": str(e)
         }), 400
+
+@app.route('/dashboard')
+def dashboard():
+    """Display account dashboard"""
+    if 'access_token' not in session:
+        return redirect(url_for('login'))
+        
+    account_data = session.get('account_data', {})
+    positions = session.get('positions', [])
+    
+    if not account_data:
+        return redirect(url_for('login'))
+        
+    # Extract relevant account information
+    account = account_data.get('securitiesAccount', {})
+    current_balances = account.get('currentBalances', {})
+    
+    account_info = {
+        'account_number': account.get('accountNumber'),
+        'account_type': account.get('type'),
+        'cash_balance': current_balances.get('cashBalance', 0),
+        'cash_available': current_balances.get('cashAvailableForTrading', 0),
+        'total_value': current_balances.get('liquidationValue', 0),
+        'long_market_value': current_balances.get('longMarketValue', 0),
+        'positions': positions
+    }
+    
+    return render_template('dashboard.html', account=account_info)
+
+@app.route('/test_strategies', methods=['GET'])
+def test_strategies():
+    """Test different trading strategies"""
+    if 'access_token' not in session:
+        return redirect(url_for('login'))
+        
+    # Initialize strategy tester and sync with Schwab account
+    tester = StrategyTester()
+    tester.sync_with_schwab(session['access_token'])
+    
+    # Define test parameters
+    symbols = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL']
+    start_date = (datetime.now() - timedelta(days=365)).strftime('%Y-%m-%d')
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    
+    # Test strategies
+    results = {}
+    strategies = {
+        'Moving Average Crossover': moving_average_crossover_strategy,
+        'RSI': rsi_strategy,
+        'Bollinger Bands': bollinger_bands_strategy
+    }
+    
+    for name, strategy in strategies.items():
+        tester = StrategyTester()
+        tester.sync_with_schwab(session['access_token'])
+        results[name] = tester.run_strategy(strategy, symbols, start_date, end_date)
+    
+    return jsonify({
+        'status': 'success',
+        'results': results
+    })
+
+@app.route('/strategy_dashboard')
+def strategy_dashboard():
+    """Show strategy testing dashboard"""
+    if 'access_token' not in session:
+        return redirect(url_for('login'))
+    return render_template('strategy_dashboard.html')
 
 if __name__ == '__main__':
     # For development only
