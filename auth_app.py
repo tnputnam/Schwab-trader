@@ -17,6 +17,7 @@ from example_strategies import (
     volume_strategy,
     tesla_volume_analysis
 )
+import numpy as np
 
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
@@ -436,12 +437,22 @@ def tesla_analysis():
         logger.error(f"Error in Tesla analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/auto_trading')
+def auto_trading_dashboard():
+    """Show auto trading dashboard"""
+    if 'access_token' not in session:
+        return redirect(url_for('login'))
+    return render_template('auto_trading.html')
+
 @app.route('/api/start_auto_trading', methods=['POST'])
 def start_auto_trading():
-    """Start auto trading with market close protection"""
+    """Start auto trading with specified strategy and budget"""
     try:
+        if 'access_token' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+            
         data = request.get_json()
-        if not data or 'strategy' not in data or 'symbols' not in data:
+        if not data or 'strategy' not in data or 'symbols' not in data or 'budget' not in data:
             return jsonify({'error': 'Missing required parameters'}), 400
             
         # Get strategy function
@@ -459,6 +470,10 @@ def start_auto_trading():
             
         # Initialize strategy tester
         tester = StrategyTester()
+        tester.sync_with_schwab(session['access_token'])
+        
+        # Set budget
+        tester.set_budget(data['budget'])
         
         # Start auto trading in a separate thread
         import threading
@@ -469,13 +484,225 @@ def start_auto_trading():
         thread.daemon = True
         thread.start()
         
+        # Store trading state in session
+        session['trading_active'] = True
+        session['trading_strategy'] = strategy_name
+        session['trading_symbols'] = data['symbols']
+        session['trading_budget'] = data['budget']
+        
         return jsonify({
             'status': 'success',
-            'message': 'Auto trading started with market close protection'
+            'message': 'Auto trading started successfully'
         })
         
     except Exception as e:
         logger.error(f"Error starting auto trading: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/stop_auto_trading', methods=['POST'])
+def stop_auto_trading():
+    """Stop auto trading"""
+    try:
+        if 'access_token' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+            
+        # Clear trading state from session
+        session.pop('trading_active', None)
+        session.pop('trading_strategy', None)
+        session.pop('trading_symbols', None)
+        session.pop('trading_budget', None)
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Auto trading stopped successfully'
+        })
+        
+    except Exception as e:
+        logger.error(f"Error stopping auto trading: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/trading_status', methods=['GET'])
+def get_trading_status():
+    """Get current trading status and performance"""
+    try:
+        if 'access_token' not in session:
+            return jsonify({'error': 'Not authenticated'}), 401
+            
+        # Initialize strategy tester
+        tester = StrategyTester()
+        tester.sync_with_schwab(session['access_token'])
+        
+        # Get current status
+        status = {
+            'active': session.get('trading_active', False),
+            'strategy': session.get('trading_strategy', None),
+            'symbols': session.get('trading_symbols', []),
+            'budget': session.get('trading_budget', 0),
+            'current_balance': tester.get_current_balance(),
+            'active_positions': tester.get_active_positions(),
+            'trade_history': tester.get_trade_history()
+        }
+        
+        return jsonify(status)
+        
+    except Exception as e:
+        logger.error(f"Error getting trading status: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/volatile_stocks')
+def volatile_stocks_dashboard():
+    """Show dashboard for top volatile stocks"""
+    return render_template('volatile_stocks.html')
+
+@app.route('/api/top_volatile_stocks')
+def top_volatile_stocks():
+    """Get top 10 most volatile stocks with volume analysis"""
+    try:
+        # List of major stocks to analyze
+        symbols = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'META', 'TSLA', 'NVDA', 'AMD']
+        
+        results = []
+        for symbol in symbols:
+            try:
+                stock = yf.Ticker(symbol)
+                # Get 1 year of data
+                data = stock.history(period="1y", interval="1d")
+                
+                if not data.empty:
+                    # Calculate volatility (standard deviation of daily returns)
+                    daily_returns = data['Close'].pct_change()
+                    volatility = daily_returns.std() * np.sqrt(252)  # Annualized volatility
+                    
+                    # Calculate volume metrics
+                    current_volume = data['Volume'].iloc[-1]
+                    avg_volume = data['Volume'].mean()
+                    volume_ratio = current_volume / avg_volume if avg_volume > 0 else 0
+                    
+                    # Calculate recent price change
+                    price_change = ((data['Close'].iloc[-1] - data['Close'].iloc[0]) / data['Close'].iloc[0]) * 100
+                    
+                    # Calculate technical indicators
+                    # Moving Averages
+                    data['SMA_20'] = data['Close'].rolling(window=20).mean()
+                    data['SMA_50'] = data['Close'].rolling(window=50).mean()
+                    data['SMA_200'] = data['Close'].rolling(window=200).mean()
+                    
+                    # RSI
+                    delta = data['Close'].diff()
+                    gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+                    loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+                    rs = gain / loss
+                    data['RSI'] = 100 - (100 / (1 + rs))
+                    
+                    # Bollinger Bands
+                    data['BB_middle'] = data['Close'].rolling(window=20).mean()
+                    data['BB_std'] = data['Close'].rolling(window=20).std()
+                    data['BB_upper'] = data['BB_middle'] + (data['BB_std'] * 2)
+                    data['BB_lower'] = data['BB_middle'] - (data['BB_std'] * 2)
+                    
+                    # MACD
+                    exp1 = data['Close'].ewm(span=12, adjust=False).mean()
+                    exp2 = data['Close'].ewm(span=26, adjust=False).mean()
+                    data['MACD'] = exp1 - exp2
+                    data['Signal_Line'] = data['MACD'].ewm(span=9, adjust=False).mean()
+                    
+                    # Stochastic Oscillator
+                    data['Lowest_14'] = data['Low'].rolling(window=14).min()
+                    data['Highest_14'] = data['High'].rolling(window=14).max()
+                    data['%K'] = 100 * ((data['Close'] - data['Lowest_14']) / (data['Highest_14'] - data['Lowest_14']))
+                    data['%D'] = data['%K'].rolling(window=3).mean()
+                    
+                    # ADX (Average Directional Index)
+                    data['+DM'] = data['High'].diff()
+                    data['-DM'] = data['Low'].diff()
+                    data['+DM'] = data['+DM'].where(data['+DM'] > 0, 0)
+                    data['-DM'] = data['-DM'].where(data['-DM'] > 0, 0)
+                    data['TR'] = data['High'] - data['Low']
+                    data['+DI'] = 100 * (data['+DM'].rolling(window=14).mean() / data['TR'].rolling(window=14).mean())
+                    data['-DI'] = 100 * (data['-DM'].rolling(window=14).mean() / data['TR'].rolling(window=14).mean())
+                    data['ADX'] = 100 * abs((data['+DI'] - data['-DI']) / (data['+DI'] + data['-DI'])).rolling(window=14).mean()
+                    
+                    # Get current price and market cap
+                    info = stock.info
+                    current_price = info.get('regularMarketPrice', 0)
+                    market_cap = info.get('marketCap', 0)
+                    
+                    # Get news
+                    news = stock.news
+                    formatted_news = []
+                    for item in news:
+                        formatted_news.append({
+                            'title': item.get('title', ''),
+                            'link': item.get('link', ''),
+                            'publisher': item.get('publisher', ''),
+                            'published': item.get('published', ''),
+                            'summary': item.get('summary', '')
+                        })
+                    
+                    # Format historical data for chart
+                    volume_history = {
+                        'dates': data.index.strftime('%Y-%m-%d').tolist(),
+                        'volumes': data['Volume'].tolist(),
+                        'prices': data['Close'].tolist(),
+                        'sma_20': data['SMA_20'].tolist(),
+                        'sma_50': data['SMA_50'].tolist(),
+                        'sma_200': data['SMA_200'].tolist(),
+                        'bb_upper': data['BB_upper'].tolist(),
+                        'bb_lower': data['BB_lower'].tolist(),
+                        'rsi': data['RSI'].tolist(),
+                        'macd': data['MACD'].tolist(),
+                        'signal_line': data['Signal_Line'].tolist(),
+                        'stochastic_k': data['%K'].tolist(),
+                        'stochastic_d': data['%D'].tolist(),
+                        'adx': data['ADX'].tolist(),
+                        'plus_di': data['+DI'].tolist(),
+                        'minus_di': data['-DI'].tolist()
+                    }
+                    
+                    # Calculate current indicator values
+                    current_indicators = {
+                        'rsi': data['RSI'].iloc[-1],
+                        'macd': data['MACD'].iloc[-1],
+                        'signal_line': data['Signal_Line'].iloc[-1],
+                        'bb_position': (current_price - data['BB_lower'].iloc[-1]) / (data['BB_upper'].iloc[-1] - data['BB_lower'].iloc[-1]) * 100,
+                        'sma_20_position': (current_price - data['SMA_20'].iloc[-1]) / data['SMA_20'].iloc[-1] * 100,
+                        'sma_50_position': (current_price - data['SMA_50'].iloc[-1]) / data['SMA_50'].iloc[-1] * 100,
+                        'sma_200_position': (current_price - data['SMA_200'].iloc[-1]) / data['SMA_200'].iloc[-1] * 100,
+                        'stochastic_k': data['%K'].iloc[-1],
+                        'stochastic_d': data['%D'].iloc[-1],
+                        'adx': data['ADX'].iloc[-1],
+                        'plus_di': data['+DI'].iloc[-1],
+                        'minus_di': data['-DI'].iloc[-1]
+                    }
+                    
+                    results.append({
+                        'symbol': symbol,
+                        'volatility': volatility * 100,  # Convert to percentage
+                        'current_price': current_price,
+                        'price_change': price_change,
+                        'market_cap': market_cap,
+                        'current_volume': current_volume,
+                        'avg_volume': avg_volume,
+                        'volume_ratio': volume_ratio,
+                        'volume_history': volume_history,
+                        'current_indicators': current_indicators,
+                        'news': formatted_news
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error analyzing {symbol}: {str(e)}")
+                continue
+        
+        # Sort by volatility (highest first)
+        results.sort(key=lambda x: x['volatility'], reverse=True)
+        
+        return jsonify({
+            'status': 'success',
+            'stocks': results[:10]  # Return top 10 most volatile
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in volatile stocks analysis: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

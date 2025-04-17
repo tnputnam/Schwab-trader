@@ -21,6 +21,9 @@ class StrategyTester:
         self.trade_history = []
         self.market_timezone = pytz.timezone('America/New_York')
         self.volume_monitoring = {}  # Track volume data for each position
+        self.budget = 0
+        self.active_positions = {}
+        self.running = False
         
     def is_market_open(self) -> bool:
         """Check if the market is currently open"""
@@ -48,7 +51,7 @@ class StrategyTester:
         if not self.is_near_market_close():
             return {'status': 'not_time', 'message': 'Not within 20 minutes of market close'}
             
-        if not self.positions:
+        if not self.active_positions:
             return {'status': 'no_positions', 'message': 'No positions to sell'}
             
         results = {
@@ -57,37 +60,37 @@ class StrategyTester:
             'positions_closed': []
         }
         
-        for symbol, position in list(self.positions.items()):
+        for symbol, position in list(self.active_positions.items()):
             try:
                 # Get current price
                 stock = yf.Ticker(symbol)
                 current_price = stock.history(period='1d')['Close'].iloc[-1]
                 
                 # Calculate profit/loss
-                profit = (current_price - position['average_price']) * position['quantity']
+                profit = (current_price - position['entry_price']) * position['shares']
                 
                 # Record the trade
                 trade = {
-                    'date': datetime.now(),
+                    'type': 'SELL',
                     'symbol': symbol,
-                    'action': 'SELL',
-                    'quantity': position['quantity'],
                     'price': current_price,
+                    'quantity': position['shares'],
+                    'timestamp': datetime.now().isoformat(),
                     'profit': profit
                 }
                 
                 # Update cash balance
-                self.cash_balance += position['quantity'] * current_price
+                self.cash_balance += position['shares'] * current_price
                 
                 # Remove position
-                del self.positions[symbol]
+                del self.active_positions[symbol]
                 
                 # Record results
                 results['trades'].append(trade)
                 results['total_profit'] += profit
                 results['positions_closed'].append(symbol)
                 
-                logger.info(f"Auto-sold {symbol}: {position['quantity']} shares at ${current_price:.2f}")
+                logger.info(f"Auto-sold {symbol}: {position['shares']} shares at ${current_price:.2f}")
                 
             except Exception as e:
                 logger.error(f"Error auto-selling {symbol}: {str(e)}")
@@ -147,7 +150,10 @@ class StrategyTester:
         """
         import time
         
-        while True:
+        self.running = True
+        logger.info(f"Starting auto trading with strategy {strategy.__name__} on symbols {symbols}")
+        
+        while self.running:
             try:
                 # Check if market is open
                 if not self.is_market_open():
@@ -248,6 +254,12 @@ class StrategyTester:
         data['BB_std'] = data['Close'].rolling(window=20).std()
         data['BB_upper'] = data['BB_middle'] + (data['BB_std'] * 2)
         data['BB_lower'] = data['BB_middle'] - (data['BB_std'] * 2)
+        
+        # MACD
+        exp1 = data['Close'].ewm(span=12, adjust=False).mean()
+        exp2 = data['Close'].ewm(span=26, adjust=False).mean()
+        data['MACD'] = exp1 - exp2
+        data['Signal_Line'] = data['MACD'].ewm(span=9, adjust=False).mean()
         
         return data
     
@@ -418,4 +430,31 @@ class StrategyTester:
         results['positions'] = self.positions
         results['cash_balance'] = self.cash_balance
         
-        return results 
+        return results
+
+    def set_budget(self, budget):
+        """Set the trading budget"""
+        self.budget = budget
+        logger.info(f"Set trading budget to ${budget}")
+        
+    def get_current_balance(self):
+        """Get current account balance including positions"""
+        total_value = self.cash_balance
+        
+        for symbol, position in self.active_positions.items():
+            try:
+                stock = yf.Ticker(symbol)
+                current_price = stock.info.get('regularMarketPrice', 0)
+                total_value += position['shares'] * current_price
+            except Exception as e:
+                logger.error(f"Error getting current price for {symbol}: {str(e)}")
+                
+        return total_value
+        
+    def get_active_positions(self):
+        """Get current active positions"""
+        return self.active_positions
+        
+    def get_trade_history(self):
+        """Get trade history"""
+        return self.trade_history 
