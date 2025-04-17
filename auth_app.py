@@ -91,65 +91,71 @@ def callback():
         client_correlid = token_response.headers.get('Schwab-Client-Correlid')
         if not client_correlid:
             # Try to get it from the token response body
-            client_correlid = token_data.get('jti', '')
+            client_correlid = token_data.get('client_correlid', '')
         
         logger.debug(f"Client correlation ID: {client_correlid}")
         
         # API headers for subsequent requests
         api_headers = {
-            'Accept': '*/*',
+            'Accept': 'application/json',
             'Authorization': f"Bearer {token_data['access_token']}",
             'X-Authorization': f"Bearer {token_data['access_token']}",
             'Schwab-Client-Correlid': client_correlid,
             'Origin': REDIRECT_URI.rsplit('/', 1)[0],
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
         }
         
-        # First get the account hash value
+        # First get the accounts list
         accounts_response = requests.get(
-            'https://api.schwabapi.com/trader/v1/accounts/accountNumbers',
-            headers=api_headers
+            'https://api.schwabapi.com/v1/accounts',
+            headers=api_headers,
+            params={'fields': 'positions,balances'},
+            verify=True
         )
-        logger.debug(f"Account numbers response: {accounts_response.status_code}")
+        logger.debug(f"Accounts response status: {accounts_response.status_code}")
+        logger.debug(f"Accounts response headers: {dict(accounts_response.headers)}")
+        logger.debug(f"Accounts response body: {accounts_response.text}")
         
         if accounts_response.status_code == 200:
             accounts_data = accounts_response.json()
             logger.debug(f"Accounts data: {accounts_data}")
             
-            # Get the hash value for the account
-            account_hash = None
-            for account in accounts_data:
-                if '400' in str(account.get('accountNumber', '')):
-                    account_hash = account.get('hashValue')
-                    break
+            # Try to get positions and portfolio for each account
+            results = []
+            for account in accounts_data.get('accounts', []):
+                account_id = account.get('accountId')
+                if account_id:
+                    # Get positions
+                    positions_response = requests.get(
+                        f'https://api.schwabapi.com/v1/accounts/{account_id}/positions',
+                        headers=api_headers
+                    )
+                    logger.debug(f"Positions response for {account_id}: {positions_response.status_code}")
+                    
+                    # Get portfolio
+                    portfolio_response = requests.get(
+                        f'https://api.schwabapi.com/v1/accounts/{account_id}/portfolio',
+                        headers=api_headers
+                    )
+                    logger.debug(f"Portfolio response for {account_id}: {portfolio_response.status_code}")
+                    
+                    results.append({
+                        'account_id': account_id,
+                        'positions': positions_response.json() if positions_response.status_code == 200 else None,
+                        'portfolio': portfolio_response.json() if portfolio_response.status_code == 200 else None
+                    })
             
-            if account_hash:
-                # Try to get positions using the hash value
-                positions_response = requests.get(
-                    f'https://api.schwabapi.com/trader/v1/accounts/{account_hash}/positions',
-                    headers=api_headers
-                )
-                logger.debug(f"Positions response: {positions_response.status_code}")
-                
-                # Try to get portfolio using the hash value
-                portfolio_response = requests.get(
-                    f'https://api.schwabapi.com/trader/v1/accounts/{account_hash}/portfolio',
-                    headers=api_headers
-                )
-                logger.debug(f"Portfolio response: {portfolio_response.status_code}")
-                
-                return jsonify({
-                    "success": True,
-                    "message": "Successfully authenticated with Schwab",
-                    "account_hash": account_hash,
-                    "positions": positions_response.json() if positions_response.status_code == 200 else None,
-                    "portfolio": portfolio_response.json() if portfolio_response.status_code == 200 else None,
-                    "debug_info": {
-                        "client_correlid": client_correlid,
-                        "headers_used": api_headers,
-                        "accounts_data": accounts_data
-                    }
-                })
+            return jsonify({
+                "success": True,
+                "message": "Successfully authenticated with Schwab",
+                "accounts": accounts_data,
+                "results": results,
+                "debug_info": {
+                    "client_correlid": client_correlid,
+                    "headers_used": api_headers
+                }
+            })
         
         # If we get here, return error information
         return jsonify({
