@@ -26,7 +26,10 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, 
+    template_folder='schwab_trader/templates',
+    static_folder='schwab_trader/static'
+)
 CORS(app)
 app.secret_key = 'your-secret-key-here'
 
