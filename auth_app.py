@@ -21,8 +21,8 @@ REDIRECT_URI = "https://fff5-2605-59c8-7260-b910-e13a-f44a-223d-42b6.ngrok-free.
 AUTHORIZATION_BASE_URL = "https://api.schwabapi.com/v1/oauth/authorize"
 TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
 
-# Updated scope to match Swagger UI
-SCOPES = ["readonly"]  # Using only the readonly scope as shown in Swagger
+# Updated scope to match Schwab's API
+SCOPES = ["api"]  # Using the api scope as returned by the token endpoint
 
 @app.route('/')
 def index():
@@ -42,10 +42,7 @@ def login():
         redirect_uri=REDIRECT_URI,
         scope=SCOPES
     )
-    authorization_url, state = schwab.authorization_url(
-        AUTHORIZATION_BASE_URL,
-        response_type="code"  # Explicitly setting response_type
-    )
+    authorization_url, state = schwab.authorization_url(AUTHORIZATION_BASE_URL)
     
     logger.debug(f"Generated Authorization URL: {authorization_url}")
     
@@ -75,12 +72,60 @@ def callback():
         session['oauth_token'] = token
         
         # Test the token by getting account information
-        accounts_response = schwab.get('https://api.schwabapi.com/v1/accounts')
+        accounts_response = schwab.get('https://api.schwabapi.com/v1/accounts/accountNumbers', headers={
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {token["access_token"]}',
+            'X-Authorization': f'Bearer {token["access_token"]}',
+            'Schwab-Client-Correlid': 'test-123'
+        })
+        
+        if accounts_response.status_code == 200:
+            account_numbers = accounts_response.json()
+            # Get detailed information for each account
+            detailed_accounts = []
+            for account_number in account_numbers:
+                account_detail = schwab.get(
+                    f'https://api.schwabapi.com/v1/accounts/{account_number}',
+                    headers={
+                        'Accept': 'application/json',
+                        'Authorization': f'Bearer {token["access_token"]}',
+                        'X-Authorization': f'Bearer {token["access_token"]}',
+                        'Schwab-Client-Correlid': 'test-123'
+                    }
+                )
+                if account_detail.status_code == 200:
+                    detailed_accounts.append(account_detail.json())
+            
+            return jsonify({
+                "success": True,
+                "message": "Successfully authenticated with Schwab",
+                "accounts": detailed_accounts
+            })
+        
+        # If the first attempt fails, try the accounts endpoint
+        accounts_response = schwab.get('https://api.schwabapi.com/v1/accounts', headers={
+            'Accept': 'application/json',
+            'Authorization': f'Bearer {token["access_token"]}',
+            'X-Authorization': f'Bearer {token["access_token"]}',
+            'Schwab-Client-Correlid': 'test-123'
+        })
+        
+        if accounts_response.status_code == 200:
+            return jsonify({
+                "success": True,
+                "message": "Successfully authenticated with Schwab",
+                "accounts": accounts_response.json()
+            })
         
         return jsonify({
             "success": True,
             "message": "Successfully authenticated with Schwab",
-            "accounts": accounts_response.json()
+            "accounts": {
+                "error": "Could not retrieve accounts",
+                "status_code": accounts_response.status_code,
+                "response": accounts_response.json(),
+                "headers": dict(accounts_response.headers)
+            }
         })
         
     except Exception as e:
