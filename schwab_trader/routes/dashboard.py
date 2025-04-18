@@ -5,8 +5,6 @@ import logging
 import os
 import requests
 from schwab_trader.services.alpha_vantage import AlphaVantageAPI
-from schwab_trader.utils.schwab_oauth import SchwabOAuth
-from types import SimpleNamespace
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -24,10 +22,10 @@ alpha_vantage = AlphaVantageAPI()
 def index():
     """Dashboard page."""
     try:
-        return render_template('dashboard.html')
+        return render_template('market_dashboard.html')
     except Exception as e:
         logger.error(f"Error in dashboard route: {str(e)}")
-        return render_template('dashboard.html')
+        return render_template('market_dashboard.html')
 
 @bp.route('/portfolio')
 def portfolio():

@@ -10,7 +10,8 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 # Import blueprints
-from . import root, news, strategies, compare, portfolio, dashboard
-from .auth import bp
+from . import root, news, strategies, compare, portfolio, analysis, alerts, watchlist
+from .dashboard import bp as dashboard
+from .auth import bp as auth
 
-__all__ = ['root', 'news', 'strategies', 'compare', 'portfolio', 'dashboard', 'bp'] 
+__all__ = ['root', 'news', 'strategies', 'compare', 'portfolio', 'analysis', 'alerts', 'watchlist', 'dashboard', 'auth'] 

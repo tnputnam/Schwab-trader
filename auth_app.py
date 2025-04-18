@@ -120,7 +120,7 @@ def schwab_logout():
     """Log out from Schwab."""
     session.pop('schwab_token', None)
     session.pop('schwab_accounts', None)
-    return redirect(url_for('index'))
+    return redirect(url_for('root.index'))
 
 # WebSocket event handlers
 @socketio.on('connect')

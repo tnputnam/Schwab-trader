@@ -52,7 +52,7 @@ def create_app(test_config=None):
     from schwab_trader.routes import (
         root, news, strategies, compare, 
         portfolio, dashboard, analysis, 
-        alerts, watchlist, bp
+        alerts, watchlist, auth
     )
     app.register_blueprint(root.bp)
     app.register_blueprint(news.bp)
@@ -63,7 +63,7 @@ def create_app(test_config=None):
     app.register_blueprint(analysis.bp)
     app.register_blueprint(alerts.bp)
     app.register_blueprint(watchlist.bp)
-    app.register_blueprint(bp)
+    app.register_blueprint(auth)
     
     # Add custom Jinja2 filters
     @app.template_filter('format_number')

@@ -197,6 +197,15 @@
 
 {% block content %}
 <div class="dashboard-container">
+    {% if not alpha_vantage_available %}
+    <div class="alert alert-warning" role="alert">
+        <h4 class="alert-heading">Alpha Vantage API Not Configured</h4>
+        <p>To use the technical analysis features, please set the ALPHA_VANTAGE_API_KEY environment variable.</p>
+        <hr>
+        <p class="mb-0">You can still view the dashboard, but real-time data and analysis features will be limited.</p>
+    </div>
+    {% endif %}
+
     {{ components.tab_navigation([
         {'id': 'volume', 'label': 'Volume Analysis'},
         {'id': 'volatility', 'label': 'Volatility Analysis'},
