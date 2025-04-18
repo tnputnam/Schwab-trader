@@ -21,7 +21,7 @@ logger.setLevel(logging.INFO)
 # Initialize Alpha Vantage API
 alpha_vantage = AlphaVantageAPI()
 
-@bp.route('/dashboard')
+@bp.route('/')
 def index():
     """Dashboard page."""
     try:

@@ -72,43 +72,38 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/"><i class="bi bi-house-door"></i> Home</a>
+                        <a class="nav-link" href="{{ url_for('root.index') }}"><i class="bi bi-house-door"></i> Home</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/dashboard"><i class="bi bi-speedometer2"></i> Dashboard</a>
+                        <a class="nav-link" href="{{ url_for('dashboard.index') }}"><i class="bi bi-speedometer2"></i> Dashboard</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/portfolio"><i class="bi bi-wallet2"></i> Portfolio</a>
+                        <a class="nav-link" href="{{ url_for('dashboard.portfolio') }}"><i class="bi bi-wallet2"></i> Portfolio</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/watchlist"><i class="bi bi-list-stars"></i> Watchlist</a>
+                        <a class="nav-link" href="{{ url_for('analysis.trading') }}"><i class="bi bi-currency-exchange"></i> Trading</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/alerts"><i class="bi bi-bell"></i> Alerts</a>
+                        <a class="nav-link" href="{{ url_for('analysis.news') }}"><i class="bi bi-newspaper"></i> News</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/strategies"><i class="bi bi-graph-up"></i> Strategies</a>
+                        <a class="nav-link" href="{{ url_for('analysis.compare') }}"><i class="bi bi-graph-up-arrow"></i> Compare</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/trading"><i class="bi bi-currency-exchange"></i> Trading</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/news"><i class="bi bi-newspaper"></i> News</a>
+                        <a class="nav-link" href="{{ url_for('analysis.volume_analysis') }}"><i class="bi bi-bar-chart"></i> Volume Analysis</a>
                     </li>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle" href="#" id="settingsDropdown" role="button" data-bs-toggle="dropdown">
                             <i class="bi bi-gear"></i> Settings
                         </a>
                         <ul class="dropdown-menu" aria-labelledby="settingsDropdown">
-                            <li><a class="dropdown-item" href="/settings"><i class="bi bi-gear"></i> General Settings</a></li>
-                            <li><a class="dropdown-item" href="/settings/api"><i class="bi bi-key"></i> API Settings</a></li>
                             <li><a class="dropdown-item" href="/test/alpha_vantage"><i class="bi bi-tools"></i> Alpha Vantage Test</a></li>
                         </ul>
                     </li>
                 </ul>
                 <ul class="navbar-nav">
                     <li class="nav-item">
-                        <a class="nav-link" href="/logout"><i class="bi bi-box-arrow-right"></i> Logout</a>
+                        <a class="nav-link" href="{{ url_for('auth.logout') }}"><i class="bi bi-box-arrow-right"></i> Logout</a>
                     </li>
                 </ul>
             </div>

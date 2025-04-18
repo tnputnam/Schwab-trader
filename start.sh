@@ -72,6 +72,7 @@ pip install Flask==2.2.5 \
     yfinance==0.2.31 \
     python-dotenv==1.0.0 \
     requests==2.31.0 \
+    requests_oauthlib==1.3.1 \
     sqlalchemy==2.0.23
 
 # Check for config file
