@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Schwab Trader - News{% endblock %}
+
+{% block extra_css %}
+<style>
+    .news-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .news-section {
+        background: white;
+        border-radius: 10px;
+        padding: 25px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        margin-bottom: 30px;
+    }
+
+    .news-section h2 {
+        color: #1a237e;
+        margin-bottom: 20px;
+        font-size: 1.5rem;
+    }
+
+    .news-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+    }
+
+    .news-card {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .news-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .news-card h3 {
+        color: #1a237e;
+        margin-bottom: 10px;
+        font-size: 1.2rem;
+    }
+
+    .news-card p {
+        color: #666;
+        margin-bottom: 15px;
+        font-size: 0.9rem;
+    }
+
+    .news-meta {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.8rem;
+        color: #999;
+    }
+
+    .news-source {
+        font-weight: 500;
+    }
+
+    .news-time {
+        font-style: italic;
+    }
+
+    @media (max-width: 768px) {
+        .news-container {
+            padding: 15px;
+        }
+
+        .news-section {
+            padding: 20px;
+        }
+
+        .news-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="news-container">
+    <div class="news-section">
+        <h2>Market News</h2>
+        <div class="news-grid" id="market-news">
+            <!-- Market news will be populated by JavaScript -->
+        </div>
+    </div>
+
+    <div class="news-section">
+        <h2>Business Headlines</h2>
+        <div class="news-grid" id="business-headlines">
+            <!-- Business headlines will be populated by JavaScript -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Function to format news items
+    function createNewsCard(news) {
+        const card = document.createElement('div');
+        card.className = 'news-card';
+        
+        const title = document.createElement('h3');
+        title.textContent = news.title;
+        
+        const description = document.createElement('p');
+        description.textContent = news.description;
+        
+        const meta = document.createElement('div');
+        meta.className = 'news-meta';
+        
+        const source = document.createElement('span');
+        source.className = 'news-source';
+        source.textContent = news.source;
+        
+        const time = document.createElement('span');
+        time.className = 'news-time';
+        time.textContent = new Date(news.published_at).toLocaleString();
+        
+        meta.appendChild(source);
+        meta.appendChild(time);
+        
+        card.appendChild(title);
+        card.appendChild(description);
+        card.appendChild(meta);
+        
+        return card;
+    }
+
+    // Function to update market news
+    async function updateMarketNews() {
+        try {
+            const response = await fetch('/news/market-news');
+            const news = await response.json();
+            const container = document.getElementById('market-news');
+            container.innerHTML = '';
+            
+            news.forEach(item => {
+                container.appendChild(createNewsCard(item));
+            });
+        } catch (error) {
+            console.error('Error updating market news:', error);
+        }
+    }
+
+    // Function to update business headlines
+    async function updateHeadlines() {
+        try {
+            const response = await fetch('/news/headlines');
+            const headlines = await response.json();
+            const container = document.getElementById('business-headlines');
+            container.innerHTML = '';
+            
+            headlines.forEach(item => {
+                container.appendChild(createNewsCard(item));
+            });
+        } catch (error) {
+            console.error('Error updating headlines:', error);
+        }
+    }
+
+    // Initial data load
+    updateMarketNews();
+    updateHeadlines();
+
+    // Set up periodic updates
+    setInterval(updateMarketNews, 300000); // Update every 5 minutes
+    setInterval(updateHeadlines, 300000); // Update every 5 minutes
+</script>
+{% endblock %} 

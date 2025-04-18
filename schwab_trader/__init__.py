@@ -59,7 +59,7 @@ def create_app(test_config=None):
     app.register_blueprint(strategies.bp)
     app.register_blueprint(compare.bp)
     app.register_blueprint(portfolio.bp)
-    app.register_blueprint(dashboard.bp)
+    app.register_blueprint(dashboard)
     app.register_blueprint(analysis.bp)
     app.register_blueprint(alerts.bp)
     app.register_blueprint(watchlist.bp)
