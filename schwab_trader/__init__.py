@@ -36,6 +36,18 @@ def create_app(test_config=None):
     init_db(app)
     cache.init_app(app)
     
+    # Configure logging
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    file_handler = logging.FileHandler('logs/app_{}.log'.format(datetime.now().strftime('%Y%m%d')))
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+    ))
+    file_handler.setLevel(logging.INFO)
+    app.logger.addHandler(file_handler)
+    app.logger.setLevel(logging.INFO)
+    
     # Register blueprints
     from schwab_trader.routes import (
         root, news, strategies, compare, 
@@ -52,6 +64,15 @@ def create_app(test_config=None):
     app.register_blueprint(alerts.bp)
     app.register_blueprint(watchlist.bp)
     app.register_blueprint(bp)
+    
+    # Add custom Jinja2 filters
+    @app.template_filter('format_number')
+    def format_number(value):
+        """Format a number with commas and 2 decimal places."""
+        try:
+            return "{:,.2f}".format(float(value))
+        except (ValueError, TypeError):
+            return value
     
     logger.info('Schwab Trader startup')
     return app

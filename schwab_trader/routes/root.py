@@ -15,8 +15,6 @@ logger.setLevel(logging.INFO)
 def index():
     """Main landing page."""
     try:
-        if 'schwab_token' in session:
-            return redirect(url_for('dashboard.index'))
         return render_template('index.html')
     except Exception as e:
         logger.error(f"Error in index route: {str(e)}")

@@ -97,7 +97,7 @@ def schwab_callback():
             accounts = schwab.get_accounts()
             if accounts:
                 session['schwab_accounts'] = accounts
-                return redirect(url_for('dashboard'))
+                return redirect(url_for('dashboard.index'))
             else:
                 return jsonify({
                     'status': 'error',
@@ -170,7 +170,7 @@ def index():
 @app.route('/login')
 def login():
     """Automatically redirect to dashboard"""
-    return redirect(url_for('dashboard'))
+    return redirect(url_for('dashboard.index'))
 
 @app.route('/dashboard')
 def dashboard():

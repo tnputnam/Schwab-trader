@@ -7,7 +7,6 @@ import requests
 from schwab_trader.services.alpha_vantage import AlphaVantageAPI
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
 from types import SimpleNamespace
-from schwab_trader.services.schwab_api import SchwabAPI
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -25,29 +24,23 @@ alpha_vantage = AlphaVantageAPI()
 def index():
     """Dashboard page."""
     try:
-        if 'schwab_token' not in session:
-            return redirect(url_for('root.login'))
         return render_template('dashboard.html')
     except Exception as e:
         logger.error(f"Error in dashboard route: {str(e)}")
-        return redirect(url_for('root.login'))
+        return render_template('dashboard.html')
 
 @bp.route('/portfolio')
 def portfolio():
     """Portfolio page."""
     try:
-        if 'schwab_token' not in session:
-            return redirect(url_for('root.login'))
         return render_template('portfolio.html')
     except Exception as e:
         logger.error(f"Error in portfolio route: {str(e)}")
-        return redirect(url_for('root.login'))
+        return render_template('portfolio.html')
 
 @bp.route('/trading')
 def trading():
     """Display the trading dashboard."""
-    if 'schwab_token' not in session:
-        return redirect(url_for('auth.schwab_auth'))
     return render_template('trading_dashboard.html')
 
 @bp.route('/volume_analysis')
@@ -59,9 +52,6 @@ def volume_analysis():
 def paper_trade():
     """Handle paper trading requests."""
     try:
-        if 'schwab_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-        
         data = request.get_json()
         if not data:
             return jsonify({'error': 'No data provided'}), 400
@@ -78,9 +68,6 @@ def paper_trade():
 def search_symbols():
     """Search for stock symbols."""
     try:
-        if 'schwab_token' not in session:
-            return jsonify({'error': 'Not authenticated'}), 401
-            
         data = request.get_json()
         if not data or 'query' not in data:
             return jsonify({'error': 'No search query provided'}), 400

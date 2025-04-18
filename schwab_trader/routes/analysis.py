@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify
+from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash
 import logging
 from datetime import datetime
 from schwab_trader.services.alpha_vantage import AlphaVantageAPI
@@ -16,45 +16,41 @@ logger.setLevel(logging.INFO)
 def news():
     """News analysis page."""
     try:
-        if 'schwab_token' not in session:
-            return redirect(url_for('root.login'))
-        return render_template('news.html')
+        return render_template('analysis_dashboard.html')
     except Exception as e:
         logger.error(f"Error in news route: {str(e)}")
-        return redirect(url_for('root.login'))
+        flash(f"Error loading news page: {str(e)}", "error")
+        return render_template('analysis_dashboard.html')
 
 @bp.route('/trading')
 def trading():
     """Trading analysis page."""
     try:
-        if 'schwab_token' not in session:
-            return redirect(url_for('root.login'))
-        return render_template('trading.html')
+        return render_template('trading_dashboard.html')
     except Exception as e:
         logger.error(f"Error in trading route: {str(e)}")
-        return redirect(url_for('root.login'))
+        flash(f"Error loading trading page: {str(e)}", "error")
+        return render_template('trading_dashboard.html')
 
 @bp.route('/compare')
 def compare():
     """Stock comparison page."""
     try:
-        if 'schwab_token' not in session:
-            return redirect(url_for('root.login'))
         return render_template('compare.html')
     except Exception as e:
         logger.error(f"Error in compare route: {str(e)}")
-        return redirect(url_for('root.login'))
+        flash(f"Error loading comparison page: {str(e)}", "error")
+        return render_template('compare.html')
 
 @bp.route('/volume_analysis')
 def volume_analysis():
     """Volume analysis page."""
     try:
-        if 'schwab_token' not in session:
-            return redirect(url_for('root.login'))
-        return render_template('volume_analysis.html')
+        return render_template('tesla_dashboard.html')
     except Exception as e:
         logger.error(f"Error in volume_analysis route: {str(e)}")
-        return redirect(url_for('root.login'))
+        flash(f"Error loading volume analysis page: {str(e)}", "error")
+        return render_template('tesla_dashboard.html')
 
 @bp.route('/api/test_alpha_vantage', methods=['POST'])
 def test_alpha_vantage():
