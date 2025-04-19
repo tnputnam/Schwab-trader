@@ -104,8 +104,15 @@ class TokenManager:
         return self.token
 
 # Create a singleton instance
-_token_manager = TokenManager()
+_token_manager = None
 
 def get_schwab_token():
     """Get the current Schwab API token."""
+    global _token_manager
+    if _token_manager is None:
+        try:
+            _token_manager = TokenManager()
+        except Exception as e:
+            logger.error(f"Error initializing token manager: {str(e)}")
+            return None
     return _token_manager.get_token() 
