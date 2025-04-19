@@ -26,23 +26,47 @@ import time
 import asyncio
 from typing import List
 from types import SimpleNamespace
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)  # Changed to DEBUG level
 logger = logging.getLogger(__name__)
+
+# Debug print environment variables
+logger.debug("Environment Variables:")
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
+            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES']:
+    logger.debug(f"{key}: {os.getenv(key)}")
 
 app = Flask(__name__, 
     template_folder='schwab_trader/templates',
     static_folder='schwab_trader/static'
 )
 CORS(app)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev_key_123')
 
-# Load configuration
-app.config.from_object('schwab_trader.config.Config')
+# Load configuration from environment variables
+app.config.update(
+    SECRET_KEY=os.getenv('FLASK_SECRET_KEY', 'dev_key_123'),
+    SCHWAB_CLIENT_ID=os.getenv('SCHWAB_CLIENT_ID'),
+    SCHWAB_CLIENT_SECRET=os.getenv('SCHWAB_CLIENT_SECRET'),
+    SCHWAB_REDIRECT_URI=os.getenv('SCHWAB_REDIRECT_URI'),
+    SCHWAB_AUTH_URL=os.getenv('SCHWAB_AUTH_URL'),
+    SCHWAB_TOKEN_URL=os.getenv('SCHWAB_TOKEN_URL'),
+    SCHWAB_SCOPES=os.getenv('SCHWAB_SCOPES'),
+    SCHWAB_API_BASE_URL=os.getenv('SCHWAB_API_BASE_URL', 'https://api.schwab.com')
+)
+
+# Debug print Flask config
+logger.debug("\nFlask Configuration:")
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
+            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES']:
+    logger.debug(f"{key}: {app.config.get(key)}")
 
 # Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///schwab_trader.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///schwab_trader.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 migrate = Migrate(app, db)
@@ -68,15 +92,23 @@ manager = ConnectionManager()
 
 def get_schwab_oauth():
     """Get an instance of SchwabOAuth."""
-    return SchwabOAuth()
+    try:
+        schwab = SchwabOAuth()
+        logger.debug("SchwabOAuth instance created successfully")
+        return schwab
+    except Exception as e:
+        logger.error(f"Error creating SchwabOAuth instance: {str(e)}")
+        raise
 
 # Schwab OAuth routes
 @app.route('/auth/schwab')
 def schwab_auth():
     """Start the Schwab OAuth flow."""
     try:
+        logger.debug("Starting Schwab auth flow")
         schwab = get_schwab_oauth()
         auth_url = schwab.get_authorization_url()
+        logger.debug(f"Auth URL: {auth_url}")
         return redirect(auth_url)
     except Exception as e:
         logger.error(f"Error starting Schwab auth: {str(e)}")
