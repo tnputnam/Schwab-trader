@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="text-center">Schwab Authorization</h3>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-info">
+                        <h4 class="alert-heading">Instructions:</h4>
+                        <ol>
+                            <li>Click the button below to open Schwab's authorization page in a new tab</li>
+                            <li>Log in to your Schwab account in the new tab</li>
+                            <li>Authorize the application</li>
+                            <li>You will be redirected back to this application automatically</li>
+                        </ol>
+                    </div>
+                    
+                    <div class="text-center mt-4">
+                        <button id="authButton" class="btn btn-primary btn-lg">
+                            Open Schwab Authorization
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('authButton').addEventListener('click', async function() {
+    try {
+        // Get the authorization URL from the server
+        const response = await fetch('/auth/schwab');
+        const data = await response.json();
+        
+        if (data.status === 'success') {
+            // Open the authorization URL in a new tab
+            window.open(data.auth_url, '_blank');
+        } else {
+            alert('Error: ' + data.message);
+        }
+    } catch (error) {
+        alert('Error: ' + error.message);
+    }
+});
+</script>
+{% endblock %} 

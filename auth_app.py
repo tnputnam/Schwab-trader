@@ -121,13 +121,23 @@ def schwab_auth():
         schwab = get_schwab_oauth()
         auth_url = schwab.get_authorization_url()
         logger.debug(f"Auth URL: {auth_url}")
-        return redirect(auth_url)
+        
+        # Return the URL instead of redirecting
+        return jsonify({
+            'status': 'success',
+            'auth_url': auth_url
+        })
     except Exception as e:
         logger.error(f"Error starting Schwab auth: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)
         }), 500
+
+@app.route('/auth/manual')
+def manual_auth():
+    """Display a page with instructions for manual authorization."""
+    return render_template('manual_auth.html')
 
 @app.route('/auth/callback')
 def schwab_callback():
@@ -223,7 +233,7 @@ def login():
 def analysis():
     """Display the analysis dashboard page"""
     if 'schwab_token' not in session:
-        return redirect(url_for('schwab_auth'))
+        return redirect(url_for('manual_auth'))
     return render_template('analysis_dashboard.html')
 
 @app.route('/trading')
