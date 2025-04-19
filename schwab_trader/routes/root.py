@@ -1,15 +1,9 @@
-from flask import Blueprint, render_template, redirect, url_for, session
-import logging
+from flask import Blueprint, render_template, redirect, url_for, session, jsonify, request
 from datetime import datetime
+from schwab_trader.services.logging_service import LoggingService
 
 bp = Blueprint('root', __name__)
-
-# Configure logging
-logger = logging.getLogger('root_routes')
-handler = logging.FileHandler('logs/root_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = LoggingService()
 
 @bp.route('/')
 def index():

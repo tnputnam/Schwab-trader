@@ -1,11 +1,11 @@
 import yfinance as yf
-import logging
+from schwab_trader.services.logging_service import LoggingService
 from datetime import datetime, timedelta
 from typing import List, Dict, Any
 
 class YFinanceAPI:
     def __init__(self):
-        self.logger = logging.getLogger(__name__)
+        self.logger = LoggingService()
         # Configure yfinance to use a proxy if needed
         yf.set_tz_cache_location("yfinance_cache")
 

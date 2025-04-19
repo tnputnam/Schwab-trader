@@ -17,11 +17,12 @@ from schwab_trader.utils.logging_utils import get_logger
 from schwab_trader.services.news_service import NewsService
 from schwab_trader.services.auth_service import AuthService
 from flask_login import login_required, current_user
+from schwab_trader.services.logging_service import LoggingService
 
 bp = Blueprint('news', __name__, url_prefix='/news')
+logger = LoggingService()
 
 # Configure route-specific logger
-logger = logging.getLogger('news_routes')
 handler = logging.FileHandler('logs/api_{}.log'.format(datetime.now().strftime('%Y%m%d')))
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)

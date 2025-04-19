@@ -3,18 +3,12 @@ from flask_login import login_required
 import pandas as pd
 import os
 from datetime import datetime
-import logging
+from schwab_trader.services.logging_service import LoggingService
 from schwab_trader.models import db, Portfolio, Position
 from collections import defaultdict
 
 bp = Blueprint('portfolio', __name__, url_prefix='/portfolio')
-
-# Configure logging
-logger = logging.getLogger('portfolio_routes')
-handler = logging.FileHandler('logs/portfolio_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = LoggingService()
 
 @bp.route('/')
 def view():

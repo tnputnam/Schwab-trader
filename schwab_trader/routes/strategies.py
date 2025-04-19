@@ -1,15 +1,9 @@
-from flask import Blueprint, render_template, jsonify
-import logging
+from flask import Blueprint, render_template, jsonify, request
 from datetime import datetime
+from schwab_trader.services.logging_service import LoggingService
 
 bp = Blueprint('strategies', __name__, url_prefix='/strategies')
-
-# Configure route-specific logger
-logger = logging.getLogger('strategies_routes')
-handler = logging.FileHandler('logs/api_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = LoggingService()
 
 @bp.route('/')
 def index():

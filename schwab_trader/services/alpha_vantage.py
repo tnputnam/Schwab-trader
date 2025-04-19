@@ -1,15 +1,14 @@
 import os
 import requests
 from typing import Dict, List, Optional, Any
-import logging
+from schwab_trader.services.logging_service import LoggingService
 from datetime import datetime
 
-logger = logging.getLogger(__name__)
+logger = LoggingService()
 
 class AlphaVantageAPI:
     def __init__(self):
         self.api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-        self.logger = logging.getLogger(__name__)
         logger.info("Initializing AlphaVantageAPI...")
         if not self.api_key:
             logger.error("ALPHA_VANTAGE_API_KEY environment variable not set")
@@ -121,12 +120,12 @@ class AlphaVantageAPI:
             
             response = requests.get(url)
             if response.status_code != 200:
-                self.logger.error(f"Error getting data from Alpha Vantage: {response.status_code}")
+                logger.error(f"Error getting data from Alpha Vantage: {response.status_code}")
                 return []
             
             data = response.json()
             if 'Time Series (Daily)' not in data:
-                self.logger.error(f"No data returned from Alpha Vantage for {symbol}")
+                logger.error(f"No data returned from Alpha Vantage for {symbol}")
                 return []
             
             # Convert data to list of dictionaries
@@ -148,9 +147,9 @@ class AlphaVantageAPI:
             # Sort by date
             result.sort(key=lambda x: x['date'])
             
-            self.logger.info(f"Retrieved {len(result)} data points from Alpha Vantage for {symbol}")
+            logger.info(f"Retrieved {len(result)} data points from Alpha Vantage for {symbol}")
             return result
             
         except Exception as e:
-            self.logger.error(f"Error getting historical data from Alpha Vantage for {symbol}: {str(e)}")
+            logger.error(f"Error getting historical data from Alpha Vantage for {symbol}: {str(e)}")
             return [] 

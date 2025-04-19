@@ -4,15 +4,18 @@ from datetime import datetime, timedelta
 from schwab_trader.services.schwab_api import SchwabAPI
 import statistics
 import os
+from schwab_trader.services.volume_analysis import VolumeAnalysisService
+from schwab_trader.services.logging_service import LoggingService
+import pandas as pd
+from schwab_trader.services.strategy_tester import StrategyTester
 
-bp = Blueprint('analysis', __name__)
+bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 
 # Configure logging
-logger = logging.getLogger('analysis_routes')
-handler = logging.FileHandler('logs/analysis_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = LoggingService()
+volume_analysis = VolumeAnalysisService()
+schwab_api = SchwabAPI()
+strategy_tester = StrategyTester()
 
 def get_alpha_vantage():
     """Get Alpha Vantage API instance or None if not configured."""
@@ -181,110 +184,175 @@ def compare():
         flash(f"Error loading comparison page: {str(e)}", "error")
         return render_template('compare.html', alpha_vantage_available=False)
 
-@bp.route('/volume_analysis')
+@bp.route('/volume-analysis')
 def volume_analysis():
-    """Volume analysis page."""
+    """Render the volume analysis page with data for multiple stocks."""
     try:
-        logger.info("Starting volume analysis...")
-        try:
-            schwab_api = SchwabAPI()
-        except ValueError as e:
-            logger.error("Schwab API not configured")
-            return render_template('analysis_dashboard.html', 
-                                alpha_vantage_available=False,
-                                error="Please log in to access market data",
-                                stock_data={},
-                                simulation_results={},
-                                active_tab='volume')
+        # Get timeframe from request or default to 1 year
+        timeframe = request.args.get('timeframe', '1y')
+        timeframe_map = {
+            '1m': 30,
+            '3m': 90,
+            '6m': 180,
+            '1y': 365,
+            '2y': 730,
+            '5y': 1825
+        }
+        days = timeframe_map.get(timeframe, 365)
         
-        logger.info("Schwab API configured successfully")
-        # Define stocks to analyze
-        stocks = ['TSLA', 'NVDA', 'AAPL']
+        # Get volume type from request
+        volume_type = request.args.get('volume_type', 'raw')
+        
+        # List of stocks to analyze
+        symbols = ['TSLA', 'NVDA', 'AAPL']
         stock_data = {}
-        simulation_results = {}
+        volume_alerts = []
         api_errors = []
         
-        for symbol in stocks:
+        for symbol in symbols:
             try:
-                logger.info(f"Fetching data for {symbol}...")
-                # Get historical data for 1 year
-                data = schwab_api.get_historical_prices(symbol, period="1y")
-                logger.info(f"Raw API response for {symbol}: {data.keys()}")
+                # Fetch historical data
+                logger.log('INFO', f"Fetching historical data for {symbol}", {
+                    'symbol': symbol,
+                    'days': days,
+                    'volume_type': volume_type
+                })
                 
-                if "candles" in data:
-                    daily_data = data["candles"]
-                    logger.info(f"Found {len(daily_data)} days of data for {symbol}")
-                    
-                    # Convert to list of daily records
-                    stock_data[symbol] = [
-                        {
-                            'date': candle['datetime'],
-                            'open': float(candle['open']),
-                            'high': float(candle['high']),
-                            'low': float(candle['low']),
-                            'close': float(candle['close']),
-                            'volume': int(candle['volume'])
-                        }
-                        for candle in daily_data
-                    ]
-                    # Sort by date
-                    stock_data[symbol].sort(key=lambda x: x['date'])
-                    logger.info(f"Processed {len(stock_data[symbol])} days of data for {symbol}")
-                    
-                    # Run simulation only if we have enough data
-                    if len(stock_data[symbol]) >= 252:  # Need at least 252 days for baseline
-                        simulation_results[symbol] = simulate_volume_trading(stock_data[symbol])
-                        if simulation_results[symbol]:
-                            logger.info(f"Simulation results for {symbol}: {len(simulation_results[symbol]['trades'])} trades")
-                    else:
-                        logger.warning(f"Not enough data points for {symbol}. Have {len(stock_data[symbol])}, need 252")
-                        api_errors.append(f"Not enough data points for {symbol} to run simulation")
-                else:
-                    logger.error(f"No time series data found for {symbol}. API response: {data}")
-                    stock_data[symbol] = []
-                    simulation_results[symbol] = None
-                    api_errors.append(f"No time series data found for {symbol}")
+                historical_data = schwab_api.get_historical_prices(symbol, days=days)
+                if not historical_data:
+                    error_msg = f"No data available for {symbol}"
+                    logger.log('WARNING', error_msg, {'symbol': symbol})
+                    api_errors.append(error_msg)
+                    continue
+                
+                # Extract volumes and process based on type
+                volumes = [float(day['volume']) for day in historical_data]
+                
+                if volume_type == 'relative':
+                    # Calculate relative volume (current volume / average volume)
+                    avg_volume = sum(volumes) / len(volumes)
+                    volumes = [v / avg_volume for v in volumes]
+                elif volume_type == 'sma':
+                    # Calculate 20-day SMA
+                    sma = pd.Series(volumes).rolling(window=20).mean()
+                    volumes = sma.tolist()
+                
+                # Update volume data and get analysis
+                analysis = volume_analysis.update_volume_data(symbol, volumes[-1])
+                
+                # Get volume alerts
+                alerts = volume_analysis.get_volume_alerts(symbol)
+                volume_alerts.extend(alerts)
+                
+                # Prepare data for template
+                stock_data[symbol] = {
+                    'historical_data': historical_data,
+                    'analysis': analysis,
+                    'alerts': alerts,
+                    'volumes': volumes
+                }
+                
+                logger.log('INFO', f"Completed analysis for {symbol}", {
+                    'symbol': symbol,
+                    'data_points': len(historical_data),
+                    'alerts_count': len(alerts)
+                })
+                
             except Exception as e:
-                logger.error(f"Error fetching data for {symbol}: {str(e)}", exc_info=True)
-                stock_data[symbol] = []
-                simulation_results[symbol] = None
-                api_errors.append(f"Error fetching data for {symbol}: {str(e)}")
+                error_msg = f"Error processing {symbol}: {str(e)}"
+                logger.log('ERROR', error_msg, {
+                    'symbol': symbol,
+                    'error': str(e)
+                })
+                api_errors.append(error_msg)
+                continue
         
-        logger.info("Rendering template with data...")
-        return render_template('analysis_dashboard.html', 
-                            alpha_vantage_available=True,
-                            stock_data=stock_data,
-                            simulation_results=simulation_results,
-                            active_tab='volume',
-                            api_errors=api_errors)
+        # Get log statistics
+        log_stats = logger.get_log_stats()
+        
+        return render_template(
+            'analysis_dashboard.html',
+            stock_data=stock_data,
+            volume_alerts=volume_alerts,
+            api_errors=api_errors,
+            timeframe=timeframe,
+            volume_type=volume_type,
+            log_stats=log_stats
+        )
+        
     except Exception as e:
-        logger.error(f"Error in volume_analysis route: {str(e)}", exc_info=True)
-        flash(f"Error loading volume analysis page: {str(e)}", "error")
-        return render_template('analysis_dashboard.html', 
-                            alpha_vantage_available=False,
-                            error=str(e),
-                            stock_data={},
-                            simulation_results={},
-                            active_tab='volume')
+        logger.log('ERROR', "Error in volume analysis route", {
+            'error': str(e)
+        })
+        return render_template(
+            'analysis_dashboard.html',
+            stock_data={},
+            volume_alerts=[],
+            api_errors=[f"System error: {str(e)}"],
+            timeframe='1y',
+            volume_type='raw',
+            log_stats={'total': 0, 'by_level': {}}
+        )
 
-@bp.route('/api/volume_analysis', methods=['POST'])
-def api_volume_analysis():
+@bp.route('/api/volume-analysis/<symbol>')
+def api_volume_analysis(symbol):
     """API endpoint for volume analysis."""
     try:
-        alpha_vantage = get_alpha_vantage()
-        if not alpha_vantage:
-            return jsonify({'error': 'Alpha Vantage API not configured'}), 400
-            
-        data = request.get_json()
-        if not data or 'symbol' not in data:
-            return jsonify({'error': 'No symbol provided'}), 400
-            
-        symbol = data['symbol']
-        result = alpha_vantage.get_daily_data(symbol, outputsize="full")
-        return jsonify({'result': result})
+        # Get timeframe from request or default to 1 year
+        timeframe = request.args.get('timeframe', '1y')
+        timeframe_map = {
+            '1m': 30,
+            '3m': 90,
+            '6m': 180,
+            '1y': 365,
+            '2y': 730,
+            '5y': 1825
+        }
+        days = timeframe_map.get(timeframe, 365)
+        
+        logger.log('INFO', f"API request for {symbol} volume analysis", {
+            'symbol': symbol,
+            'timeframe': timeframe
+        })
+        
+        # Fetch historical data
+        historical_data = schwab_api.get_historical_prices(symbol, days=days)
+        if not historical_data:
+            error_msg = f"No data available for {symbol}"
+            logger.log('WARNING', error_msg, {'symbol': symbol})
+            return jsonify({'error': error_msg}), 404
+        
+        # Extract volumes
+        volumes = [float(day['volume']) for day in historical_data]
+        
+        # Update volume data and get analysis
+        analysis = volume_analysis.update_volume_data(symbol, volumes[-1])
+        
+        # Get volume alerts
+        alerts = volume_analysis.get_volume_alerts(symbol)
+        
+        response = {
+            'symbol': symbol,
+            'analysis': analysis,
+            'alerts': alerts,
+            'historical_data': historical_data
+        }
+        
+        logger.log('INFO', f"Completed API analysis for {symbol}", {
+            'symbol': symbol,
+            'data_points': len(historical_data),
+            'alerts_count': len(alerts)
+        })
+        
+        return jsonify(response)
+        
     except Exception as e:
-        logger.error(f"Error in volume_analysis API: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        error_msg = f"Error in volume analysis API: {str(e)}"
+        logger.log('ERROR', error_msg, {
+            'symbol': symbol,
+            'error': str(e)
+        })
+        return jsonify({'error': error_msg}), 500
 
 @bp.route('/api/test_alpha_vantage', methods=['POST'])
 def test_alpha_vantage():
@@ -302,4 +370,104 @@ def test_alpha_vantage():
         return jsonify({'result': result})
     except Exception as e:
         logger.error(f"Error in test_alpha_vantage route: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/test-strategy')
+def test_strategy():
+    """Test a trading strategy on historical data."""
+    try:
+        # Get parameters from request
+        symbol = request.args.get('symbol', 'TSLA')
+        period = request.args.get('period', '1m')
+        strategy_type = request.args.get('strategy', 'volume')
+        
+        # Calculate date range
+        end_date = datetime.now()
+        if period == '1m':
+            start_date = end_date - timedelta(days=30)
+        elif period == '3m':
+            start_date = end_date - timedelta(days=90)
+        elif period == '6m':
+            start_date = end_date - timedelta(days=180)
+        else:  # 1y
+            start_date = end_date - timedelta(days=365)
+        
+        # Get strategy function based on type
+        if strategy_type == 'volume':
+            strategy_func = volume_analysis.analyze_volume_pattern
+        elif strategy_type == 'technical':
+            strategy_func = strategy_tester.calculate_indicators
+        else:  # combined
+            def combined_strategy(data, timestamp):
+                volume_signal = volume_analysis.analyze_volume_pattern(data, timestamp)
+                technical_signal = strategy_tester.calculate_indicators(data)
+                return {
+                    'signal': 'BUY' if volume_signal['signal'] == 'BUY' and technical_signal['signal'] == 'BUY' else 'SELL',
+                    'confidence': (volume_signal['confidence'] + technical_signal['confidence']) / 2
+                }
+            strategy_func = combined_strategy
+        
+        # Run strategy test
+        results = strategy_tester.run_strategy(
+            symbol=symbol,
+            start_date=start_date,
+            end_date=end_date,
+            strategy_func=strategy_func
+        )
+        
+        # Calculate performance metrics
+        total_trades = len(results['trades'])
+        winning_trades = sum(1 for trade in results['trades'] if trade.get('profit', 0) > 0)
+        win_rate = winning_trades / total_trades if total_trades > 0 else 0
+        avg_return = sum(trade.get('profit', 0) for trade in results['trades']) / total_trades if total_trades > 0 else 0
+        max_drawdown = min(results['daily_returns']) if results['daily_returns'] else 0
+        
+        # Prepare response
+        response = {
+            'total_trades': total_trades,
+            'win_rate': win_rate,
+            'avg_return': avg_return,
+            'max_drawdown': max_drawdown,
+            'performance': {
+                'labels': [date.strftime('%Y-%m-%d') for date in results['daily_returns'].index],
+                'values': results['portfolio_value']
+            }
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.error(f"Error testing strategy: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/stream-data')
+def stream_data():
+    """Stream real-time market data."""
+    try:
+        # Get current market data
+        symbol = request.args.get('symbol', 'TSLA')
+        data = strategy_tester.get_historical_data(symbol, start_date=datetime.now() - timedelta(days=1), end_date=datetime.now())
+        
+        if data.empty:
+            return jsonify({'error': 'No data available'}), 404
+        
+        # Get latest data point
+        latest = data.iloc[-1]
+        
+        # Analyze volume pattern
+        volume_signal = volume_analysis.analyze_volume_pattern(data, datetime.now())
+        
+        # Prepare response
+        response = {
+            'symbol': symbol,
+            'price': float(latest['Close']),
+            'volume': int(latest['Volume']),
+            'signal': volume_signal['signal'],
+            'timestamp': datetime.now().isoformat()
+        }
+        
+        return jsonify(response)
+        
+    except Exception as e:
+        logger.error(f"Error streaming data: {str(e)}")
         return jsonify({'error': str(e)}), 500 

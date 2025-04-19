@@ -7,15 +7,10 @@ import requests
 from schwab_trader.services.alpha_vantage import AlphaVantageAPI
 import pandas as pd
 import numpy as np
+from schwab_trader.services.logging_service import LoggingService
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
-
-# Configure logging
-logger = logging.getLogger('dashboard_routes')
-handler = logging.FileHandler('logs/dashboard_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = LoggingService()
 
 # Initialize Alpha Vantage API
 alpha_vantage = AlphaVantageAPI()
