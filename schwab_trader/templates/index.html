@@ -223,23 +223,23 @@
 
     <div class="quick-actions">
         <div class="action-card">
-            <h3><i class="bi bi-speedometer2"></i> Market Dashboard</h3>
-            <p>View real-time market data and key indicators.</p>
-            <a href="{{ url_for('dashboard.index') }}" class="action-button">
-                <i class="bi bi-arrow-right"></i> Go to Dashboard
+            <h3><i class="bi bi-graph-up"></i> Market Analysis</h3>
+            <p>Analyze market data, technical indicators, and real-time market trends.</p>
+            <a href="{{ url_for('analysis.index') }}" class="action-button">
+                <i class="bi bi-arrow-right"></i> Start Analysis
             </a>
         </div>
         <div class="action-card">
-            <h3><i class="bi bi-bar-chart"></i> Volume Analysis</h3>
-            <p>Analyze trading volume patterns and simulate trades with $2000 budget.</p>
-            <a href="{{ url_for('analysis.volume_analysis') }}" class="action-button">
-                <i class="bi bi-arrow-right"></i> Start Analysis
+            <h3><i class="bi bi-robot"></i> Auto Trading</h3>
+            <p>Configure and monitor automated trading strategies.</p>
+            <a href="{{ url_for('trading.index') }}" class="action-button">
+                <i class="bi bi-arrow-right"></i> Trading Dashboard
             </a>
         </div>
         <div class="action-card">
             <h3><i class="bi bi-wallet2"></i> Portfolio</h3>
             <p>Manage your investments and track performance.</p>
-            <a href="{{ url_for('dashboard.portfolio') }}" class="action-button">
+            <a href="{{ url_for('portfolio.index') }}" class="action-button">
                 <i class="bi bi-arrow-right"></i> View Portfolio
             </a>
         </div>
@@ -250,130 +250,91 @@
         <div class="market-metrics">
             <div class="metric-card">
                 <h4>S&P 500</h4>
-                <div class="value" id="sp500-value">-</div>
-                <div class="change" id="sp500-change">-</div>
+                <div class="value" id="sp500-value">Loading...</div>
+                <div class="change" id="sp500-change">Loading...</div>
             </div>
             <div class="metric-card">
                 <h4>NASDAQ</h4>
-                <div class="value" id="nasdaq-value">-</div>
-                <div class="change" id="nasdaq-change">-</div>
+                <div class="value" id="nasdaq-value">Loading...</div>
+                <div class="change" id="nasdaq-change">Loading...</div>
             </div>
             <div class="metric-card">
                 <h4>DOW</h4>
-                <div class="value" id="dow-value">-</div>
-                <div class="change" id="dow-change">-</div>
+                <div class="value" id="dow-value">Loading...</div>
+                <div class="change" id="dow-change">Loading...</div>
             </div>
             <div class="metric-card">
                 <h4>VIX</h4>
-                <div class="value" id="vix-value">-</div>
-                <div class="change" id="vix-change">-</div>
+                <div class="value" id="vix-value">Loading...</div>
+                <div class="change" id="vix-change">Loading...</div>
             </div>
         </div>
     </div>
 
     <div class="recent-activity">
-        <h2>Recent Activity</h2>
-        <ul class="activity-list" id="activity-list">
-            <!-- Activity items will be populated by JavaScript -->
+        <h2>Recent Market Activity</h2>
+        <ul class="activity-list" id="market-activity">
+            <!-- Activity items will be populated here -->
         </ul>
     </div>
 </div>
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
 <script>
-    // Function to format numbers with commas and 2 decimal places
-    function formatNumber(num) {
-        return num.toLocaleString('en-US', {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2
-        });
-    }
+// Update market metrics
+function updateMarketMetrics() {
+    fetch('/api/market-metrics')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('sp500-value').textContent = data.sp500.value;
+            document.getElementById('sp500-change').textContent = data.sp500.change;
+            document.getElementById('sp500-change').className = `change ${data.sp500.change.startsWith('+') ? 'positive' : 'negative'}`;
 
-    // Function to format percentage changes
-    function formatChange(change) {
-        const formatted = (change * 100).toFixed(2);
-        return `${change >= 0 ? '+' : ''}${formatted}%`;
-    }
+            document.getElementById('nasdaq-value').textContent = data.nasdaq.value;
+            document.getElementById('nasdaq-change').textContent = data.nasdaq.change;
+            document.getElementById('nasdaq-change').className = `change ${data.nasdaq.change.startsWith('+') ? 'positive' : 'negative'}`;
 
-    // Function to update market metrics
-    async function updateMarketMetrics() {
-        try {
-            const response = await fetch('/api/market_overview');
-            const data = await response.json();
+            document.getElementById('dow-value').textContent = data.dow.value;
+            document.getElementById('dow-change').textContent = data.dow.change;
+            document.getElementById('dow-change').className = `change ${data.dow.change.startsWith('+') ? 'positive' : 'negative'}`;
 
-            // Update S&P 500
-            document.getElementById('sp500-value').textContent = formatNumber(data.sp500.price);
-            const sp500Change = document.getElementById('sp500-change');
-            sp500Change.textContent = formatChange(data.sp500.change);
-            sp500Change.className = `change ${data.sp500.change >= 0 ? 'positive' : 'negative'}`;
+            document.getElementById('vix-value').textContent = data.vix.value;
+            document.getElementById('vix-change').textContent = data.vix.change;
+            document.getElementById('vix-change').className = `change ${data.vix.change.startsWith('+') ? 'positive' : 'negative'}`;
+        })
+        .catch(error => console.error('Error fetching market metrics:', error));
+}
 
-            // Update NASDAQ
-            document.getElementById('nasdaq-value').textContent = formatNumber(data.nasdaq.price);
-            const nasdaqChange = document.getElementById('nasdaq-change');
-            nasdaqChange.textContent = formatChange(data.nasdaq.change);
-            nasdaqChange.className = `change ${data.nasdaq.change >= 0 ? 'positive' : 'negative'}`;
+// Update market activity
+function updateMarketActivity() {
+    fetch('/api/market-activity')
+        .then(response => response.json())
+        .then(data => {
+            const activityList = document.getElementById('market-activity');
+            activityList.innerHTML = data.map(activity => `
+                <li class="activity-item">
+                    <div class="activity-icon">
+                        <i class="bi ${activity.icon}"></i>
+                    </div>
+                    <div class="activity-details">
+                        <div class="activity-title">${activity.title}</div>
+                        <div class="activity-time">${activity.time}</div>
+                    </div>
+                </li>
+            `).join('');
+        })
+        .catch(error => console.error('Error fetching market activity:', error));
+}
 
-            // Update DOW
-            document.getElementById('dow-value').textContent = formatNumber(data.dow.price);
-            const dowChange = document.getElementById('dow-change');
-            dowChange.textContent = formatChange(data.dow.change);
-            dowChange.className = `change ${data.dow.change >= 0 ? 'positive' : 'negative'}`;
-
-            // Update VIX
-            document.getElementById('vix-value').textContent = formatNumber(data.vix.price);
-            const vixChange = document.getElementById('vix-change');
-            vixChange.textContent = formatChange(data.vix.change);
-            vixChange.className = `change ${data.vix.change >= 0 ? 'positive' : 'negative'}`;
-        } catch (error) {
-            console.error('Error updating market metrics:', error);
-        }
-    }
-
-    // Function to update recent activity
-    async function updateRecentActivity() {
-        try {
-            const response = await fetch('/api/recent_activity');
-            const activities = await response.json();
-            const activityList = document.getElementById('activity-list');
-            activityList.innerHTML = '';
-
-            activities.forEach(activity => {
-                const item = document.createElement('li');
-                item.className = 'activity-item';
-
-                const icon = document.createElement('div');
-                icon.className = 'activity-icon';
-                icon.innerHTML = `<i class="bi bi-${activity.icon}"></i>`;
-
-                const details = document.createElement('div');
-                details.className = 'activity-details';
-
-                const title = document.createElement('div');
-                title.className = 'activity-title';
-                title.textContent = activity.title;
-
-                const time = document.createElement('div');
-                time.className = 'activity-time';
-                time.textContent = activity.time;
-
-                details.appendChild(title);
-                details.appendChild(time);
-                item.appendChild(icon);
-                item.appendChild(details);
-                activityList.appendChild(item);
-            });
-        } catch (error) {
-            console.error('Error updating recent activity:', error);
-        }
-    }
-
-    // Initial data load
+// Update data on page load
+window.onload = function() {
     updateMarketMetrics();
-    updateRecentActivity();
-
-    // Set up periodic updates
-    setInterval(updateMarketMetrics, 60000); // Update every minute
-    setInterval(updateRecentActivity, 300000); // Update every 5 minutes
+    updateMarketActivity();
+    
+    // Update every minute
+    setInterval(updateMarketMetrics, 60000);
+    setInterval(updateMarketActivity, 60000);
+};
 </script>
 {% endblock %} 
