@@ -866,137 +866,141 @@ const state = {
     streamInterval: null,
     isLoading: false,
     error: null,
-    lastPrice: null
+    lastPrice: null,
+    stockData: JSON.parse('{{ stock_data|tojson|safe }}'),
+    sectorData: JSON.parse('{{ sector_data|tojson|safe }}'),
+    volumeProfile: JSON.parse('{{ volume_profile|tojson|safe }}'),
+    marketDepth: JSON.parse('{{ market_depth|tojson|safe }}')
 };
 
 // Initialize charts with technical indicators
 function initCharts() {
-    {% for symbol, data in stock_data.items() %}
-    const ctx = document.getElementById('{{ symbol }}-chart').getContext('2d');
-    state.charts['{{ symbol }}'] = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ data.historical_data|map(attribute='date')|list|tojson }},
-            datasets: [
-                {
-                    label: 'Price',
-                    data: {{ data.historical_data|map(attribute='close')|list|tojson }},
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 2,
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'Volume',
-                    data: {{ data.volumes|tojson }},
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y1'
-                },
-                {
-                    label: 'SMA (20)',
-                    data: {{ data.analysis.indicators.sma_values|tojson }},
-                    borderColor: 'rgba(255, 99, 132, 1)',
-                    borderWidth: 1,
-                    borderDash: [5, 5],
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'EMA (20)',
-                    data: {{ data.analysis.indicators.ema_values|tojson }},
-                    borderColor: 'rgba(153, 102, 255, 1)',
-                    borderWidth: 1,
-                    borderDash: [5, 5],
-                    yAxisID: 'y'
-                },
-                {
-                    label: 'MACD',
-                    data: {{ data.analysis.indicators.macd_values|tojson }},
-                    borderColor: 'rgba(255, 159, 64, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y2'
-                },
-                {
-                    label: 'Stochastic',
-                    data: {{ data.analysis.indicators.stochastic_values|tojson }},
-                    borderColor: 'rgba(75, 192, 192, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y3'
-                },
-                {
-                    label: 'ATR',
-                    data: {{ data.analysis.indicators.atr_values|tojson }},
-                    borderColor: 'rgba(201, 203, 207, 1)',
-                    borderWidth: 1,
-                    yAxisID: 'y4'
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Price ($)'
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Volume'
+    Object.entries(state.stockData).forEach(([symbol, data]) => {
+        const ctx = document.getElementById(`${symbol}-chart`).getContext('2d');
+        state.charts[symbol] = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.historical_data.map(d => d.date),
+                datasets: [
+                    {
+                        label: 'Price',
+                        data: data.historical_data.map(d => d.close),
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2,
+                        yAxisID: 'y'
                     },
-                    grid: {
-                        drawOnChartArea: false
-                    }
-                },
-                y2: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'MACD'
+                    {
+                        label: 'Volume',
+                        data: data.volumes,
+                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y1'
                     },
-                    grid: {
-                        drawOnChartArea: false
-                    }
-                },
-                y3: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Stochastic'
+                    {
+                        label: 'SMA (20)',
+                        data: data.analysis.indicators.sma_values,
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        yAxisID: 'y'
                     },
-                    grid: {
-                        drawOnChartArea: false
-                    }
-                },
-                y4: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'ATR'
+                    {
+                        label: 'EMA (20)',
+                        data: data.analysis.indicators.ema_values,
+                        borderColor: 'rgba(153, 102, 255, 1)',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        yAxisID: 'y'
                     },
-                    grid: {
-                        drawOnChartArea: false
+                    {
+                        label: 'MACD',
+                        data: data.analysis.indicators.macd_values,
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y2'
+                    },
+                    {
+                        label: 'Stochastic',
+                        data: data.analysis.indicators.stochastic_values,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y3'
+                    },
+                    {
+                        label: 'ATR',
+                        data: data.analysis.indicators.atr_values,
+                        borderColor: 'rgba(201, 203, 207, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y4'
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Price ($)'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Volume'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    y2: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'MACD'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    y3: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Stochastic'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    },
+                    y4: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'ATR'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
                     }
                 }
             }
-        }
+        });
     });
-    {% endfor %}
 
     // Initialize comparison charts
     initComparisonCharts();
@@ -1005,21 +1009,18 @@ function initCharts() {
 function initComparisonCharts() {
     // Initialize comparison chart
     const comparisonCtx = document.getElementById('comparison-chart').getContext('2d');
+    const firstStock = Object.values(state.stockData)[0];
     state.charts.comparison = new Chart(comparisonCtx, {
         type: 'line',
         data: {
-            labels: {{ stock_data.values()|first|attr('historical_data')|map(attribute='date')|list|tojson }},
-            datasets: [
-                {% for symbol, data in stock_data.items() %}
-                {
-                    label: '{{ symbol }}',
-                    data: {{ data.historical_data|map(attribute='close')|list|tojson }},
-                    borderColor: getRandomColor(),
-                    borderWidth: 2,
-                    fill: false
-                }{% if not loop.last %},{% endif %}
-                {% endfor %}
-            ]
+            labels: firstStock.historical_data.map(d => d.date),
+            datasets: Object.entries(state.stockData).map(([symbol, data]) => ({
+                label: symbol,
+                data: data.historical_data.map(d => d.close),
+                borderColor: getRandomColor(),
+                borderWidth: 2,
+                fill: false
+            }))
         },
         options: {
             responsive: true,
@@ -1041,10 +1042,10 @@ function initComparisonCharts() {
     state.charts.sector = new Chart(sectorCtx, {
         type: 'bar',
         data: {
-            labels: {{ sector_data.keys()|list|tojson }},
+            labels: Object.keys(state.sectorData),
             datasets: [{
                 label: 'Sector Performance',
-                data: {{ sector_data.values()|list|tojson }},
+                data: Object.values(state.sectorData),
                 backgroundColor: 'rgba(75, 192, 192, 0.5)',
                 borderColor: 'rgba(75, 192, 192, 1)',
                 borderWidth: 1
@@ -1059,6 +1060,91 @@ function initComparisonCharts() {
                     title: {
                         display: true,
                         text: 'Performance (%)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Initialize volume profile chart
+function initVolumeProfileChart() {
+    const ctx = document.getElementById('volume-profile-chart').getContext('2d');
+    state.charts.volumeProfile = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: Object.keys(state.volumeProfile),
+            datasets: [{
+                label: 'Volume Profile',
+                data: Object.values(state.volumeProfile),
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Volume'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Price Level'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Initialize market depth chart
+function initMarketDepthChart() {
+    const ctx = document.getElementById('market-depth-chart').getContext('2d');
+    state.charts.marketDepth = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: state.marketDepth.labels,
+            datasets: [
+                {
+                    label: 'Bids',
+                    data: state.marketDepth.bids,
+                    backgroundColor: 'rgba(40, 167, 69, 0.5)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Asks',
+                    data: state.marketDepth.asks,
+                    backgroundColor: 'rgba(220, 53, 69, 0.5)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                x: {
+                    stacked: true,
+                    title: {
+                        display: true,
+                        text: 'Price'
+                    }
+                },
+                y: {
+                    stacked: true,
+                    title: {
+                        display: true,
+                        text: 'Volume'
                     }
                 }
             }
@@ -1303,91 +1389,6 @@ function getRandomColor() {
         color += letters[Math.floor(Math.random() * 16)];
     }
     return color;
-}
-
-// Initialize volume profile chart
-function initVolumeProfileChart() {
-    const ctx = document.getElementById('volume-profile-chart').getContext('2d');
-    state.charts.volumeProfile = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: {{ volume_profile.keys()|list|tojson }},
-            datasets: [{
-                label: 'Volume Profile',
-                data: {{ volume_profile.values()|list|tojson }},
-                backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: 'y',
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Volume'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Price Level'
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Initialize market depth chart
-function initMarketDepthChart() {
-    const ctx = document.getElementById('market-depth-chart').getContext('2d');
-    state.charts.marketDepth = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: {{ market_depth.labels|tojson }},
-            datasets: [
-                {
-                    label: 'Bids',
-                    data: {{ market_depth.bids|tojson }},
-                    backgroundColor: 'rgba(40, 167, 69, 0.5)',
-                    borderColor: 'rgba(40, 167, 69, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Asks',
-                    data: {{ market_depth.asks|tojson }},
-                    backgroundColor: 'rgba(220, 53, 69, 0.5)',
-                    borderColor: 'rgba(220, 53, 69, 1)',
-                    borderWidth: 1
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    stacked: true,
-                    title: {
-                        display: true,
-                        text: 'Price'
-                    }
-                },
-                y: {
-                    stacked: true,
-                    title: {
-                        display: true,
-                        text: 'Volume'
-                    }
-                }
-            }
-        }
-    });
 }
 
 // Event listeners

@@ -19,6 +19,17 @@ check_port() {
     return 0
 }
 
+# Function to check disk space
+check_disk_space() {
+    local required_space=1000  # 1GB in MB
+    local available_space=$(df -m . | awk 'NR==2 {print $4}')
+    if [ "$available_space" -lt "$required_space" ]; then
+        log_message "Error: Insufficient disk space. Required: ${required_space}MB, Available: ${available_space}MB"
+        return 1
+    fi
+    return 0
+}
+
 # Function to kill existing Flask server
 kill_flask_server() {
     log_message "Checking for existing Flask server..."
@@ -26,13 +37,13 @@ kill_flask_server() {
         log_message "Stopping existing Flask server..."
         pkill -f "python -m flask"
         sleep 2  # Give it time to shut down gracefully
-    fi
-    
-    # Double check if port is still in use
-    if ! check_port 5000; then
-        log_message "Force closing port 5000..."
-        kill $(lsof -t -i:5000) 2>/dev/null || true
-        sleep 1
+        
+        # Double check if port is still in use
+        if ! check_port 5000; then
+            log_message "Force closing port 5000..."
+            kill $(lsof -t -i:5000) 2>/dev/null || true
+            sleep 1
+        fi
     fi
 }
 
@@ -73,23 +84,54 @@ EOF
     fi
 }
 
-# Check if Python is installed
+# Function to check if requirements are up to date
+check_requirements() {
+    if [ -f "requirements.txt" ]; then
+        log_message "Checking if requirements are up to date..."
+        pip freeze | sort > current_requirements.txt
+        sort requirements.txt > sorted_requirements.txt
+        if ! diff -q current_requirements.txt sorted_requirements.txt > /dev/null; then
+            return 1
+        fi
+        rm current_requirements.txt sorted_requirements.txt
+    fi
+    return 0
+}
+
+# Function to initialize database
+initialize_database() {
+    log_message "Initializing/upgrading the database..."
+    if [ -f "create_db.py" ]; then
+        if ! python create_db.py; then
+            log_message "Error: Database initialization failed"
+            return 1
+        fi
+    fi
+    return 0
+}
+
+# Main script starts here
+set -e  # Exit on any error
+
+# Check prerequisites
 if ! command_exists python3; then
     log_message "Error: Python 3 is not installed. Please install Python 3 and try again."
     exit 1
 fi
 
-# Check if pip is installed
 if ! command_exists pip3; then
     log_message "Error: pip3 is not installed. Please install pip3 and try again."
     exit 1
 fi
 
+# Check disk space
+if ! check_disk_space; then
+    exit 1
+fi
+
 # Create necessary directories
 log_message "Creating required directories..."
-mkdir -p logs
-mkdir -p sessions
-mkdir -p data
+mkdir -p logs sessions data
 
 # Kill any existing Flask server
 kill_flask_server
@@ -98,7 +140,10 @@ kill_flask_server
 log_message "Activating virtual environment..."
 if [ ! -d "venv" ]; then
     log_message "Creating virtual environment..."
-    python3 -m venv venv
+    if ! python3 -m venv venv; then
+        log_message "Error: Failed to create virtual environment"
+        exit 1
+    fi
 fi
 source venv/bin/activate
 
@@ -127,8 +172,13 @@ alembic==1.12.1
 EOL
 fi
 
-log_message "Installing requirements..."
-pip install -r requirements.txt
+if ! check_requirements; then
+    log_message "Installing/updating requirements..."
+    if ! pip install -r requirements.txt; then
+        log_message "Error: Failed to install requirements"
+        exit 1
+    fi
+fi
 
 # Check for config file
 CONFIG_FILE=".env"
@@ -170,10 +220,9 @@ if ! validate_env_vars; then
     exit 1
 fi
 
-# Initialize/upgrade the database
-log_message "Initializing/upgrading the database..."
-if [ -f "create_db.py" ]; then
-    python create_db.py
+# Initialize database
+if ! initialize_database; then
+    exit 1
 fi
 
 # Check if port is available
