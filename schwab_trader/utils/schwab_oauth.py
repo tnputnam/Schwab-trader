@@ -12,7 +12,7 @@ logger = logging.getLogger('schwab_oauth')
 handler = logging.FileHandler('logs/schwab_oauth_{}.log'.format(datetime.now().strftime('%Y%m%d')))
 handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
 logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 class OAuthError(Exception):
     """Base class for OAuth errors."""
@@ -38,6 +38,14 @@ class SchwabOAuth:
         self.auth_url = current_app.config['SCHWAB_AUTH_URL']
         self.token_url = current_app.config['SCHWAB_TOKEN_URL']
         self.scopes = current_app.config['SCHWAB_SCOPES']
+        
+        # Debug log the configuration
+        logger.debug("OAuth Configuration:")
+        logger.debug(f"Client ID: {self.client_id}")
+        logger.debug(f"Auth URL: {self.auth_url}")
+        logger.debug(f"Token URL: {self.token_url}")
+        logger.debug(f"Redirect URI: {self.redirect_uri}")
+        logger.debug(f"Scopes: {self.scopes}")
     
     def _validate_config(self):
         """Validate the OAuth configuration."""
@@ -52,22 +60,32 @@ class SchwabOAuth:
         
         missing = [key for key in required_config if not current_app.config.get(key)]
         if missing:
+            logger.error(f"Missing required configuration: {', '.join(missing)}")
             raise ConfigError(f"Missing required configuration: {', '.join(missing)}")
     
     def get_authorization_url(self):
         """Get the authorization URL for OAuth flow."""
         try:
+            logger.debug("Creating OAuth2Session")
+            logger.debug(f"Client ID: {self.client_id}")
+            logger.debug(f"Redirect URI: {self.redirect_uri}")
+            logger.debug(f"Scopes: {self.scopes}")
+            
             oauth = OAuth2Session(
                 self.client_id,
                 redirect_uri=self.redirect_uri,
                 scope=self.scopes
             )
             
+            logger.debug(f"Getting authorization URL from: {self.auth_url}")
             authorization_url, state = oauth.authorization_url(
                 self.auth_url,
                 access_type="offline",
                 include_granted_scopes="true"
             )
+            
+            logger.debug(f"Generated authorization URL: {authorization_url}")
+            logger.debug(f"Generated state: {state}")
             
             # Store the state in the session
             session['oauth_state'] = state
@@ -75,6 +93,8 @@ class SchwabOAuth:
             return authorization_url
         except Exception as e:
             logger.error(f"Error getting authorization URL: {str(e)}")
+            logger.error(f"Error type: {type(e)}")
+            logger.error(f"Error args: {e.args}")
             raise OAuthError("Failed to get authorization URL")
     
     def fetch_token(self, authorization_response):

@@ -38,8 +38,11 @@ logger = logging.getLogger(__name__)
 # Debug print environment variables
 logger.debug("Environment Variables:")
 for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
-            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES']:
-    logger.debug(f"{key}: {os.getenv(key)}")
+            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
+    value = os.getenv(key)
+    logger.debug(f"{key}: {value}")
+    if not value:
+        logger.error(f"Missing environment variable: {key}")
 
 app = Flask(__name__, 
     template_folder='schwab_trader/templates',
@@ -48,21 +51,30 @@ app = Flask(__name__,
 CORS(app)
 
 # Load configuration from environment variables
-app.config.update(
-    SECRET_KEY=os.getenv('FLASK_SECRET_KEY', 'dev_key_123'),
-    SCHWAB_CLIENT_ID=os.getenv('SCHWAB_CLIENT_ID'),
-    SCHWAB_CLIENT_SECRET=os.getenv('SCHWAB_CLIENT_SECRET'),
-    SCHWAB_REDIRECT_URI=os.getenv('SCHWAB_REDIRECT_URI'),
-    SCHWAB_AUTH_URL=os.getenv('SCHWAB_AUTH_URL'),
-    SCHWAB_TOKEN_URL=os.getenv('SCHWAB_TOKEN_URL'),
-    SCHWAB_SCOPES=os.getenv('SCHWAB_SCOPES'),
-    SCHWAB_API_BASE_URL=os.getenv('SCHWAB_API_BASE_URL', 'https://api.schwab.com')
-)
+config = {
+    'SECRET_KEY': os.getenv('FLASK_SECRET_KEY', 'dev_key_123'),
+    'SCHWAB_CLIENT_ID': os.getenv('SCHWAB_CLIENT_ID'),
+    'SCHWAB_CLIENT_SECRET': os.getenv('SCHWAB_CLIENT_SECRET'),
+    'SCHWAB_REDIRECT_URI': os.getenv('SCHWAB_REDIRECT_URI'),
+    'SCHWAB_AUTH_URL': os.getenv('SCHWAB_AUTH_URL'),
+    'SCHWAB_TOKEN_URL': os.getenv('SCHWAB_TOKEN_URL'),
+    'SCHWAB_SCOPES': os.getenv('SCHWAB_SCOPES'),
+    'SCHWAB_API_BASE_URL': os.getenv('SCHWAB_API_BASE_URL', 'https://api.schwabapi.com/v1')
+}
 
-# Debug print Flask config
-logger.debug("\nFlask Configuration:")
+# Debug print Flask config before update
+logger.debug("\nFlask Configuration (before update):")
 for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
-            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES']:
+            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
+    logger.debug(f"{key}: {app.config.get(key)}")
+
+# Update Flask config
+app.config.update(config)
+
+# Debug print Flask config after update
+logger.debug("\nFlask Configuration (after update):")
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
+            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
     logger.debug(f"{key}: {app.config.get(key)}")
 
 # Database configuration
