@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Default ports
+DEFAULT_PROD_PORT=5000
+DEFAULT_TEST_PORT=5001
+
 # Function to check if a command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
@@ -15,9 +19,28 @@ log_message() {
 check_port() {
     local port=$1
     if lsof -i :$port > /dev/null; then
+        log_message "Port $port is already in use"
         return 1
     fi
     return 0
+}
+
+# Function to find an available port
+find_available_port() {
+    local start_port=$1
+    local max_port=$2
+    local port=$start_port
+    
+    while [ $port -le $max_port ]; do
+        if check_port $port; then
+            echo $port
+            return 0
+        fi
+        port=$((port + 1))
+    done
+    
+    log_message "Error: Could not find an available port between $start_port and $max_port"
+    return 1
 }
 
 # Function to check disk space
@@ -33,16 +56,17 @@ check_disk_space() {
 
 # Function to kill existing Flask server
 kill_flask_server() {
-    log_message "Checking for existing Flask server..."
-    if pgrep -f "python -m flask" > /dev/null; then
-        log_message "Stopping existing Flask server..."
-        pkill -f "python -m flask"
+    local port=$1
+    log_message "Checking for existing Flask server on port $port..."
+    if pgrep -f "python -m flask.*:$port" > /dev/null; then
+        log_message "Stopping existing Flask server on port $port..."
+        pkill -f "python -m flask.*:$port"
         sleep 2  # Give it time to shut down gracefully
         
         # Double check if port is still in use
-        if ! check_port 5000; then
-            log_message "Force closing port 5000..."
-            kill $(lsof -t -i:5000) 2>/dev/null || true
+        if ! check_port $port; then
+            log_message "Force closing port $port..."
+            kill $(lsof -t -i:$port) 2>/dev/null || true
             sleep 1
         fi
     fi
@@ -88,29 +112,54 @@ main() {
         exit 1
     fi
     
-    # Kill existing Flask server
-    kill_flask_server
+    # Determine environment and port
+    local is_test=false
+    local port=$DEFAULT_PROD_PORT
+    
+    if [ "$1" == "test" ]; then
+        is_test=true
+        port=$DEFAULT_TEST_PORT
+    fi
+    
+    # Find available port if default is in use
+    if ! check_port $port; then
+        log_message "Default port $port is in use, searching for alternative..."
+        if [ "$is_test" = true ]; then
+            port=$(find_available_port $DEFAULT_TEST_PORT $((DEFAULT_TEST_PORT + 10)))
+        else
+            port=$(find_available_port $DEFAULT_PROD_PORT $((DEFAULT_PROD_PORT + 10)))
+        fi
+        if [ $? -ne 0 ]; then
+            exit 1
+        fi
+        log_message "Using alternative port $port"
+    fi
+    
+    # Kill existing Flask server on the port
+    kill_flask_server $port
     
     # Setup virtual environment
     setup_venv
     
     # Load environment variables
-    if [ "$1" == "test" ]; then
+    if [ "$is_test" = true ]; then
         load_env "schwab_trader/.env.test"
     else
         load_env ".env"
     fi
     
     # Start Flask application
-    log_message "Starting Flask application..."
+    log_message "Starting Flask application on port $port..."
     export FLASK_APP=auth_app.py
     export FLASK_ENV=development
     
-    if [ "$1" == "test" ]; then
-        python -m flask run --host=0.0.0.0 --port=5001
-    else
-        python -m flask run --host=0.0.0.0 --port=5000
+    # Update callback URL in environment if it's test mode
+    if [ "$is_test" = true ]; then
+        export SCHWAB_REDIRECT_URI="http://localhost:$port/auth/callback"
+        log_message "Updated callback URL to: $SCHWAB_REDIRECT_URI"
     fi
+    
+    python -m flask run --host=0.0.0.0 --port=$port
 }
 
 # Run main function with arguments
