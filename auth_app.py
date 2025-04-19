@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 # Debug print environment variables
 logger.debug("Environment Variables:")
-for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URL', 
             'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
     value = os.getenv(key)
     logger.debug(f"{key}: {value}")
@@ -55,7 +55,7 @@ config = {
     'SECRET_KEY': os.getenv('FLASK_SECRET_KEY', 'dev_key_123'),
     'SCHWAB_CLIENT_ID': os.getenv('SCHWAB_CLIENT_ID'),
     'SCHWAB_CLIENT_SECRET': os.getenv('SCHWAB_CLIENT_SECRET'),
-    'SCHWAB_REDIRECT_URI': os.getenv('SCHWAB_REDIRECT_URI'),
+    'SCHWAB_REDIRECT_URL': os.getenv('SCHWAB_REDIRECT_URL'),
     'SCHWAB_AUTH_URL': os.getenv('SCHWAB_AUTH_URL'),
     'SCHWAB_TOKEN_URL': os.getenv('SCHWAB_TOKEN_URL'),
     'SCHWAB_SCOPES': os.getenv('SCHWAB_SCOPES'),
@@ -64,7 +64,7 @@ config = {
 
 # Debug print Flask config before update
 logger.debug("\nFlask Configuration (before update):")
-for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URL', 
             'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
     logger.debug(f"{key}: {app.config.get(key)}")
 
@@ -73,7 +73,7 @@ app.config.update(config)
 
 # Debug print Flask config after update
 logger.debug("\nFlask Configuration (after update):")
-for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URL', 
             'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
     logger.debug(f"{key}: {app.config.get(key)}")
 

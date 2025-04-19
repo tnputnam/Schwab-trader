@@ -34,7 +34,7 @@ class SchwabOAuth:
         self._validate_config()
         self.client_id = current_app.config['SCHWAB_CLIENT_ID']
         self.client_secret = current_app.config['SCHWAB_CLIENT_SECRET']
-        self.redirect_uri = current_app.config['SCHWAB_REDIRECT_URI']
+        self.redirect_uri = current_app.config['SCHWAB_REDIRECT_URL']
         self.auth_url = current_app.config['SCHWAB_AUTH_URL']
         self.token_url = current_app.config['SCHWAB_TOKEN_URL']
         self.scopes = current_app.config['SCHWAB_SCOPES']
@@ -44,7 +44,7 @@ class SchwabOAuth:
         logger.debug(f"Client ID: {self.client_id}")
         logger.debug(f"Auth URL: {self.auth_url}")
         logger.debug(f"Token URL: {self.token_url}")
-        logger.debug(f"Redirect URI: {self.redirect_uri}")
+        logger.debug(f"Redirect URL: {self.redirect_uri}")
         logger.debug(f"Scopes: {self.scopes}")
     
     def _validate_config(self):
@@ -52,7 +52,7 @@ class SchwabOAuth:
         required_config = [
             'SCHWAB_CLIENT_ID',
             'SCHWAB_CLIENT_SECRET',
-            'SCHWAB_REDIRECT_URI',
+            'SCHWAB_REDIRECT_URL',
             'SCHWAB_AUTH_URL',
             'SCHWAB_TOKEN_URL',
             'SCHWAB_SCOPES'
@@ -68,8 +68,18 @@ class SchwabOAuth:
         try:
             logger.debug("Creating OAuth2Session")
             logger.debug(f"Client ID: {self.client_id}")
-            logger.debug(f"Redirect URI: {self.redirect_uri}")
+            logger.debug(f"Redirect URL: {self.redirect_uri}")
             logger.debug(f"Scopes: {self.scopes}")
+            
+            # Ensure redirect URL includes /auth/callback
+            if not self.redirect_uri.endswith('/auth/callback'):
+                self.redirect_uri = f"{self.redirect_uri}/auth/callback"
+                logger.debug(f"Updated redirect URL: {self.redirect_uri}")
+            
+            # Split scopes into a list if it's a string
+            if isinstance(self.scopes, str):
+                self.scopes = self.scopes.split()
+                logger.debug(f"Updated scopes: {self.scopes}")
             
             oauth = OAuth2Session(
                 self.client_id,

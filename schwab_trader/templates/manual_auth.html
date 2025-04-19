@@ -12,17 +12,24 @@
                     <div class="alert alert-info">
                         <h4 class="alert-heading">Instructions:</h4>
                         <ol>
-                            <li>Click the button below to open Schwab's authorization page in a new tab</li>
-                            <li>Log in to your Schwab account in the new tab</li>
-                            <li>Authorize the application</li>
+                            <li>Click one of the buttons below to open Schwab's login page</li>
+                            <li>Log in to your Schwab account</li>
+                            <li>After logging in, you'll be redirected to authorize the application</li>
                             <li>You will be redirected back to this application automatically</li>
                         </ol>
                     </div>
                     
                     <div class="text-center mt-4">
-                        <button id="authButton" class="btn btn-primary btn-lg">
-                            Open Schwab Authorization
-                        </button>
+                        <div class="mb-3">
+                            <button id="authButton" class="btn btn-primary btn-lg">
+                                Open Schwab Authorization (OAuth)
+                            </button>
+                        </div>
+                        <div>
+                            <button id="directLoginButton" class="btn btn-secondary btn-lg">
+                                Open Schwab Login (Firefox)
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -46,6 +53,11 @@ document.getElementById('authButton').addEventListener('click', async function()
     } catch (error) {
         alert('Error: ' + error.message);
     }
+});
+
+document.getElementById('directLoginButton').addEventListener('click', function() {
+    // Open Schwab login page directly in a new tab
+    window.open('https://sws-gateway.schwab.com/ui/host/#/login-one-step', '_blank');
 });
 </script>
 {% endblock %} 
