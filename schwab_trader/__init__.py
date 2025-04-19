@@ -4,6 +4,7 @@ from flask import Flask
 from flask_caching import Cache
 from schwab_trader.database import init_db, db
 from schwab_trader.utils.logging_utils import setup_logger
+from schwab_trader.utils.error_utils import AppError, handle_error
 
 # Initialize extensions
 cache = Cache()
@@ -49,39 +50,31 @@ def create_app(test_config=None):
     app.register_blueprint(auth.bp)
     
     # Register error handlers
-    from schwab_trader.utils.error_utils import AppError
-    
     @app.errorhandler(AppError)
     def handle_app_error(error):
-        if request.is_json:
-            return jsonify({
-                'status': 'error',
-                'code': error.code,
-                'message': error.message,
-                'details': error.details
-            }), error.status_code
-        return render_template('error.html', error=error), error.status_code
+        return error.to_response()
     
     @app.errorhandler(404)
     def handle_not_found(error):
-        if request.is_json:
-            return jsonify({
-                'status': 'error',
-                'code': 'NOT_FOUND',
-                'message': 'Resource not found'
-            }), 404
-        return render_template('error.html', error=error), 404
+        return AppError(
+            message="Resource not found",
+            status_code=404,
+            code="NOT_FOUND"
+        ).to_response()
     
     @app.errorhandler(500)
     def handle_internal_error(error):
         logger.error(f"Internal server error: {str(error)}", exc_info=True)
-        if request.is_json:
-            return jsonify({
-                'status': 'error',
-                'code': 'INTERNAL_ERROR',
-                'message': 'An unexpected error occurred'
-            }), 500
-        return render_template('error.html', error=error), 500
+        return AppError(
+            message="An unexpected error occurred",
+            status_code=500,
+            code="INTERNAL_ERROR"
+        ).to_response()
+    
+    # Register global error handler
+    @app.errorhandler(Exception)
+    def handle_all_errors(error):
+        return handle_error(error)
     
     return app
 

@@ -6,6 +6,9 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import requests
 from typing import Dict, List, Optional
+from schwab_trader.utils.error_utils import handle_errors, handle_api_error, AppError
+from schwab_trader.utils.logging_utils import get_logger
+from schwab_trader.services.news_service import NewsService
 
 bp = Blueprint('news', __name__, url_prefix='/news')
 
@@ -67,71 +70,86 @@ def news_feed():
 @bp.route('/market')
 @limiter.limit("10 per minute")
 @handle_errors
-def market_news():
-    """Get market news data."""
-    logger.info('Fetching market news')
-    api_key = validate_api_key()
-    
-    # TODO: Implement actual news API integration
-    news = [
-        {
-            'title': 'Market Update',
-            'description': 'Latest market movements and analysis',
-            'source': 'Financial Times',
-            'published_at': datetime.now().isoformat(),
-            'category': 'market'
-        }
-    ]
-    return jsonify(news)
+def get_market_news():
+    """Get market news."""
+    try:
+        news = news_service.get_market_news()
+        return jsonify({
+            'status': 'success',
+            'data': news
+        })
+    except Exception as e:
+        raise AppError(
+            message="Failed to fetch market news",
+            status_code=500,
+            code="MARKET_NEWS_ERROR",
+            details=str(e)
+        )
 
 @bp.route('/headlines')
 @limiter.limit("10 per minute")
 @handle_errors
-def headlines():
-    """Get top business headlines."""
-    logger.info('Fetching business headlines')
-    api_key = validate_api_key()
-    
-    # TODO: Implement actual news API integration
-    headlines = [
-        {
-            'title': 'Business Update',
-            'description': 'Latest business news and updates',
-            'source': 'Bloomberg',
-            'published_at': datetime.now().isoformat(),
-            'category': 'business'
-        }
-    ]
-    return jsonify(headlines)
+def get_business_headlines():
+    """Get business headlines."""
+    try:
+        headlines = news_service.get_business_headlines()
+        return jsonify({
+            'status': 'success',
+            'data': headlines
+        })
+    except Exception as e:
+        raise AppError(
+            message="Failed to fetch business headlines",
+            status_code=500,
+            code="HEADLINES_ERROR",
+            details=str(e)
+        )
 
 @bp.route('/search')
 @limiter.limit("20 per minute")
 @handle_errors
 def search_news():
-    """Search for news articles."""
+    """Search news articles."""
     query = request.args.get('q', '')
-    category = request.args.get('category', '')
     page = int(request.args.get('page', 1))
     per_page = int(request.args.get('per_page', 10))
     
     if not query:
-        raise NewsError('Search query is required', 'INVALID_INPUT', 400)
+        raise AppError(
+            message="Search query is required",
+            status_code=400,
+            code="MISSING_QUERY"
+        )
     
-    api_key = validate_api_key()
-    
-    # TODO: Implement actual news API search
-    results = {
-        'total': 1,
-        'page': page,
-        'per_page': per_page,
-        'articles': [
-            {
-                'title': f'Search result for: {query}',
-                'description': 'This is a mock search result',
-                'source': 'Search API',
-                'published_at': datetime.now().isoformat(),
-                'category': category or 'general'
-            }
-        ]
-    }
-    return jsonify(results) 
+    try:
+        results = news_service.search_news(query, page, per_page)
+        return jsonify({
+            'status': 'success',
+            'data': results
+        })
+    except Exception as e:
+        raise AppError(
+            message="Failed to search news",
+            status_code=500,
+            code="SEARCH_ERROR",
+            details=str(e)
+        )
+
+@bp.route('/api/test_alpha_vantage')
+@handle_api_error
+@handle_errors
+def test_alpha_vantage_api():
+    """Test Alpha Vantage API endpoint."""
+    try:
+        response = news_service.test_alpha_vantage()
+        return jsonify({
+            'status': 'success',
+            'data': response
+        })
+    except Exception as e:
+        raise AppError(
+            message="Failed to test Alpha Vantage API",
+            status_code=500,
+            code="API_TEST_ERROR",
+            details=str(e)
+        ) 

@@ -39,8 +39,10 @@ if ! command_exists pip3; then
     exit 1
 fi
 
-# Create logs directory if it doesn't exist
+# Create necessary directories
+log_message "Creating required directories..."
 mkdir -p logs
+mkdir -p sessions
 
 # Kill any existing Flask server
 kill_flask_server
@@ -78,7 +80,30 @@ pip install -r requirements.txt
 CONFIG_FILE=".env"
 if [ ! -f "$CONFIG_FILE" ]; then
     log_message "Creating .env file..."
-    touch "$CONFIG_FILE"
+    cat > "$CONFIG_FILE" << EOL
+# Flask Configuration
+FLASK_APP=schwab_trader
+FLASK_ENV=development
+SECRET_KEY=$(openssl rand -hex 32)
+
+# Database Configuration
+DATABASE_URL=sqlite:///schwab_trader.db
+
+# Logging Configuration
+LOG_LEVEL=INFO
+LOG_DIR=logs
+
+# Session Configuration
+SESSION_TYPE=filesystem
+SESSION_FILE_DIR=sessions
+SESSION_PERMANENT=true
+PERMANENT_SESSION_LIFETIME=3600
+
+# API Configuration
+SCHWAB_API_KEY=your_api_key_here
+SCHWAB_API_SECRET=your_api_secret_here
+SCHWAB_API_BASE_URL=https://api.schwab.com
+EOL
     chmod 600 "$CONFIG_FILE"  # Make it readable only by the user
 fi
 
@@ -99,8 +124,7 @@ load_env_vars
 
 # Set Flask environment variables
 export FLASK_APP=schwab_trader
-export FLASK_DEBUG=1
-export FLASK_ENV=development
+export FLASK_ENV=${FLASK_ENV:-development}
 
 # Initialize/upgrade the database
 log_message "Initializing/upgrading the database..."

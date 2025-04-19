@@ -1,49 +1,42 @@
-import logging
+"""Centralized logging management for Schwab Trader."""
 import os
-from datetime import datetime
+import logging
 from logging.handlers import RotatingFileHandler
+from typing import Optional
+from .config_utils import Config
 
-def setup_logger(name: str, log_dir: str = 'logs') -> logging.Logger:
-    """
-    Set up a logger with consistent configuration.
-    
-    Args:
-        name: Name of the logger
-        log_dir: Directory to store log files
-        
-    Returns:
-        Configured logger instance
-    """
+def setup_logger(name: str, level: Optional[str] = None) -> logging.Logger:
+    """Set up a logger with the specified name and level."""
     # Create logs directory if it doesn't exist
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
+    os.makedirs(Config.LOG_DIR, exist_ok=True)
     
     # Create logger
     logger = logging.getLogger(name)
-    logger.setLevel(logging.INFO)
+    
+    # Set log level
+    level = level or Config.LOG_LEVEL
+    logger.setLevel(getattr(logging, level.upper()))
     
     # Create formatters
     file_formatter = logging.Formatter(
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
     console_formatter = logging.Formatter(
-        '%(asctime)s - %(levelname)s - %(message)s'
+        '%(levelname)s - %(message)s'
     )
     
-    # Create and configure file handler
-    log_file = os.path.join(log_dir, f'{name}_{datetime.now().strftime("%Y%m%d")}.log')
+    # Create file handler
+    log_file = os.path.join(Config.LOG_DIR, f'{name}.log')
     file_handler = RotatingFileHandler(
         log_file,
         maxBytes=10*1024*1024,  # 10MB
         backupCount=5
     )
     file_handler.setFormatter(file_formatter)
-    file_handler.setLevel(logging.INFO)
     
-    # Create and configure console handler
+    # Create console handler
     console_handler = logging.StreamHandler()
     console_handler.setFormatter(console_formatter)
-    console_handler.setLevel(logging.INFO)
     
     # Add handlers to logger
     logger.addHandler(file_handler)
@@ -51,16 +44,9 @@ def setup_logger(name: str, log_dir: str = 'logs') -> logging.Logger:
     
     return logger
 
+# Create default logger
+logger = setup_logger('schwab_trader')
+
 def get_logger(name: str) -> logging.Logger:
-    """
-    Get a logger instance, creating it if it doesn't exist.
-    
-    Args:
-        name: Name of the logger
-        
-    Returns:
-        Logger instance
-    """
-    if not logging.getLogger(name).handlers:
-        return setup_logger(name)
+    """Get a logger with the specified name."""
     return logging.getLogger(name) 
