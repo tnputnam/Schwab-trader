@@ -1,12 +1,13 @@
-// Initialize chart
+// Initialize charts
 let volumeChart = null;
+let priceChart = null;
 
-// Function to load volume data based on market condition
-async function loadVolumeData(marketCondition) {
+// Function to load historical data based on stock and market condition
+async function loadHistoricalData(symbol, marketCondition) {
     try {
-        const response = await fetch(`/dashboard/api/test_data/TSLA/${marketCondition}`);
+        const response = await fetch(`/dashboard/api/test_data/${symbol}/${marketCondition}`);
         if (!response.ok) {
-            throw new Error('Failed to fetch volume data');
+            throw new Error('Failed to fetch historical data');
         }
         
         const data = await response.json();
@@ -14,7 +15,7 @@ async function loadVolumeData(marketCondition) {
             throw new Error(data.message || 'Error loading data');
         }
         
-        // Process the data for the chart
+        // Process the data for the charts
         const chartData = {
             labels: data.data.prices.map(p => p.date),
             datasets: [{
@@ -22,11 +23,17 @@ async function loadVolumeData(marketCondition) {
                 data: data.data.prices.map(p => p.volume),
                 backgroundColor: 'rgba(54, 162, 235, 0.5)',
                 borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
+                borderWidth: 1,
+                yAxisID: 'y1'
+            }, {
+                label: 'Price',
+                data: data.data.prices.map(p => p.close),
+                borderColor: 'rgba(75, 192, 192, 1)',
+                yAxisID: 'y'
             }]
         };
         
-        // Update or create the chart
+        // Update or create the volume chart
         if (volumeChart) {
             volumeChart.data = chartData;
             volumeChart.update();
@@ -40,23 +47,31 @@ async function loadVolumeData(marketCondition) {
                     maintainAspectRatio: false,
                     scales: {
                         y: {
-                            beginAtZero: true,
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Price'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
                             title: {
                                 display: true,
                                 text: 'Volume'
-                            }
-                        },
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'Date'
+                            },
+                            grid: {
+                                drawOnChartArea: false
                             }
                         }
                     },
                     plugins: {
                         title: {
                             display: true,
-                            text: `Volume Analysis - ${marketCondition.charAt(0).toUpperCase() + marketCondition.slice(1)} Market`
+                            text: `${symbol} - ${marketCondition.charAt(0).toUpperCase() + marketCondition.slice(1)} Market Analysis`
                         }
                     }
                 }
@@ -64,23 +79,40 @@ async function loadVolumeData(marketCondition) {
         }
         
         // Update market condition info
+        const minPrice = Math.min(...data.data.prices.map(p => p.low));
+        const maxPrice = Math.max(...data.data.prices.map(p => p.high));
+        const avgVolume = Math.round(data.data.prices.reduce((sum, p) => sum + p.volume, 0) / data.data.prices.length);
+        
         document.getElementById('marketConditionInfo').innerHTML = `
-            <p>Period: ${data.data.period.start} to ${data.data.period.end}</p>
-            <p>Price Range: $${Math.min(...data.data.prices.map(p => p.low)).toFixed(2)} - $${Math.max(...data.data.prices.map(p => p.high)).toFixed(2)}</p>
+            <div class="market-stats">
+                <p><strong>Period:</strong> ${data.data.period.start} to ${data.data.period.end}</p>
+                <p><strong>Price Range:</strong> $${minPrice.toFixed(2)} - $${maxPrice.toFixed(2)}</p>
+                <p><strong>Average Daily Volume:</strong> ${avgVolume.toLocaleString()}</p>
+                <p><strong>Total Trades:</strong> ${data.data.trades.length}</p>
+                <p><strong>Buy/Sell Ratio:</strong> ${data.data.trades.filter(t => t.type === 'buy').length}/${data.data.trades.filter(t => t.type === 'sell').length}</p>
+            </div>
         `;
         
     } catch (error) {
-        console.error('Error loading volume data:', error);
-        showNotification('Error loading volume data: ' + error.message, 'error');
+        console.error('Error loading historical data:', error);
+        showNotification('Error loading historical data: ' + error.message, 'error');
     }
 }
 
-// Event listener for market condition selector
+// Event listeners for stock and market condition selectors
+document.getElementById('stockSymbol').addEventListener('change', (e) => {
+    const marketCondition = document.getElementById('marketCondition').value;
+    loadHistoricalData(e.target.value, marketCondition);
+});
+
 document.getElementById('marketCondition').addEventListener('change', (e) => {
-    loadVolumeData(e.target.value);
+    const symbol = document.getElementById('stockSymbol').value;
+    loadHistoricalData(symbol, e.target.value);
 });
 
 // Load initial data
 document.addEventListener('DOMContentLoaded', () => {
-    loadVolumeData('bullish'); // Default to bullish market
+    const symbol = document.getElementById('stockSymbol').value;
+    const marketCondition = document.getElementById('marketCondition').value;
+    loadHistoricalData(symbol, marketCondition);
 }); 
