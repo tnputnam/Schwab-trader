@@ -446,17 +446,6 @@
         gap: 10px;
     }
 
-    .metric-card {
-        background: #f8f9fa;
-        padding: 10px;
-        border-radius: 4px;
-    }
-
-    .metric-value {
-        font-size: 1.1rem;
-        font-weight: 500;
-    }
-
     @media (max-width: 768px) {
         .stock-grid {
             grid-template-columns: 1fr;
@@ -561,6 +550,53 @@
             </div>
         </div>
     </div>
+
+    <!-- Real-time Data Stream -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Real-time Data Stream</h5>
+                    <div class="stream-controls">
+                        <button class="stream-button start-stream" onclick="startDataStream()">Start Stream</button>
+                        <button class="stream-button stop-stream" onclick="stopDataStream()">Stop Stream</button>
+                        <button class="stream-button clear-stream" onclick="clearDataStream()">Clear Stream</button>
+                    </div>
+                    <div class="data-stream" id="dataStream">
+                        <!-- Data points will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Technical Analysis -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Technical Analysis</h5>
+                    <div class="technical-indicators" id="technicalIndicators">
+                        <!-- Indicators will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Market Depth -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Market Depth</h5>
+                    <div class="depth-chart" id="depthChart">
+                        <!-- Market depth chart will be rendered here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
 {{ components.api_status() }}
@@ -570,6 +606,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 let priceChart, volumeChart, maChart, rsiChart;
+let dataStreamInterval;
 
 // Check authentication status on page load
 window.onload = function() {
@@ -607,6 +644,7 @@ function updateData() {
         .then(data => {
             if (data.status === 'success') {
                 updateCharts(data.data);
+                updateTechnicalIndicators(data.data);
             } else {
                 showError(data.message);
             }
@@ -710,6 +748,87 @@ function updateCharts(data) {
                 }
             }
         });
+    }
+}
+
+function updateTechnicalIndicators(data) {
+    const indicatorsContainer = document.getElementById('technicalIndicators');
+    const indicators = [
+        {
+            label: 'RSI',
+            value: data.rsi ? data.rsi[data.rsi.length - 1].toFixed(2) : 'N/A',
+            change: data.rsi ? (data.rsi[data.rsi.length - 1] - data.rsi[data.rsi.length - 2]).toFixed(2) : 'N/A',
+            isPositive: data.rsi ? data.rsi[data.rsi.length - 1] > 50 : false
+        },
+        {
+            label: 'MACD',
+            value: data.macd ? data.macd[data.macd.length - 1].toFixed(2) : 'N/A',
+            change: data.macd ? (data.macd[data.macd.length - 1] - data.macd[data.macd.length - 2]).toFixed(2) : 'N/A',
+            isPositive: data.macd ? data.macd[data.macd.length - 1] > 0 : false
+        },
+        {
+            label: 'Bollinger Bands',
+            value: data.bb ? data.bb[data.bb.length - 1].toFixed(2) : 'N/A',
+            change: data.bb ? (data.bb[data.bb.length - 1] - data.bb[data.bb.length - 2]).toFixed(2) : 'N/A',
+            isPositive: data.bb ? data.bb[data.bb.length - 1] > 0 : false
+        }
+    ];
+
+    indicatorsContainer.innerHTML = indicators.map(indicator => `
+        <div class="indicator-card ${indicator.isPositive ? 'positive' : 'negative'}">
+            <div class="indicator-label">${indicator.label}</div>
+            <div class="indicator-value">
+                ${indicator.value}
+                <span class="indicator-change ${indicator.isPositive ? 'positive' : 'negative'}">
+                    ${indicator.change > 0 ? '+' : ''}${indicator.change}
+                </span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function startDataStream() {
+    if (dataStreamInterval) return;
+    
+    const symbol = document.getElementById('symbol').value;
+    dataStreamInterval = setInterval(() => {
+        fetch(`/analysis/api/stream-data?symbol=${symbol}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateDataStream(data.data);
+                }
+            })
+            .catch(error => console.error('Error streaming data:', error));
+    }, 1000);
+}
+
+function stopDataStream() {
+    if (dataStreamInterval) {
+        clearInterval(dataStreamInterval);
+        dataStreamInterval = null;
+    }
+}
+
+function clearDataStream() {
+    document.getElementById('dataStream').innerHTML = '';
+}
+
+function updateDataStream(data) {
+    const streamContainer = document.getElementById('dataStream');
+    const dataPoint = document.createElement('div');
+    dataPoint.className = 'data-point';
+    
+    dataPoint.innerHTML = Object.entries(data).map(([key, value]) => `
+        <div class="data-label">${key}</div>
+        <div class="data-value">${value}</div>
+    `).join('');
+    
+    streamContainer.insertBefore(dataPoint, streamContainer.firstChild);
+    
+    // Limit the number of data points shown
+    while (streamContainer.children.length > 50) {
+        streamContainer.removeChild(streamContainer.lastChild);
     }
 }
 
