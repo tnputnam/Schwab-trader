@@ -192,11 +192,154 @@
         background-color: #f8d7da;
         color: #842029;
     }
+
+    .simulation-results {
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 15px;
+        margin-top: 20px;
+    }
+
+    .simulation-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+
+    .simulation-metric {
+        text-align: center;
+        padding: 10px;
+        background: #f8f9fa;
+        border-radius: 4px;
+    }
+
+    .simulation-metric .label {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .simulation-metric .value {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: #212529;
+    }
+
+    .simulation-metric .value.positive {
+        color: #198754;
+    }
+
+    .simulation-metric .value.negative {
+        color: #dc3545;
+    }
+
+    .trade-history {
+        margin-top: 20px;
+    }
+
+    .trade-history table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .trade-history th,
+    .trade-history td {
+        padding: 8px;
+        text-align: left;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .trade-history th {
+        background: #f8f9fa;
+        font-weight: 500;
+    }
+
+    .trade-history tr:hover {
+        background: #f8f9fa;
+    }
+
+    .trade-history .profit.positive {
+        color: #198754;
+    }
+
+    .trade-history .profit.negative {
+        color: #dc3545;
+    }
+
+    .milestones-section {
+        margin-top: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 15px;
+    }
+
+    .milestones-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .milestone-item {
+        padding: 10px;
+        border-radius: 4px;
+        border-left: 4px solid;
+    }
+
+    .milestone-item.positive {
+        background: #d1e7dd;
+        border-left-color: #198754;
+    }
+
+    .milestone-item.negative {
+        background: #f8d7da;
+        border-left-color: #dc3545;
+    }
+
+    .milestone-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+
+    .milestone-date {
+        font-weight: 500;
+    }
+
+    .milestone-type {
+        text-transform: capitalize;
+        font-weight: 600;
+    }
+
+    .milestone-amount {
+        font-weight: 600;
+    }
+
+    .milestone-details {
+        font-size: 0.9rem;
+        color: #495057;
+    }
+
+    .milestone-cause {
+        margin-bottom: 5px;
+    }
+
+    .milestone-total {
+        font-weight: 500;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
+    </div>
+    {% endif %}
+
     {% if not alpha_vantage_available %}
     <div class="alert alert-warning" role="alert">
         <h4 class="alert-heading">Alpha Vantage API Not Configured</h4>
@@ -204,350 +347,221 @@
         <hr>
         <p class="mb-0">You can still view the dashboard, but real-time data and analysis features will be limited.</p>
     </div>
-    {% endif %}
-
-    {{ components.tab_navigation([
-        {'id': 'volume', 'label': 'Volume Analysis'},
-        {'id': 'volatility', 'label': 'Volatility Analysis'},
-        {'id': 'technical', 'label': 'Technical Analysis'}
-    ]) }}
-
-    <div id="volume" class="tab-content active">
-        <div class="analysis-section">
-            <div class="filters card">
-                <h3>Volume Analysis Filters</h3>
-                <div class="filter-group">
-                    <label for="volume-timeframe">Timeframe</label>
-                    <select id="volume-timeframe" class="form-control">
-                        <option value="1d">1 Day</option>
-                        <option value="5d">5 Days</option>
-                        <option value="1m">1 Month</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="volume-min-price">Min Price</label>
-                    <input type="number" id="volume-min-price" class="form-control" min="0" step="0.01">
-                </div>
-                <div class="filter-group">
-                    <label for="volume-min-volume">Min Volume</label>
-                    <input type="number" id="volume-min-volume" class="form-control" min="0">
-                </div>
-                <button id="volume-apply" class="btn btn-primary">
-                    <i class="bi bi-funnel"></i> Apply Filters
-                </button>
-            </div>
-
-            <div class="analysis-results">
-                {{ components.chart_container('volume-chart', 'Volume Distribution') }}
-                <div id="volumeStocks">
-                    <!-- Volume analysis results will be loaded here -->
-                </div>
-            </div>
-        </div>
+    {% else %}
+    <div class="tab-navigation">
+        <button class="tab-button {% if active_tab == 'volume' %}active{% endif %}" 
+                onclick="showTab('volume')">Volume Analysis</button>
+        <button class="tab-button {% if active_tab == 'technical' %}active{% endif %}" 
+                onclick="showTab('technical')">Technical Analysis</button>
+        <button class="tab-button {% if active_tab == 'fundamental' %}active{% endif %}" 
+                onclick="showTab('fundamental')">Fundamental Analysis</button>
     </div>
 
-    <div id="volatility" class="tab-content">
-        <div class="analysis-section">
-            <div class="filters card">
-                <h3>Volatility Analysis Filters</h3>
+    <div id="volume-tab" class="tab-content {% if active_tab == 'volume' %}active{% endif %}">
+        <div class="filter-section">
+            <div class="filter-grid">
                 <div class="filter-group">
-                    <label for="volatility-timeframe">Timeframe</label>
-                    <select id="volatility-timeframe" class="form-control">
-                        <option value="1d">1 Day</option>
-                        <option value="5d">5 Days</option>
-                        <option value="1m">1 Month</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="volatility-min-price">Min Price</label>
-                    <input type="number" id="volatility-min-price" class="form-control" min="0" step="0.01">
-                </div>
-                <div class="filter-group">
-                    <label for="volatility-min-volume">Min Volume</label>
-                    <input type="number" id="volatility-min-volume" class="form-control" min="0">
-                </div>
-                <button id="volatility-apply" class="btn btn-primary">
-                    <i class="bi bi-funnel"></i> Apply Filters
-                </button>
-            </div>
-
-            <div class="analysis-results">
-                {{ components.chart_container('volatility-chart', 'Volatility Distribution') }}
-                <div id="volatilityStocks">
-                    <!-- Volatility analysis results will be loaded here -->
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="technical" class="tab-content">
-        <div class="analysis-section">
-            <div class="filters card">
-                <h3>Technical Analysis</h3>
-                <div class="filter-group">
-                    <label for="technical-symbol">Symbol</label>
-                    <input type="text" id="technical-symbol" class="form-control" required>
-                </div>
-                <div class="filter-group">
-                    <label for="technical-timeframe">Timeframe</label>
-                    <select id="technical-timeframe" class="form-control">
-                        <option value="1d">1 Day</option>
-                        <option value="5d">5 Days</option>
+                    <label for="timeframe">Timeframe</label>
+                    <select id="timeframe" class="form-select">
                         <option value="1m">1 Month</option>
                         <option value="3m">3 Months</option>
                         <option value="6m">6 Months</option>
-                        <option value="1y">1 Year</option>
+                        <option value="1y" selected>1 Year</option>
+                        <option value="2y">2 Years</option>
+                        <option value="5y">5 Years</option>
                     </select>
                 </div>
-                <button id="technical-analyze" class="btn btn-primary">
-                    <i class="bi bi-graph-up"></i> Analyze
-                </button>
-            </div>
-
-            <div class="analysis-results">
-                <div class="technical-metrics">
-                    {{ components.metric_card('RSI', '0.00', None) }}
-                    {{ components.metric_card('MACD', '0.00', None) }}
-                    {{ components.metric_card('Bollinger Bands', '0.00', None) }}
-                    {{ components.metric_card('Moving Average', '0.00', None) }}
-                </div>
-
-                <div class="technical-charts">
-                    {{ components.chart_container('price-chart', 'Price Chart') }}
-                    {{ components.chart_container('indicators-chart', 'Technical Indicators') }}
+                <div class="filter-group">
+                    <label for="volume-type">Volume Type</label>
+                    <select id="volume-type" class="form-select">
+                        <option value="raw">Raw Volume</option>
+                        <option value="relative">Relative Volume</option>
+                        <option value="sma">Volume SMA</option>
+                    </select>
                 </div>
             </div>
         </div>
+
+        <div class="stock-grid">
+            {% for symbol, data in stock_data.items() %}
+            <div class="stock-card">
+                <div class="stock-header">
+                    <span class="stock-symbol">{{ symbol }}</span>
+                    <span class="stock-price">${{ data[0].close|round(2) }}</span>
+                </div>
+                
+                <div class="stock-metrics">
+                    <div class="metric">
+                        <span class="metric-label">Average Volume</span>
+                        <span class="metric-value">{{ (data|sum(attribute='volume') / data|length)|int }}</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Total Days</span>
+                        <span class="metric-value">{{ data|length }}</span>
+                    </div>
+                </div>
+
+                <div class="volume-chart">
+                    <canvas id="{{ symbol }}-volume-chart"></canvas>
+                </div>
+
+                {% if simulation_results[symbol] %}
+                <div class="simulation-results">
+                    <h4>Volume Trading Simulation</h4>
+                    <div class="simulation-metrics">
+                        <div class="simulation-metric">
+                            <div class="label">Initial Budget</div>
+                            <div class="value">${{ simulation_results[symbol].initial_budget|int }}</div>
+                        </div>
+                        <div class="simulation-metric">
+                            <div class="label">Final Budget</div>
+                            <div class="value {% if simulation_results[symbol].final_budget > simulation_results[symbol].initial_budget %}positive{% else %}negative{% endif %}">
+                                ${{ simulation_results[symbol].final_budget|int }}
+                            </div>
+                        </div>
+                        <div class="simulation-metric">
+                            <div class="label">Total Profit</div>
+                            <div class="value {% if simulation_results[symbol].total_profit > 0 %}positive{% else %}negative{% endif %}">
+                                {{ simulation_results[symbol].total_profit|round(2) }}%
+                            </div>
+                        </div>
+                        <div class="simulation-metric">
+                            <div class="label">Profit Amount</div>
+                            <div class="value {% if simulation_results[symbol].total_profit_amount > 0 %}positive{% else %}negative{% endif %}">
+                                ${{ simulation_results[symbol].total_profit_amount|round(2) }}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if simulation_results[symbol].milestones %}
+                    <div class="milestones-section">
+                        <h5>Significant Milestones ($500+)</h5>
+                        <div class="milestones-list">
+                            {% for milestone in simulation_results[symbol].milestones %}
+                            <div class="milestone-item {% if milestone.type == 'gain' %}positive{% else %}negative{% endif %}">
+                                <div class="milestone-header">
+                                    <span class="milestone-date">{{ milestone.date }}</span>
+                                    <span class="milestone-type">{{ milestone.type|title }}</span>
+                                    <span class="milestone-amount">${{ milestone.amount|round(2) }}</span>
+                                </div>
+                                <div class="milestone-details">
+                                    <div class="milestone-cause">{{ milestone.cause }}</div>
+                                    <div class="milestone-total">New Total: ${{ milestone.total|round(2) }}</div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="trade-history">
+                        <h5>Trade History</h5>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Price</th>
+                                    <th>Shares</th>
+                                    <th>Value</th>
+                                    <th>Profit</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for trade in simulation_results[symbol].trades %}
+                                <tr>
+                                    <td>{{ trade.date }}</td>
+                                    <td>{{ trade.type|title }}</td>
+                                    <td>${{ trade.price|round(2) }}</td>
+                                    <td>{{ trade.shares }}</td>
+                                    <td>${{ trade.trade_value|round(2) if trade.type == 'sell' else trade.cost|round(2) }}</td>
+                                    <td class="profit {% if trade.type == 'sell' and trade.profit > 0 %}positive{% elif trade.type == 'sell' and trade.profit < 0 %}negative{% endif %}">
+                                        {% if trade.type == 'sell' %}
+                                        {{ trade.profit|round(2) }}%
+                                        {% else %}
+                                        -
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="stock-actions">
+                    <button class="action-button details" onclick="showDetails('{{ symbol }}')">
+                        View Details
+                    </button>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
     </div>
+
+    <div id="technical-tab" class="tab-content {% if active_tab == 'technical' %}active{% endif %}">
+        <!-- Technical analysis content will go here -->
+    </div>
+
+    <div id="fundamental-tab" class="tab-content {% if active_tab == 'fundamental' %}active{% endif %}">
+        <!-- Fundamental analysis content will go here -->
+    </div>
+    {% endif %}
 </div>
 
 {{ components.api_status() }}
 {% endblock %}
 
 {% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    let volumeChart;
-    let volatilityChart;
-    let priceChart;
-    let indicatorsChart;
+function showTab(tabName) {
+    // Hide all tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.classList.remove('active');
+    });
+    
+    // Show selected tab
+    document.getElementById(`${tabName}-tab`).classList.add('active');
+    document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`).classList.add('active');
+}
 
-    // Volume Analysis Functions
-    function loadVolumeAnalysis() {
-        const container = document.getElementById('volumeStocks');
-        container.innerHTML = '{{ components.loading_message() }}';
+function showDetails(symbol) {
+    // Implement details view
+    console.log(`Showing details for ${symbol}`);
+}
 
-        const timeframe = document.getElementById('volume-timeframe').value;
-        const minPrice = document.getElementById('volume-min-price').value;
-        const minVolume = document.getElementById('volume-min-volume').value;
-
-        fetch(`/api/analysis/volume?timeframe=${timeframe}&min_price=${minPrice}&min_volume=${minVolume}`)
-            .then(response => response.json())
-            .then(data => {
-                container.innerHTML = '';
-                
-                if (data.stocks.length === 0) {
-                    container.innerHTML = '<div class="empty-state">No stocks found matching criteria</div>';
-                    return;
-                }
-
-                data.stocks.forEach(stock => {
-                    const stockElement = createStockElement(stock);
-                    container.appendChild(stockElement);
-                });
-
-                updateVolumeChart(data.distribution);
-            })
-            .catch(error => {
-                console.error('Error loading volume analysis:', error);
-                container.innerHTML = '{{ components.error_message("Error loading volume analysis. Please try again.") }}';
-            });
-    }
-
-    function updateVolumeChart(data) {
-        const ctx = document.getElementById('volume-chart').getContext('2d');
-        
-        if (volumeChart) {
-            volumeChart.destroy();
-        }
-        
-        volumeChart = new Chart(ctx, createChartConfig('bar', {
-            labels: data.labels,
+document.addEventListener('DOMContentLoaded', function() {
+    {% for symbol, data in stock_data.items() %}
+    // Volume Chart
+    const volumeCtx = document.getElementById('{{ symbol }}-volume-chart').getContext('2d');
+    new Chart(volumeCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ data|map(attribute='date')|list|tojson }},
             datasets: [{
-                label: 'Volume Distribution',
-                data: data.values,
-                backgroundColor: '#0d6efd',
-                borderColor: '#0d6efd',
+                label: 'Volume',
+                data: {{ data|map(attribute='volume')|list|tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
                 borderWidth: 1
             }]
-        }));
-    }
-
-    // Volatility Analysis Functions
-    function loadVolatilityAnalysis() {
-        const container = document.getElementById('volatilityStocks');
-        container.innerHTML = '{{ components.loading_message() }}';
-
-        const timeframe = document.getElementById('volatility-timeframe').value;
-        const minPrice = document.getElementById('volatility-min-price').value;
-        const minVolume = document.getElementById('volatility-min-volume').value;
-
-        fetch(`/api/analysis/volatility?timeframe=${timeframe}&min_price=${minPrice}&min_volume=${minVolume}`)
-            .then(response => response.json())
-            .then(data => {
-                container.innerHTML = '';
-                
-                if (data.stocks.length === 0) {
-                    container.innerHTML = '<div class="empty-state">No stocks found matching criteria</div>';
-                    return;
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
                 }
-
-                data.stocks.forEach(stock => {
-                    const stockElement = createStockElement(stock);
-                    container.appendChild(stockElement);
-                });
-
-                updateVolatilityChart(data.distribution);
-            })
-            .catch(error => {
-                console.error('Error loading volatility analysis:', error);
-                container.innerHTML = '{{ components.error_message("Error loading volatility analysis. Please try again.") }}';
-            });
-    }
-
-    function updateVolatilityChart(data) {
-        const ctx = document.getElementById('volatility-chart').getContext('2d');
-        
-        if (volatilityChart) {
-            volatilityChart.destroy();
+            }
         }
-        
-        volatilityChart = new Chart(ctx, createChartConfig('bar', {
-            labels: data.labels,
-            datasets: [{
-                label: 'Volatility Distribution',
-                data: data.values,
-                backgroundColor: '#dc3545',
-                borderColor: '#dc3545',
-                borderWidth: 1
-            }]
-        }));
-    }
-
-    // Technical Analysis Functions
-    function loadTechnicalAnalysis() {
-        const symbol = document.getElementById('technical-symbol').value;
-        const timeframe = document.getElementById('technical-timeframe').value;
-
-        if (!symbol) {
-            showToast('Please enter a stock symbol', 'error');
-            return;
-        }
-
-        fetch(`/api/analysis/technical?symbol=${symbol}&timeframe=${timeframe}`)
-            .then(response => response.json())
-            .then(data => {
-                updateTechnicalMetrics(data.metrics);
-                updatePriceChart(data.price_data);
-                updateIndicatorsChart(data.indicators);
-            })
-            .catch(error => {
-                console.error('Error loading technical analysis:', error);
-                showToast('Error loading technical analysis', 'error');
-            });
-    }
-
-    function updateTechnicalMetrics(metrics) {
-        document.querySelector('[data-metric="RSI"]').textContent = metrics.rsi.toFixed(2);
-        document.querySelector('[data-metric="MACD"]').textContent = metrics.macd.toFixed(2);
-        document.querySelector('[data-metric="Bollinger Bands"]').textContent = metrics.bollinger.toFixed(2);
-        document.querySelector('[data-metric="Moving Average"]').textContent = metrics.ma.toFixed(2);
-    }
-
-    function updatePriceChart(data) {
-        const ctx = document.getElementById('price-chart').getContext('2d');
-        
-        if (priceChart) {
-            priceChart.destroy();
-        }
-        
-        priceChart = new Chart(ctx, createChartConfig('line', {
-            labels: data.dates,
-            datasets: [{
-                label: 'Price',
-                data: data.prices,
-                borderColor: '#0d6efd',
-                tension: 0.1
-            }]
-        }));
-    }
-
-    function updateIndicatorsChart(data) {
-        const ctx = document.getElementById('indicators-chart').getContext('2d');
-        
-        if (indicatorsChart) {
-            indicatorsChart.destroy();
-        }
-        
-        indicatorsChart = new Chart(ctx, createChartConfig('line', {
-            labels: data.dates,
-            datasets: [{
-                label: 'RSI',
-                data: data.rsi,
-                borderColor: '#198754',
-                tension: 0.1
-            }, {
-                label: 'MACD',
-                data: data.macd,
-                borderColor: '#dc3545',
-                tension: 0.1
-            }]
-        }));
-    }
-
-    function createStockElement(stock) {
-        const element = document.createElement('div');
-        element.className = 'stock-item';
-        
-        element.innerHTML = `
-            <div class="stock-header">
-                <span class="stock-symbol">${stock.symbol}</span>
-                <span class="stock-price">$${stock.price.toFixed(2)}</span>
-            </div>
-            <div class="stock-details">
-                <div class="detail">
-                    <span class="label">Change</span>
-                    <span class="value ${stock.change >= 0 ? 'positive' : 'negative'}">
-                        ${stock.change >= 0 ? '+' : ''}${stock.change.toFixed(2)}%
-                    </span>
-                </div>
-                <div class="detail">
-                    <span class="label">Volume</span>
-                    <span class="value">${formatNumber(stock.volume)}</span>
-                </div>
-                <div class="detail">
-                    <span class="label">Market Cap</span>
-                    <span class="value">$${formatNumber(stock.market_cap)}</span>
-                </div>
-            </div>
-            <div class="stock-actions">
-                <button class="btn btn-sm btn-primary" onclick="addToWatchlist('${stock.symbol}')">
-                    <i class="bi bi-plus-circle"></i> Watchlist
-                </button>
-                <button class="btn btn-sm btn-warning" onclick="setAlert('${stock.symbol}')">
-                    <i class="bi bi-bell"></i> Alert
-                </button>
-            </div>
-        `;
-        
-        return element;
-    }
-
-    // Event Listeners
-    document.getElementById('volume-apply').addEventListener('click', loadVolumeAnalysis);
-    document.getElementById('volatility-apply').addEventListener('click', loadVolatilityAnalysis);
-    document.getElementById('technical-analyze').addEventListener('click', loadTechnicalAnalysis);
-
-    // Initial Load
-    loadVolumeAnalysis();
+    });
+    {% endfor %}
+});
 </script>
 {% endblock %} 
