@@ -274,4 +274,47 @@
 #api-status.error {
     background-color: #F44336;
     color: white;
+}
+
+/* Service Status Indicators */
+.services-status {
+    margin-top: 10px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.service-status {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 5px 0;
+    padding: 5px;
+}
+
+.service-name {
+    font-size: 0.9em;
+    color: #666;
+}
+
+.status-indicator {
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.status-indicator.connected {
+    background-color: #4CAF50;
+    color: white;
+}
+
+.status-indicator.error {
+    background-color: #F44336;
+    color: white;
+}
+
+.status-indicator.disconnected {
+    background-color: #FF9800;
+    color: white;
 } 

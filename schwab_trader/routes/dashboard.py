@@ -106,8 +106,63 @@ def test_alpha_vantage():
 
 @bp.route('/api/status')
 def api_status():
-    """API health check endpoint."""
-    return jsonify({
-        'status': 'ok',
-        'timestamp': datetime.now().isoformat()
-    }) 
+    """Mock API health check endpoint."""
+    try:
+        # Simulate API response with mock data
+        mock_response = {
+            'status': 'ok',
+            'timestamp': datetime.now().isoformat(),
+            'services': {
+                'schwab_api': {
+                    'status': 'connected',
+                    'last_update': datetime.now().isoformat()
+                },
+                'alpha_vantage': {
+                    'status': 'connected',
+                    'last_update': datetime.now().isoformat()
+                },
+                'yfinance': {
+                    'status': 'connected',
+                    'last_update': datetime.now().isoformat()
+                }
+            }
+        }
+        return jsonify(mock_response)
+    except Exception as e:
+        logger.error(f"Error in mock API status: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@bp.route('/api/test_data/<symbol>')
+def get_test_data(symbol):
+    """Serve test historical data for a symbol."""
+    try:
+        # For now, we'll use a simple mock data structure
+        mock_data = {
+            'prices': [
+                {'date': '2025-01-01', 'open': 100.0, 'high': 105.0, 'low': 98.0, 'close': 102.0, 'volume': 1000000},
+                {'date': '2025-01-02', 'open': 102.0, 'high': 108.0, 'low': 101.0, 'close': 107.0, 'volume': 1200000},
+                {'date': '2025-01-03', 'open': 107.0, 'high': 110.0, 'low': 105.0, 'close': 108.0, 'volume': 900000},
+                {'date': '2025-01-04', 'open': 108.0, 'high': 112.0, 'low': 106.0, 'close': 110.0, 'volume': 1100000},
+                {'date': '2025-01-05', 'open': 110.0, 'high': 115.0, 'low': 109.0, 'close': 114.0, 'volume': 1300000}
+            ],
+            'trades': [
+                {'date': '2025-01-02', 'type': 'buy', 'price': 102.0, 'volume': 1000},
+                {'date': '2025-01-04', 'type': 'sell', 'price': 110.0, 'volume': 1000}
+            ]
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'symbol': symbol,
+            'data': mock_data
+        })
+    except Exception as e:
+        logger.error(f"Error serving test data: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500 

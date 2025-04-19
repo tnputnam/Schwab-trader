@@ -514,6 +514,9 @@ def test_alpha_vantage_api():
             'message': str(e)
         }), 500
 
+# Register blueprints
+app.register_blueprint(dashboard_bp, url_prefix='/dashboard')
+
 if __name__ == '__main__':
     # Print all registered routes
     print("\nRegistered Routes:")

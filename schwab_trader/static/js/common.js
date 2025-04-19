@@ -1,6 +1,6 @@
 // API Status
 function checkAPIStatus() {
-    fetch('/api/status')
+    fetch('/dashboard/api/status')
         .then(response => {
             if (!response.ok) {
                 throw new Error(`API Error: ${response.status}`);
@@ -11,8 +11,33 @@ function checkAPIStatus() {
             console.log('API Status:', data);
             const statusElement = document.getElementById('api-status');
             if (statusElement) {
-                statusElement.classList.add('connected');
-                statusElement.textContent = 'API Connected';
+                if (data.status === 'ok') {
+                    statusElement.classList.add('connected');
+                    statusElement.textContent = 'All Services Connected';
+                    
+                    // Create detailed status display
+                    const servicesStatus = document.createElement('div');
+                    servicesStatus.className = 'services-status';
+                    servicesStatus.innerHTML = `
+                        <div class="service-status">
+                            <span class="service-name">Schwab API:</span>
+                            <span class="status-indicator ${data.services.schwab_api.status}">${data.services.schwab_api.status}</span>
+                        </div>
+                        <div class="service-status">
+                            <span class="service-name">Alpha Vantage:</span>
+                            <span class="status-indicator ${data.services.alpha_vantage.status}">${data.services.alpha_vantage.status}</span>
+                        </div>
+                        <div class="service-status">
+                            <span class="service-name">YFinance:</span>
+                            <span class="status-indicator ${data.services.yfinance.status}">${data.services.yfinance.status}</span>
+                        </div>
+                    `;
+                    statusElement.appendChild(servicesStatus);
+                } else {
+                    statusElement.classList.add('error');
+                    statusElement.textContent = 'API Error';
+                    showNotification(data.message || 'API Error', 'error');
+                }
             }
         })
         .catch(error => {
