@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "components.html" as components %}
 
-{% block title %}Tesla Dashboard{% endblock %}
+{% block title %}Volume Analysis Dashboard{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -249,393 +249,157 @@
 {% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="tesla-overview">
-        <h2>Tesla (TSLA) Overview</h2>
-        {{ components.stock_card({
-            'symbol': 'TSLA',
-            'price': tesla_data.price,
-            'volume': tesla_data.volume,
-            'change': tesla_data.change,
-            'market_cap': tesla_data.market_cap
-        }) }}
+<div class="dashboard-container">
+    {% if error %}
+    <div class="alert alert-danger" role="alert">
+        {{ error }}
     </div>
+    {% endif %}
 
-    <div class="tesla-analysis">
-        <h2>Volume Analysis</h2>
-        <div class="analysis-chart">
-            <!-- Volume analysis chart will be rendered here -->
-        </div>
+    {% if not alpha_vantage_available %}
+    <div class="alert alert-warning" role="alert">
+        Alpha Vantage API is not configured. Please set the ALPHA_VANTAGE_API_KEY environment variable.
     </div>
-
-    <div class="tesla-news">
-        <h2>Latest News</h2>
-        <div class="news-feed">
-            {% for news_item in tesla_news %}
-                <div class="news-card">
-                    <h3>{{ news_item.title }}</h3>
-                    <p>{{ news_item.summary }}</p>
-                    <a href="{{ news_item.url }}" target="_blank">Read more</a>
-                </div>
+    {% else %}
+    <div class="stock-tabs">
+        <ul class="nav nav-tabs" id="stockTabs" role="tablist">
+            {% for symbol in stock_data.keys() %}
+            <li class="nav-item">
+                <a class="nav-link {% if loop.first %}active{% endif %}" 
+                   id="{{ symbol }}-tab" 
+                   data-bs-toggle="tab" 
+                   href="#{{ symbol }}" 
+                   role="tab">
+                    {{ symbol }}
+                </a>
+            </li>
             {% endfor %}
-        </div>
+        </ul>
     </div>
+
+    <div class="tab-content" id="stockTabsContent">
+        {% for symbol, data in stock_data.items() %}
+        <div class="tab-pane fade {% if loop.first %}show active{% endif %}" 
+             id="{{ symbol }}" 
+             role="tabpanel">
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Total Days</div>
+                    <div class="metric-value">{{ data|length }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Average Volume</div>
+                    <div class="metric-value">{{ (data|sum(attribute='volume') / data|length)|int }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Current Price</div>
+                    <div class="metric-value">{{ data[0].close|round(2) }}</div>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Volume Analysis</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="{{ symbol }}-volume-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-header">
+                    <h3>Price vs Volume</h3>
+                </div>
+                <div class="chart-container">
+                    <canvas id="{{ symbol }}-price-volume-chart"></canvas>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    let charts = {};
-    let currentTimeframe = '1m';
-    let isTrading = false;
-    let isLoading = false;
-
-    // API Status Check
-    async function checkAPIStatus() {
-        try {
-            const response = await fetch('/api/alpha_vantage/status');
-            const data = await response.json();
-            
-            const statusElement = document.getElementById('api-status');
-            if (data.status === 'success') {
-                statusElement.className = 'api-status connected';
-                statusElement.innerHTML = `<i class="bi bi-check-circle"></i> Alpha Vantage API Connected`;
-            } else {
-                statusElement.className = 'api-status error';
-                statusElement.innerHTML = `<i class="bi bi-exclamation-circle"></i> Alpha Vantage API Error: ${data.message}`;
-            }
-        } catch (error) {
-            const statusElement = document.getElementById('api-status');
-            statusElement.className = 'api-status error';
-            statusElement.innerHTML = `<i class="bi bi-exclamation-circle"></i> Alpha Vantage API Error: ${error.message}`;
-        }
-    }
-
-    // Analysis Functions
-    async function fetchTeslaData() {
-        if (isLoading) return;
-        
-        isLoading = true;
-        const loadingElement = document.getElementById('loading');
-        const errorElement = document.getElementById('error-message');
-        
-        loadingElement.style.display = 'inline-block';
-        errorElement.style.display = 'none';
-        
-        try {
-            const response = await fetch(`/api/alpha_vantage/tesla?timeframe=${currentTimeframe}`);
-            if (!response.ok) throw new Error('Failed to fetch data');
-            
-            const data = await response.json();
-            
-            if (data.status === 'success') {
-                updateMetrics(data.metrics);
-                updateCharts(data.chartData);
-                updateNews(data.news);
-            } else {
-                throw new Error(data.message || 'Unknown error occurred');
-            }
-        } catch (error) {
-            console.error('Error fetching Tesla data:', error);
-            errorElement.textContent = error.message;
-            errorElement.style.display = 'block';
-        } finally {
-            isLoading = false;
-            loadingElement.style.display = 'none';
-        }
-    }
-
-    function updateMetrics(metrics) {
-        document.getElementById('current-price').textContent = `$${metrics.current_price.toFixed(2)}`;
-        document.getElementById('today-change').textContent = `${metrics.price_change.toFixed(2)}%`;
-        document.getElementById('today-change').className = `metric-value ${metrics.price_change >= 0 ? 'positive' : 'negative'}`;
-        document.getElementById('market-cap').textContent = `$${(metrics.market_cap / 1e9).toFixed(2)}B`;
-        document.getElementById('pe-ratio').textContent = metrics.pe_ratio.toFixed(2);
-        document.getElementById('volume').textContent = `${(metrics.volume / 1e6).toFixed(1)}M`;
-        document.getElementById('high-52').textContent = `$${metrics.high_52.toFixed(2)}`;
-        document.getElementById('low-52').textContent = `$${metrics.low_52.toFixed(2)}`;
-        document.getElementById('beta').textContent = metrics.beta.toFixed(2);
-        
-        // Volume metrics
-        document.getElementById('avg-volume').textContent = `${(metrics.avg_volume / 1e6).toFixed(1)}M`;
-        document.getElementById('today-volume').textContent = `${(metrics.today_volume / 1e6).toFixed(1)}M`;
-        document.getElementById('volume-change').textContent = `${metrics.volume_change.toFixed(1)}%`;
-        document.getElementById('volume-correlation').textContent = metrics.volume_correlation.toFixed(2);
-        
-        // Technical indicators
-        document.getElementById('rsi').textContent = metrics.rsi.toFixed(2);
-        document.getElementById('macd').textContent = metrics.macd.toFixed(2);
-        document.getElementById('bollinger').textContent = metrics.bollinger.toFixed(2);
-        document.getElementById('ma-50').textContent = `$${metrics.ma_50.toFixed(2)}`;
-        document.getElementById('ma-200').textContent = `$${metrics.ma_200.toFixed(2)}`;
-    }
-
-    function updateCharts(chartData) {
-        // Price chart
-        const priceCtx = document.getElementById('price-chart').getContext('2d');
-        if (charts.price) charts.price.destroy();
-        charts.price = new Chart(priceCtx, {
-            type: 'line',
-            data: {
-                labels: chartData.dates,
-                datasets: [{
-                    label: 'Price',
-                    data: chartData.prices,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: false
-                    }
+document.addEventListener('DOMContentLoaded', function() {
+    {% for symbol, data in stock_data.items() %}
+    // Volume Chart
+    const volumeCtx = document.getElementById('{{ symbol }}-volume-chart').getContext('2d');
+    new Chart(volumeCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ data|map(attribute='date')|list|tojson }},
+            datasets: [{
+                label: 'Volume',
+                data: {{ data|map(attribute='volume')|list|tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                borderColor: 'rgba(54, 162, 235, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true
                 }
             }
-        });
+        }
+    });
 
-        // Volume chart
-        const volumeCtx = document.getElementById('volume-chart').getContext('2d');
-        if (charts.volume) charts.volume.destroy();
-        charts.volume = new Chart(volumeCtx, {
-            type: 'bar',
-            data: {
-                labels: chartData.dates,
-                datasets: [{
-                    label: 'Volume',
-                    data: chartData.volumes,
-                    backgroundColor: 'rgba(255, 99, 132, 0.5)'
-                }]
-            },
-            options: {
-                responsive: true
-            }
-        });
-
-        // Indicators chart
-        const indicatorsCtx = document.getElementById('indicators-chart').getContext('2d');
-        if (charts.indicators) charts.indicators.destroy();
-        charts.indicators = new Chart(indicatorsCtx, {
-            type: 'line',
-            data: {
-                labels: chartData.dates,
-                datasets: [
-                    {
-                        label: 'RSI',
-                        data: chartData.rsi,
-                        borderColor: 'rgb(255, 99, 132)',
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'MACD',
-                        data: chartData.macd,
-                        borderColor: 'rgb(54, 162, 235)',
-                        yAxisID: 'y1'
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        type: 'linear',
+    // Price vs Volume Chart
+    const priceVolumeCtx = document.getElementById('{{ symbol }}-price-volume-chart').getContext('2d');
+    new Chart(priceVolumeCtx, {
+        type: 'line',
+        data: {
+            labels: {{ data|map(attribute='date')|list|tojson }},
+            datasets: [{
+                label: 'Price',
+                data: {{ data|map(attribute='close')|list|tojson }},
+                borderColor: 'rgba(75, 192, 192, 1)',
+                yAxisID: 'y'
+            }, {
+                label: 'Volume',
+                data: {{ data|map(attribute='volume')|list|tojson }},
+                backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                yAxisID: 'y1',
+                type: 'bar'
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
                         display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'RSI'
-                        }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'MACD'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
+                        text: 'Price'
                     }
-                }
-            }
-        });
-    }
-
-    function updateNews(news) {
-        const container = document.getElementById('news-container');
-        container.innerHTML = news.map(item => `
-            <div class="news-item">
-                <div class="news-title">${item.title}</div>
-                <div class="news-source">${item.source}</div>
-                <div class="news-date">${new Date(item.published).toLocaleString()}</div>
-                <a href="${item.link}" target="_blank">Read more</a>
-            </div>
-        `).join('');
-    }
-
-    // Trading Functions
-    async function startTrading() {
-        if (isLoading) return;
-        
-        isLoading = true;
-        const startButton = document.getElementById('start-button');
-        const stopButton = document.getElementById('stop-button');
-        const statusElement = document.getElementById('trading-status');
-        
-        startButton.disabled = true;
-        stopButton.disabled = false;
-        
-        try {
-            const response = await fetch('/api/trading/start', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({
-                    volume_lookback: parseInt(document.getElementById('volume-lookback').value),
-                    volume_threshold: parseFloat(document.getElementById('volume-threshold').value),
-                    min_volume: parseFloat(document.getElementById('min-volume').value),
-                    correlation_window: parseInt(document.getElementById('correlation-window').value),
-                    initial_budget: parseFloat(document.getElementById('initial-budget').value),
-                    position_size: parseFloat(document.getElementById('position-size').value),
-                    stop_loss: parseFloat(document.getElementById('stop-loss').value),
-                    take_profit: parseFloat(document.getElementById('take-profit').value)
-                })
-            });
-            
-            if (response.ok) {
-                isTrading = true;
-                statusElement.className = 'status running';
-                statusElement.textContent = 'Status: Running';
-                updateTradingData();
-            } else {
-                throw new Error('Failed to start trading');
-            }
-        } catch (error) {
-            console.error('Error starting trading:', error);
-            alert('Failed to start trading: ' + error.message);
-            startButton.disabled = false;
-            stopButton.disabled = true;
-        } finally {
-            isLoading = false;
-        }
-    }
-
-    async function stopTrading() {
-        if (isLoading) return;
-        
-        isLoading = true;
-        const startButton = document.getElementById('start-button');
-        const stopButton = document.getElementById('stop-button');
-        const statusElement = document.getElementById('trading-status');
-        
-        try {
-            const response = await fetch('/api/trading/stop', {
-                method: 'POST'
-            });
-            
-            if (response.ok) {
-                isTrading = false;
-                statusElement.className = 'status stopped';
-                statusElement.textContent = 'Status: Stopped';
-                startButton.disabled = false;
-                stopButton.disabled = true;
-            } else {
-                throw new Error('Failed to stop trading');
-            }
-        } catch (error) {
-            console.error('Error stopping trading:', error);
-            alert('Failed to stop trading: ' + error.message);
-        } finally {
-            isLoading = false;
-        }
-    }
-
-    async function updateTradingData() {
-        if (!isTrading) return;
-        
-        try {
-            const response = await fetch('/api/trading/data');
-            if (!response.ok) throw new Error('Failed to fetch trading data');
-            
-            const data = await response.json();
-            
-            // Update metrics
-            document.getElementById('current-balance').textContent = `$${data.balance.toFixed(2)}`;
-            document.getElementById('total-trades').textContent = data.total_trades;
-            document.getElementById('win-rate').textContent = `${(data.win_rate * 100).toFixed(1)}%`;
-            
-            // Update performance chart
-            updatePerformanceChart(data.performance_data);
-            
-            // Update trade list
-            updateTradeList(data.recent_trades);
-            
-            // Schedule next update
-            setTimeout(updateTradingData, 5000);
-        } catch (error) {
-            console.error('Error updating trading data:', error);
-            setTimeout(updateTradingData, 5000);
-        }
-    }
-
-    function updatePerformanceChart(data) {
-        const ctx = document.getElementById('performance-chart').getContext('2d');
-        if (charts.performance) charts.performance.destroy();
-        
-        charts.performance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.dates,
-                datasets: [{
-                    label: 'Portfolio Value',
-                    data: data.values,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                scales: {
-                    y: {
-                        beginAtZero: false
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Volume'
+                    },
+                    grid: {
+                        drawOnChartArea: false
                     }
                 }
             }
-        });
-    }
-
-    function updateTradeList(trades) {
-        const container = document.getElementById('trade-list');
-        container.innerHTML = trades.map(trade => `
-            <div class="trade-item ${trade.type === 'buy' ? 'trade-buy' : 'trade-sell'}">
-                <div><strong>${trade.type.toUpperCase()}</strong> - ${trade.shares} shares @ $${trade.price.toFixed(2)}</div>
-                <div>Time: ${new Date(trade.timestamp).toLocaleString()}</div>
-                <div>Volume: ${(trade.volume / 1e6).toFixed(1)}M</div>
-                <div>Correlation: ${trade.correlation.toFixed(2)}</div>
-            </div>
-        `).join('');
-    }
-
-    // Event Listeners
-    document.querySelectorAll('.timeframe-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            currentTimeframe = btn.dataset.timeframe;
-            document.querySelectorAll('.timeframe-btn').forEach(b => b.classList.remove('active'));
-            btn.classList.add('active');
-            fetchTeslaData();
-        });
+        }
     });
-    
-    // Initial Load
-    document.addEventListener('DOMContentLoaded', () => {
-        checkAPIStatus();
-        fetchTeslaData();
-        document.querySelector(`.timeframe-btn[data-timeframe="${currentTimeframe}"]`).classList.add('active');
-    });
+    {% endfor %}
+});
 </script>
 {% endblock %} 

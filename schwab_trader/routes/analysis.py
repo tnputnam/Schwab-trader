@@ -58,11 +58,65 @@ def volume_analysis():
     """Volume analysis page."""
     try:
         alpha_vantage = get_alpha_vantage()
-        return render_template('tesla_dashboard.html', alpha_vantage_available=alpha_vantage is not None)
+        if not alpha_vantage:
+            return render_template('tesla_dashboard.html', 
+                                alpha_vantage_available=False,
+                                error="Alpha Vantage API not configured")
+        
+        # Define stocks to analyze
+        stocks = ['TSLA', 'NVDA', 'AAPL']
+        stock_data = {}
+        
+        for symbol in stocks:
+            try:
+                # Get daily data with full output size for 12 months
+                data = alpha_vantage.get_daily_data(symbol, outputsize="full")
+                if "Time Series (Daily)" in data:
+                    daily_data = data["Time Series (Daily)"]
+                    # Convert to list of daily records
+                    stock_data[symbol] = [
+                        {
+                            'date': date,
+                            'open': float(day_data['1. open']),
+                            'high': float(day_data['2. high']),
+                            'low': float(day_data['3. low']),
+                            'close': float(day_data['4. close']),
+                            'volume': int(day_data['5. volume'])
+                        }
+                        for date, day_data in daily_data.items()
+                    ]
+            except Exception as e:
+                logger.error(f"Error fetching data for {symbol}: {str(e)}")
+                stock_data[symbol] = []
+        
+        return render_template('tesla_dashboard.html', 
+                            alpha_vantage_available=True,
+                            stock_data=stock_data)
     except Exception as e:
         logger.error(f"Error in volume_analysis route: {str(e)}")
         flash(f"Error loading volume analysis page: {str(e)}", "error")
-        return render_template('tesla_dashboard.html', alpha_vantage_available=False)
+        return render_template('tesla_dashboard.html', 
+                            alpha_vantage_available=False,
+                            error=str(e))
+
+@bp.route('/api/volume_analysis', methods=['POST'])
+def api_volume_analysis():
+    """API endpoint for volume analysis."""
+    try:
+        alpha_vantage = get_alpha_vantage()
+        if not alpha_vantage:
+            return jsonify({'error': 'Alpha Vantage API not configured'}), 400
+            
+        data = request.get_json()
+        if not data or 'symbol' not in data:
+            return jsonify({'error': 'No symbol provided'}), 400
+            
+        symbol = data['symbol']
+        result = alpha_vantage.get_daily_data(symbol, outputsize="full")
+        return jsonify({'result': result})
+    except Exception as e:
+        logger.error(f"Error in volume_analysis API: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/api/test_alpha_vantage', methods=['POST'])
 def test_alpha_vantage():
