@@ -216,7 +216,12 @@
         updateInterval: 300000, // 5 minutes
         maxRetries: 3,
         retryDelay: 5000,
-        itemsPerPage: 10
+        itemsPerPage: 10,
+        endpoints: {
+            market: '/news/market',
+            headlines: '/news/headlines',
+            search: '/news/search'
+        }
     };
 
     // State management
@@ -227,6 +232,13 @@
             articles: [],
             total: 0,
             page: 1
+        },
+        isLoading: false,
+        error: null,
+        retryCounts: {
+            market: 0,
+            headlines: 0,
+            search: 0
         }
     };
 
@@ -277,25 +289,45 @@
 
     // News fetching functions
     async function fetchNews(endpoint, params = {}) {
-        const url = new URL(`/news/${endpoint}`, window.location.origin);
-        Object.entries(params).forEach(([key, value]) => {
-            url.searchParams.append(key, value);
-        });
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.message || 'Failed to fetch news');
+        if (state.isLoading) {
+            return;
         }
-        return await response.json();
+
+        state.isLoading = true;
+        state.error = null;
+
+        try {
+            const url = new URL(CONFIG.endpoints[endpoint], window.location.origin);
+            Object.entries(params).forEach(([key, value]) => {
+                url.searchParams.append(key, value);
+            });
+
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch news');
+            }
+
+            return data;
+        } catch (error) {
+            state.error = error.message;
+            throw error;
+        } finally {
+            state.isLoading = false;
+        }
     }
 
-    async function updateNews(endpoint, containerId, retryCount = 0) {
+    async function updateNews(endpoint, containerId) {
         const container = document.getElementById(containerId);
+        const retryCount = state.retryCounts[endpoint];
         
         try {
-            const data = await fetchNews(endpoint);
+            showLoading(container);
+            const data = await fetchNews(endpoint, { limit: CONFIG.itemsPerPage });
+            
             container.innerHTML = '';
+            state.retryCounts[endpoint] = 0; // Reset retry count on success
             
             if (data.length === 0) {
                 container.innerHTML = '<div class="loading">No news available</div>';
@@ -308,17 +340,20 @@
         } catch (error) {
             console.error(`Error updating ${endpoint}:`, error);
             if (retryCount < CONFIG.maxRetries) {
+                state.retryCounts[endpoint]++;
                 showLoading(container);
-                setTimeout(() => updateNews(endpoint, containerId, retryCount + 1), CONFIG.retryDelay);
+                setTimeout(() => updateNews(endpoint, containerId), CONFIG.retryDelay);
             } else {
-                showError(container, `Failed to load ${endpoint}. Please try again later.`);
+                showError(container, `Failed to load ${endpoint}. ${state.error || 'Please try again later.'}`);
             }
         }
     }
 
     async function searchNews() {
         const query = document.getElementById('search-input').value.trim();
-        if (!query) return;
+        if (!query) {
+            return;
+        }
 
         const container = document.getElementById('search-news');
         const resultsSection = document.getElementById('search-results');
@@ -337,15 +372,26 @@
                 total: data.total,
                 page: data.page
             };
+            state.retryCounts.search = 0; // Reset retry count on success
 
             container.innerHTML = '';
+            if (data.articles.length === 0) {
+                container.innerHTML = '<div class="loading">No results found</div>';
+                return;
+            }
+
             data.articles.forEach(item => {
                 container.appendChild(createNewsCard(item));
             });
 
             updatePagination();
         } catch (error) {
-            showError(container, 'Failed to search news. Please try again.');
+            if (state.retryCounts.search < CONFIG.maxRetries) {
+                state.retryCounts.search++;
+                setTimeout(searchNews, CONFIG.retryDelay);
+            } else {
+                showError(container, `Failed to search news. ${state.error || 'Please try again.'}`);
+            }
         }
     }
 
@@ -353,6 +399,11 @@
         const pagination = document.getElementById('search-pagination');
         const totalPages = Math.ceil(state.searchResults.total / CONFIG.itemsPerPage);
         
+        if (totalPages <= 1) {
+            pagination.innerHTML = '';
+            return;
+        }
+
         pagination.innerHTML = `
             <button onclick="changePage(${state.searchResults.page - 1})" 
                     ${state.searchResults.page === 1 ? 'disabled' : ''}>
@@ -367,18 +418,30 @@
     }
 
     function changePage(page) {
-        if (page < 1 || page > Math.ceil(state.searchResults.total / CONFIG.itemsPerPage)) return;
+        if (page < 1 || page > Math.ceil(state.searchResults.total / CONFIG.itemsPerPage)) {
+            return;
+        }
         state.searchResults.page = page;
         searchNews();
     }
 
     function refreshAll() {
+        if (state.isLoading) {
+            return;
+        }
         updateNews('market', 'market-news');
         updateNews('headlines', 'business-headlines');
         if (document.getElementById('search-input').value.trim()) {
             searchNews();
         }
     }
+
+    // Event listeners
+    document.getElementById('search-input').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            searchNews();
+        }
+    });
 
     // Initial data load
     updateNews('market', 'market-news');

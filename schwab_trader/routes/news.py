@@ -6,9 +6,17 @@ from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 import requests
 from typing import Dict, List, Optional
-from schwab_trader.utils.error_utils import handle_errors, handle_api_error, AppError
+from schwab_trader.utils.error_utils import (
+    APIError,
+    AuthenticationError,
+    NetworkError,
+    ValidationError,
+    TimeoutError
+)
 from schwab_trader.utils.logging_utils import get_logger
 from schwab_trader.services.news_service import NewsService
+from schwab_trader.services.auth_service import AuthService
+from flask_login import login_required, current_user
 
 bp = Blueprint('news', __name__, url_prefix='/news')
 
@@ -33,27 +41,47 @@ class NewsError(Exception):
         super().__init__(message)
 
 def handle_errors(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
+    """Decorator to handle different types of errors."""
+    def wrapper(*args, **kwargs):
         try:
             return f(*args, **kwargs)
-        except NewsError as e:
-            logger.error(f'News error in {f.__name__}: {str(e)}')
+        except AuthenticationError as e:
+            logger.error(f"Authentication error: {str(e)}")
             return jsonify({
-                'status': 'error',
-                'code': e.code,
-                'message': e.message,
-                'details': str(e)
-            }), e.status_code
+                'error': e.message,
+                'status_code': 401
+            }), 401
+        except ValidationError as e:
+            logger.error(f"Validation error: {str(e)}")
+            return jsonify({
+                'error': e.message,
+                'status_code': 400
+            }), 400
+        except NetworkError as e:
+            logger.error(f"Network error: {str(e)}")
+            return jsonify({
+                'error': e.message,
+                'status_code': 503
+            }), 503
+        except TimeoutError as e:
+            logger.error(f"Timeout error: {str(e)}")
+            return jsonify({
+                'error': e.message,
+                'status_code': 504
+            }), 504
+        except APIError as e:
+            logger.error(f"API error: {str(e)}")
+            return jsonify({
+                'error': e.message,
+                'status_code': e.status_code or 500
+            }), e.status_code or 500
         except Exception as e:
-            logger.error(f'Unexpected error in {f.__name__}: {str(e)}')
+            logger.error(f"Unexpected error: {str(e)}")
             return jsonify({
-                'status': 'error',
-                'code': 'INTERNAL_ERROR',
-                'message': 'An unexpected error occurred',
-                'details': str(e)
+                'error': 'An unexpected error occurred',
+                'status_code': 500
             }), 500
-    return decorated_function
+    return wrapper
 
 def validate_api_key():
     api_key = current_app.config.get('NEWS_API_KEY')
@@ -61,95 +89,105 @@ def validate_api_key():
         raise NewsError('News API key not configured', 'API_KEY_MISSING', 500)
     return api_key
 
+def development_mode():
+    """Check if running in development mode."""
+    return current_app.config.get('ENV') == 'development'
+
+def ensure_valid_token():
+    """Ensure the user has a valid access token."""
+    if development_mode():
+        return  # Skip authentication in development mode
+    
+    if not current_user.is_authenticated:
+        raise AuthenticationError("User not authenticated")
+    
+    if current_user.is_token_expired():
+        try:
+            tokens = current_user.refresh_token()
+            if not tokens:
+                raise AuthenticationError("Failed to refresh token")
+        except Exception as e:
+            logger.error(f"Token refresh error: {str(e)}")
+            raise AuthenticationError(details=str(e))
+
+def get_access_token():
+    """Get the access token, using a dummy token in development mode."""
+    if development_mode():
+        return "development_token"
+    return current_user.access_token
+
 @bp.route('/')
+@login_required
+@handle_errors
 def news_feed():
     """Display the news feed page."""
     logger.info('Accessing news feed page')
     return render_template('news.html')
 
-@bp.route('/market')
-@limiter.limit("10 per minute")
-@handle_errors
+@bp.route('/market', methods=['GET'])
+@login_required
 def get_market_news():
     """Get market news."""
     try:
-        news = news_service.get_market_news()
-        return jsonify({
-            'status': 'success',
-            'data': news
-        })
+        limit = request.args.get('limit', default=10, type=int)
+        news_service = NewsService()
+        news = news_service.get_market_news(limit=limit)
+        return jsonify(news)
+    except APIError as e:
+        logger.error(f"API error in get_market_news: {str(e)}")
+        return jsonify({'error': str(e)}), e.status_code
     except Exception as e:
-        raise AppError(
-            message="Failed to fetch market news",
-            status_code=500,
-            code="MARKET_NEWS_ERROR",
-            details=str(e)
-        )
+        logger.error(f"Error in get_market_news: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
-@bp.route('/headlines')
-@limiter.limit("10 per minute")
-@handle_errors
+@bp.route('/headlines', methods=['GET'])
+@login_required
 def get_business_headlines():
     """Get business headlines."""
     try:
-        headlines = news_service.get_business_headlines()
-        return jsonify({
-            'status': 'success',
-            'data': headlines
-        })
+        limit = request.args.get('limit', default=10, type=int)
+        news_service = NewsService()
+        headlines = news_service.get_business_headlines(limit=limit)
+        return jsonify(headlines)
+    except APIError as e:
+        logger.error(f"API error in get_business_headlines: {str(e)}")
+        return jsonify({'error': str(e)}), e.status_code
     except Exception as e:
-        raise AppError(
-            message="Failed to fetch business headlines",
-            status_code=500,
-            code="HEADLINES_ERROR",
-            details=str(e)
-        )
+        logger.error(f"Error in get_business_headlines: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
-@bp.route('/search')
-@limiter.limit("20 per minute")
-@handle_errors
+@bp.route('/search', methods=['GET'])
+@login_required
 def search_news():
     """Search news articles."""
-    query = request.args.get('q', '')
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 10))
-    
-    if not query:
-        raise AppError(
-            message="Search query is required",
-            status_code=400,
-            code="MISSING_QUERY"
-        )
-    
     try:
-        results = news_service.search_news(query, page, per_page)
-        return jsonify({
-            'status': 'success',
-            'data': results
-        })
-    except Exception as e:
-        raise AppError(
-            message="Failed to search news",
-            status_code=500,
-            code="SEARCH_ERROR",
-            details=str(e)
+        query = request.args.get('q', '')
+        page = request.args.get('page', default=1, type=int)
+        per_page = request.args.get('per_page', default=10, type=int)
+        
+        if not query:
+            return jsonify({'error': 'Search query is required'}), 400
+            
+        news_service = NewsService()
+        results = news_service.search_news(
+            query=query,
+            page=page,
+            per_page=per_page
         )
+        return jsonify(results)
+    except APIError as e:
+        logger.error(f"API error in search_news: {str(e)}")
+        return jsonify({'error': str(e)}), e.status_code
+    except Exception as e:
+        logger.error(f"Error in search_news: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
 
-@bp.route('/api/test_alpha_vantage')
-@handle_api_error
+@bp.route('/test_api')
+@login_required
 @handle_errors
-def test_alpha_vantage_api():
-    """Test Alpha Vantage API endpoint."""
-    try:
-        response = news_service.test_alpha_vantage()
-        return jsonify({
-            'status': 'success',
-            'data': response
-        })
-    except Exception as e:
-        raise AppError(
-            message="Failed to test Alpha Vantage API",
-            status_code=500,
-            code="API_TEST_ERROR",
-            details=str(e)
-        ) 
+def test_api():
+    """Test Alpha Vantage API connection."""
+    ensure_valid_token()
+    news_service = NewsService()
+    result = news_service.test_api_connection(get_access_token())
+    return jsonify(result) 

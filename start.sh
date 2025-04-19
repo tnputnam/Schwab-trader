@@ -10,6 +10,15 @@ log_message() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
 }
 
+# Function to check if a port is available
+check_port() {
+    local port=$1
+    if lsof -i :$port > /dev/null; then
+        return 1
+    fi
+    return 0
+}
+
 # Function to kill existing Flask server
 kill_flask_server() {
     log_message "Checking for existing Flask server..."
@@ -20,10 +29,47 @@ kill_flask_server() {
     fi
     
     # Double check if port is still in use
-    if lsof -i :5000 > /dev/null; then
+    if ! check_port 5000; then
         log_message "Force closing port 5000..."
         kill $(lsof -t -i:5000) 2>/dev/null || true
         sleep 1
+    fi
+}
+
+# Function to validate environment variables
+validate_env_vars() {
+    local required_vars=(
+        "FLASK_APP"
+        "FLASK_ENV"
+        "SECRET_KEY"
+        "DATABASE_URL"
+        "SCHWAB_API_KEY"
+        "SCHWAB_API_SECRET"
+        "SCHWAB_API_BASE_URL"
+    )
+    
+    for var in "${required_vars[@]}"; do
+        if [ -z "${!var}" ]; then
+            log_message "Error: Required environment variable $var is not set"
+            return 1
+        fi
+    done
+    return 0
+}
+
+# Function to safely load environment variables
+load_env_vars() {
+    if [ -f "$CONFIG_FILE" ]; then
+        log_message "Loading environment variables from $CONFIG_FILE..."
+        # Use python to safely parse the .env file
+        python3 - << EOF
+import os
+from dotenv import load_dotenv
+load_dotenv('$CONFIG_FILE')
+for key, value in os.environ.items():
+    if key.startswith(('FLASK_', 'DATABASE_', 'SCHWAB_', 'SECRET_')):
+        print(f"export {key}='{value}'")
+EOF
     fi
 }
 
@@ -43,12 +89,17 @@ fi
 log_message "Creating required directories..."
 mkdir -p logs
 mkdir -p sessions
+mkdir -p data
 
 # Kill any existing Flask server
 kill_flask_server
 
 # Activate virtual environment
 log_message "Activating virtual environment..."
+if [ ! -d "venv" ]; then
+    log_message "Creating virtual environment..."
+    python3 -m venv venv
+fi
 source venv/bin/activate
 
 # Install/upgrade pip
@@ -58,7 +109,8 @@ pip install --upgrade pip
 # Install requirements if needed
 if [ ! -f "requirements.txt" ]; then
     log_message "Creating requirements.txt..."
-    echo "Flask==2.2.5
+    cat > requirements.txt << EOL
+Flask==2.2.5
 Flask-SQLAlchemy==3.0.5
 Flask-Login==0.6.2
 Flask-Caching==2.0.2
@@ -70,7 +122,9 @@ yfinance==0.2.31
 python-dotenv==1.0.0
 requests==2.31.0
 requests_oauthlib==1.3.1
-sqlalchemy==2.0.23" > requirements.txt
+sqlalchemy==2.0.23
+alembic==1.12.1
+EOL
 fi
 
 log_message "Installing requirements..."
@@ -87,7 +141,7 @@ FLASK_ENV=development
 SECRET_KEY=$(openssl rand -hex 32)
 
 # Database Configuration
-DATABASE_URL=sqlite:///schwab_trader.db
+DATABASE_URL=sqlite:///data/schwab_trader.db
 
 # Logging Configuration
 LOG_LEVEL=INFO
@@ -107,29 +161,25 @@ EOL
     chmod 600 "$CONFIG_FILE"  # Make it readable only by the user
 fi
 
-# Function to load environment variables
-load_env_vars() {
-    if [ -f "$CONFIG_FILE" ]; then
-        log_message "Loading environment variables from $CONFIG_FILE..."
-        while IFS= read -r line; do
-            if [[ ! -z "$line" && ! "$line" =~ ^# ]]; then
-                export "$line"
-            fi
-        done < "$CONFIG_FILE"
-    fi
-}
+# Load environment variables
+eval "$(load_env_vars)"
 
-# Load existing environment variables
-load_env_vars
-
-# Set Flask environment variables
-export FLASK_APP=schwab_trader
-export FLASK_ENV=${FLASK_ENV:-development}
+# Validate environment variables
+if ! validate_env_vars; then
+    log_message "Error: Missing required environment variables. Please check your .env file."
+    exit 1
+fi
 
 # Initialize/upgrade the database
 log_message "Initializing/upgrading the database..."
 if [ -f "create_db.py" ]; then
     python create_db.py
+fi
+
+# Check if port is available
+if ! check_port 5000; then
+    log_message "Error: Port 5000 is already in use. Please free up the port and try again."
+    exit 1
 fi
 
 # Start the Flask server
