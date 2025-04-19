@@ -40,10 +40,10 @@ def trading():
 
 @bp.route('/volume_analysis')
 def volume_analysis():
-    """Display the volume analysis dashboard."""
+    """Redirect to the analysis dashboard."""
     if 'schwab_token' not in session:
         return redirect(url_for('auth.schwab_auth'))
-    return render_template('tesla_dashboard.html')
+    return redirect(url_for('analysis.volume_analysis'))
 
 @bp.route('/api/paper_trade', methods=['POST'])
 def paper_trade():

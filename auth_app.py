@@ -280,11 +280,6 @@ def compare():
     """Display the compare page"""
     return render_template('compare.html')
 
-@app.route('/volume_analysis')
-def volume_analysis():
-    """Display the volume analysis page"""
-    return render_template('tesla_dashboard.html')
-
 @app.route('/dashboard/api/paper_trade', methods=['POST'])
 def paper_trade():
     """Run paper trading with selected strategy"""

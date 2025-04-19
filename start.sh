@@ -48,183 +48,70 @@ kill_flask_server() {
     fi
 }
 
-# Function to validate environment variables
-validate_env_vars() {
-    local required_vars=(
-        "FLASK_APP"
-        "FLASK_ENV"
-        "SECRET_KEY"
-        "DATABASE_URL"
-        "SCHWAB_API_KEY"
-        "SCHWAB_API_SECRET"
-        "SCHWAB_API_BASE_URL"
-    )
+# Function to setup virtual environment
+setup_venv() {
+    if [ ! -d "venv" ]; then
+        log_message "Creating virtual environment..."
+        python3 -m venv venv
+    fi
     
-    for var in "${required_vars[@]}"; do
-        if [ -z "${!var}" ]; then
-            log_message "Error: Required environment variable $var is not set"
-            return 1
+    log_message "Activating virtual environment..."
+    source venv/bin/activate
+    
+    log_message "Installing/updating dependencies..."
+    pip install -r requirements.txt
+}
+
+# Function to load environment variables
+load_env() {
+    local env_file=$1
+    if [ -f "$env_file" ]; then
+        log_message "Loading environment variables from $env_file..."
+        export $(grep -v '^#' "$env_file" | xargs)
+    else
+        log_message "Warning: $env_file not found. Using default environment variables."
+    fi
+}
+
+# Main script
+main() {
+    # Check for required commands
+    for cmd in python3 pip virtualenv; do
+        if ! command_exists $cmd; then
+            log_message "Error: $cmd is required but not installed."
+            exit 1
         fi
     done
-    return 0
-}
-
-# Function to safely load environment variables
-load_env_vars() {
-    if [ -f "$CONFIG_FILE" ]; then
-        log_message "Loading environment variables from $CONFIG_FILE..."
-        # Use python to safely parse the .env file
-        python3 - << EOF
-import os
-from dotenv import load_dotenv
-load_dotenv('$CONFIG_FILE')
-for key, value in os.environ.items():
-    if key.startswith(('FLASK_', 'DATABASE_', 'SCHWAB_', 'SECRET_')):
-        print(f"export {key}='{value}'")
-EOF
-    fi
-}
-
-# Function to check if requirements are up to date
-check_requirements() {
-    if [ -f "requirements.txt" ]; then
-        log_message "Checking if requirements are up to date..."
-        pip freeze | sort > current_requirements.txt
-        sort requirements.txt > sorted_requirements.txt
-        if ! diff -q current_requirements.txt sorted_requirements.txt > /dev/null; then
-            return 1
-        fi
-        rm current_requirements.txt sorted_requirements.txt
-    fi
-    return 0
-}
-
-# Function to initialize database
-initialize_database() {
-    log_message "Initializing/upgrading the database..."
-    if [ -f "create_db.py" ]; then
-        if ! python create_db.py; then
-            log_message "Error: Database initialization failed"
-            return 1
-        fi
-    fi
-    return 0
-}
-
-# Main script starts here
-set -e  # Exit on any error
-
-# Check prerequisites
-if ! command_exists python3; then
-    log_message "Error: Python 3 is not installed. Please install Python 3 and try again."
-    exit 1
-fi
-
-if ! command_exists pip3; then
-    log_message "Error: pip3 is not installed. Please install pip3 and try again."
-    exit 1
-fi
-
-# Check disk space
-if ! check_disk_space; then
-    exit 1
-fi
-
-# Create necessary directories
-log_message "Creating required directories..."
-mkdir -p logs sessions data
-
-# Kill any existing Flask server
-kill_flask_server
-
-# Activate virtual environment
-log_message "Activating virtual environment..."
-if [ ! -d "venv" ]; then
-    log_message "Creating virtual environment..."
-    if ! python3 -m venv venv; then
-        log_message "Error: Failed to create virtual environment"
+    
+    # Check disk space
+    if ! check_disk_space; then
         exit 1
     fi
-fi
-source venv/bin/activate
-
-# Install/upgrade pip
-log_message "Upgrading pip..."
-pip install --upgrade pip
-
-# Install requirements if needed
-if ! check_requirements; then
-    log_message "Installing/updating requirements..."
-    if ! pip install -r requirements.txt; then
-        log_message "Error: Failed to install requirements"
-        exit 1
-    fi
-fi
-
-# Check for config file
-CONFIG_FILE=".env"
-if [ ! -f "$CONFIG_FILE" ]; then
-    log_message "Creating .env file..."
-    cat > "$CONFIG_FILE" << EOL
-# Flask Configuration
-FLASK_APP=auth_app.py
-FLASK_ENV=development
-SECRET_KEY=$(openssl rand -hex 32)
-
-# Database Configuration
-DATABASE_URL=sqlite:///data/schwab_trader.db
-
-# Logging Configuration
-LOG_LEVEL=INFO
-LOG_DIR=logs
-
-# Session Configuration
-SESSION_TYPE=filesystem
-SESSION_FILE_DIR=sessions
-SESSION_PERMANENT=true
-PERMANENT_SESSION_LIFETIME=3600
-
-# API Configuration
-SCHWAB_API_KEY=your_api_key_here
-SCHWAB_API_SECRET=your_api_secret_here
-SCHWAB_API_BASE_URL=https://api.schwab.com
-EOL
-    chmod 600 "$CONFIG_FILE"  # Make it readable only by the user
-else
-    log_message "Using existing .env file"
-fi
-
-# Load environment variables
-eval "$(load_env_vars)"
-
-# Initialize database
-if ! initialize_database; then
-    log_message "Error: Database initialization failed"
-    exit 1
-fi
-
-# Start the Flask server
-log_message "Starting Flask server..."
-export FLASK_APP=auth_app.py
-export FLASK_ENV=development
-python -m flask run --host=0.0.0.0 --port=5000 --no-reload 2>&1 | tee -a logs/server.log
-
-# If the server crashes, log the error
-if [ $? -ne 0 ]; then
-    log_message "Error: Server crashed. Check logs/server.log for details."
-    exit 1
-fi
-
-# Trap script exit and cleanup
-cleanup() {
-    log_message "Shutting down..."
+    
+    # Kill existing Flask server
     kill_flask_server
-    if [ -n "$VIRTUAL_ENV" ]; then
-        deactivate
+    
+    # Setup virtual environment
+    setup_venv
+    
+    # Load environment variables
+    if [ "$1" == "test" ]; then
+        load_env "schwab_trader/.env.test"
+    else
+        load_env ".env"
+    fi
+    
+    # Start Flask application
+    log_message "Starting Flask application..."
+    export FLASK_APP=auth_app.py
+    export FLASK_ENV=development
+    
+    if [ "$1" == "test" ]; then
+        python -m flask run --host=0.0.0.0 --port=5001
+    else
+        python -m flask run --host=0.0.0.0 --port=5000
     fi
 }
 
-trap cleanup EXIT
-
-# Keep the script running
-wait 
+# Run main function with arguments
+main "$@" 
