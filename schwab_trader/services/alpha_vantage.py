@@ -2,6 +2,7 @@ import os
 import requests
 from typing import Dict, List, Optional
 import logging
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -98,4 +99,57 @@ class AlphaVantageAPI:
         params = {
             "function": "TOP_GAINERS_LOSERS"
         }
-        return self._make_request(params) 
+        return self._make_request(params)
+
+    def get_historical_data(self, symbol: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+        """
+        Get historical price data for a symbol from Alpha Vantage
+        
+        Args:
+            symbol: Stock symbol
+            start_date: Start date for historical data
+            end_date: End date for historical data
+            
+        Returns:
+            List of dictionaries containing historical price data
+        """
+        try:
+            # Get daily adjusted data
+            function = 'TIME_SERIES_DAILY_ADJUSTED'
+            url = f'{self.base_url}/query?function={function}&symbol={symbol}&outputsize=full&apikey={self.api_key}'
+            
+            response = requests.get(url)
+            if response.status_code != 200:
+                self.logger.error(f"Error getting data from Alpha Vantage: {response.status_code}")
+                return []
+            
+            data = response.json()
+            if 'Time Series (Daily)' not in data:
+                self.logger.error(f"No data returned from Alpha Vantage for {symbol}")
+                return []
+            
+            # Convert data to list of dictionaries
+            daily_data = data['Time Series (Daily)']
+            result = []
+            
+            for date_str, values in daily_data.items():
+                date = datetime.strptime(date_str, '%Y-%m-%d')
+                if start_date <= date <= end_date:
+                    result.append({
+                        'date': date_str,
+                        'open': float(values['1. open']),
+                        'high': float(values['2. high']),
+                        'low': float(values['3. low']),
+                        'close': float(values['4. close']),
+                        'volume': int(values['6. volume'])
+                    })
+            
+            # Sort by date
+            result.sort(key=lambda x: x['date'])
+            
+            self.logger.info(f"Retrieved {len(result)} data points from Alpha Vantage for {symbol}")
+            return result
+            
+        except Exception as e:
+            self.logger.error(f"Error getting historical data from Alpha Vantage for {symbol}: {str(e)}")
+            return [] 
