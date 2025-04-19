@@ -298,12 +298,26 @@
                 </div>
             </div>
 
-            <div class="panel">
-                <div class="panel-header">
-                    <h3>Volume Analysis</h3>
-                </div>
-                <div class="chart-container">
-                    <canvas id="{{ symbol }}-volume-chart"></canvas>
+            <div class="container mt-4">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4>Volume Analysis</h4>
+                                <div class="market-condition-selector">
+                                    <label for="marketCondition">Market Condition:</label>
+                                    <select id="marketCondition" class="form-select">
+                                        <option value="bullish">Bullish Market (Apr 2020 - Mar 2021)</option>
+                                        <option value="bearish">Bearish Market (Jan 2022 - Dec 2022)</option>
+                                        <option value="neutral">Neutral Market (Jul 2021 - Jun 2022)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="card-body">
+                                <div id="volumeChart" style="height: 400px;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
