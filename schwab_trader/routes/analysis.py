@@ -9,7 +9,7 @@ from schwab_trader.services.logging_service import LoggingService
 import pandas as pd
 from schwab_trader.services.strategy_tester import StrategyTester
 
-bp = Blueprint('analysis', __name__, url_prefix='/analysis')
+analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 
 # Configure logging
 logger = LoggingService('analysis').logger
@@ -150,7 +150,7 @@ def simulate_volume_trading(data, baseline_period=252, initial_budget=2000):
         'winning_trades': winning_trades
     }
 
-@bp.route('/news')
+@analysis_bp.route('/news')
 def news():
     """News analysis page."""
     try:
@@ -162,7 +162,7 @@ def news():
         flash(f"Error loading news page: {str(e)}", "error")
         return render_template('analysis_dashboard.html', alpha_vantage_available=False)
 
-@bp.route('/trading')
+@analysis_bp.route('/trading')
 def trading():
     """Trading analysis page."""
     try:
@@ -174,7 +174,7 @@ def trading():
         flash(f"Error loading trading page: {str(e)}", "error")
         return render_template('trading_dashboard.html', alpha_vantage_available=False)
 
-@bp.route('/compare')
+@analysis_bp.route('/compare')
 def compare():
     """Stock comparison page."""
     try:
@@ -186,7 +186,7 @@ def compare():
         flash(f"Error loading comparison page: {str(e)}", "error")
         return render_template('compare.html', alpha_vantage_available=False)
 
-@bp.route('/volume-analysis')
+@analysis_bp.route('/volume-analysis')
 def volume_analysis():
     """Render the volume analysis page with data for multiple stocks."""
     try:
@@ -296,7 +296,7 @@ def volume_analysis():
             log_stats={'total': 0, 'by_level': {}}
         )
 
-@bp.route('/api/volume-analysis/<symbol>')
+@analysis_bp.route('/api/volume-analysis/<symbol>')
 def api_volume_analysis(symbol):
     """API endpoint for volume analysis."""
     try:
@@ -356,7 +356,7 @@ def api_volume_analysis(symbol):
         })
         return jsonify({'error': error_msg}), 500
 
-@bp.route('/api/test_alpha_vantage', methods=['POST'])
+@analysis_bp.route('/api/test_alpha_vantage', methods=['POST'])
 def test_alpha_vantage():
     """Test Alpha Vantage API connection."""
     try:
@@ -374,7 +374,7 @@ def test_alpha_vantage():
         logger.error(f"Error in test_alpha_vantage route: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@bp.route('/test-strategy')
+@analysis_bp.route('/test-strategy')
 def test_strategy():
     """Test a trading strategy on historical data."""
     try:
@@ -442,7 +442,7 @@ def test_strategy():
         logger.error(f"Error testing strategy: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
-@bp.route('/stream-data')
+@analysis_bp.route('/stream-data')
 def stream_data():
     """Stream real-time market data."""
     try:

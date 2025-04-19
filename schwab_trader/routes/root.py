@@ -2,10 +2,10 @@ from flask import Blueprint, render_template, redirect, url_for, session, jsonif
 from datetime import datetime
 from schwab_trader.services.logging_service import LoggingService
 
-bp = Blueprint('root', __name__)
+root_bp = Blueprint('root', __name__)
 logger = LoggingService()
 
-@bp.route('/')
+@root_bp.route('/')
 def index():
     """Main landing page."""
     try:
@@ -14,7 +14,7 @@ def index():
         logger.error(f"Error in index route: {str(e)}")
         return render_template('index.html')
 
-@bp.route('/login')
+@root_bp.route('/login')
 def login():
     """Login page."""
     try:

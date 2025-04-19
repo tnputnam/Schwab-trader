@@ -100,12 +100,19 @@ load_env() {
 # Main script
 main() {
     # Check for required commands
-    for cmd in python3 pip virtualenv; do
+    for cmd in python3 pip; do
         if ! command_exists $cmd; then
             log_message "Error: $cmd is required but not installed."
             exit 1
         fi
     done
+    
+    # Check if python3-venv is installed
+    if ! python3 -c "import venv" 2>/dev/null; then
+        log_message "Error: python3-venv is required but not installed."
+        log_message "Please install it with: sudo apt-get install python3-venv"
+        exit 1
+    fi
     
     # Check disk space
     if ! check_disk_space; then

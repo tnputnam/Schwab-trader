@@ -5,15 +5,15 @@ from schwab_trader.services.data_manager import DataManager
 from schwab_trader.services.schwab_market import SchwabMarketAPI
 from schwab_trader.utils.logger import setup_logger
 
-bp = Blueprint('analysis', __name__, url_prefix='/analysis')
+analysis_dashboard_bp = Blueprint('analysis_dashboard', __name__, url_prefix='/analysis')
 logger = setup_logger('analysis_dashboard')
 
-@bp.route('/')
+@analysis_dashboard_bp.route('/')
 def index():
     """Render the analysis dashboard."""
     return render_template('analysis_dashboard.html')
 
-@bp.route('/api/market-status')
+@analysis_dashboard_bp.route('/api/market-status')
 def get_market_status():
     """Get current market status from Schwab API."""
     try:
@@ -30,7 +30,7 @@ def get_market_status():
             'message': str(e)
         }), 500
 
-@bp.route('/api/market-data')
+@analysis_dashboard_bp.route('/api/market-data')
 def get_market_data():
     """Get market data for analysis."""
     try:
@@ -108,7 +108,7 @@ def get_market_data():
             'message': str(e)
         }), 500
 
-@bp.route('/api/verify-auth')
+@analysis_dashboard_bp.route('/api/verify-auth')
 def verify_auth():
     """Verify Schwab API authentication."""
     try:
