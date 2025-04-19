@@ -13,9 +13,9 @@ log_message() {
 # Function to kill existing Flask server
 kill_flask_server() {
     log_message "Checking for existing Flask server..."
-    if pgrep -f "flask run" > /dev/null; then
+    if pgrep -f "python -m flask" > /dev/null; then
         log_message "Stopping existing Flask server..."
-        pkill -f "flask run"
+        pkill -f "python -m flask"
         sleep 2  # Give it time to shut down gracefully
     fi
     
@@ -45,35 +45,34 @@ mkdir -p logs
 # Kill any existing Flask server
 kill_flask_server
 
-# Check if virtual environment exists, if not create it
-if [ ! -d "schwab-trading-env" ]; then
-    log_message "Creating virtual environment..."
-    python3 -m venv schwab-trading-env
-fi
-
 # Activate virtual environment
 log_message "Activating virtual environment..."
-source schwab-trading-env/bin/activate
+source venv/bin/activate
 
 # Install/upgrade pip
 log_message "Upgrading pip..."
 pip install --upgrade pip
 
-# Install requirements
+# Install requirements if needed
+if [ ! -f "requirements.txt" ]; then
+    log_message "Creating requirements.txt..."
+    echo "Flask==2.2.5
+Flask-SQLAlchemy==3.0.5
+Flask-Login==0.6.2
+Flask-Caching==2.0.2
+Werkzeug==2.2.3
+pandas==2.1.3
+numpy==1.26.2
+matplotlib==3.8.2
+yfinance==0.2.31
+python-dotenv==1.0.0
+requests==2.31.0
+requests_oauthlib==1.3.1
+sqlalchemy==2.0.23" > requirements.txt
+fi
+
 log_message "Installing requirements..."
-pip install Flask==2.2.5 \
-    Flask-SQLAlchemy==3.0.5 \
-    Flask-Login==0.6.2 \
-    Flask-Caching==2.0.2 \
-    Werkzeug==2.2.3 \
-    pandas==2.1.3 \
-    numpy==1.26.2 \
-    matplotlib==3.8.2 \
-    yfinance==0.2.31 \
-    python-dotenv==1.0.0 \
-    requests==2.31.0 \
-    requests_oauthlib==1.3.1 \
-    sqlalchemy==2.0.23
+pip install -r requirements.txt
 
 # Check for config file
 CONFIG_FILE=".env"
@@ -95,29 +94,13 @@ load_env_vars() {
     fi
 }
 
-# Function to save environment variable
-save_env_var() {
-    local var_name=$1
-    local var_value=$2
-    sed -i "/^$var_name=/d" "$CONFIG_FILE"
-    echo "$var_name=$var_value" >> "$CONFIG_FILE"
-    export "$var_name=$var_value"
-}
-
 # Load existing environment variables
 load_env_vars
 
-# Check if environment variables are set
-if [ -z "$ALPHA_VANTAGE_API_KEY" ]; then
-    log_message "ALPHA_VANTAGE_API_KEY is not set. Please enter your Alpha Vantage API key:"
-    read -r api_key
-    save_env_var "ALPHA_VANTAGE_API_KEY" "$api_key"
-    log_message "API key saved to $CONFIG_FILE"
-fi
-
 # Set Flask environment variables
 export FLASK_APP=schwab_trader
-export FLASK_DEBUG=1  # Using FLASK_DEBUG instead of deprecated FLASK_ENV
+export FLASK_DEBUG=1
+export FLASK_ENV=development
 
 # Initialize/upgrade the database
 log_message "Initializing/upgrading the database..."
@@ -127,7 +110,7 @@ fi
 
 # Start the Flask server
 log_message "Starting Flask server..."
-flask run --host=0.0.0.0 --port=5000 2>&1 | tee -a logs/server.log
+python -m flask run --host=0.0.0.0 --port=5000 --no-reload 2>&1 | tee -a logs/server.log
 
 # If the server crashes, log the error
 if [ $? -ne 0 ]; then

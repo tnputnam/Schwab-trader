@@ -1,6 +1,6 @@
 import os
 import requests
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 import logging
 from datetime import datetime
 
@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 class AlphaVantageAPI:
     def __init__(self):
         self.api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
+        self.logger = logging.getLogger(__name__)
         logger.info("Initializing AlphaVantageAPI...")
         if not self.api_key:
             logger.error("ALPHA_VANTAGE_API_KEY environment variable not set")
