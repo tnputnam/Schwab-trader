@@ -5,6 +5,8 @@ import logging
 import os
 import requests
 from schwab_trader.services.alpha_vantage import AlphaVantageAPI
+import pandas as pd
+import numpy as np
 
 bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -140,19 +142,61 @@ def api_status():
 def get_test_data(symbol):
     """Serve test historical data for a symbol."""
     try:
-        # For now, we'll use a simple mock data structure
+        # Generate 12 months of mock data for TSLA
+        # Create date range for the past 12 months
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=365)
+        dates = pd.date_range(start=start_date, end=end_date, freq='D')
+        
+        # Generate mock price data with some realistic volatility
+        # Start with a realistic TSLA price
+        base_price = 180.0
+        prices = []
+        current_price = base_price
+        
+        for date in dates:
+            # Generate daily price movement
+            daily_change = np.random.normal(0, 2.0)  # Average daily change of $2
+            current_price += daily_change
+            current_price = max(100, min(300, current_price))  # Keep within reasonable range
+            
+            # Generate volume with some randomness
+            base_volume = 100000000  # 100M shares
+            volume = int(base_volume * (1 + np.random.normal(0, 0.3)))
+            
+            # Calculate OHLC
+            open_price = current_price
+            high_price = current_price * (1 + abs(np.random.normal(0, 0.02)))
+            low_price = current_price * (1 - abs(np.random.normal(0, 0.02)))
+            close_price = current_price
+            
+            prices.append({
+                'date': date.strftime('%Y-%m-%d'),
+                'open': round(open_price, 2),
+                'high': round(high_price, 2),
+                'low': round(low_price, 2),
+                'close': round(close_price, 2),
+                'volume': volume
+            })
+        
+        # Generate some mock trades
+        trades = []
+        for _ in range(10):  # 10 random trades
+            trade_date = np.random.choice(dates)
+            trade_price = np.random.uniform(min(p['low'] for p in prices), max(p['high'] for p in prices))
+            trade_type = np.random.choice(['buy', 'sell'])
+            trade_volume = int(np.random.uniform(100, 1000))
+            
+            trades.append({
+                'date': trade_date.strftime('%Y-%m-%d'),
+                'type': trade_type,
+                'price': round(trade_price, 2),
+                'volume': trade_volume
+            })
+        
         mock_data = {
-            'prices': [
-                {'date': '2025-01-01', 'open': 100.0, 'high': 105.0, 'low': 98.0, 'close': 102.0, 'volume': 1000000},
-                {'date': '2025-01-02', 'open': 102.0, 'high': 108.0, 'low': 101.0, 'close': 107.0, 'volume': 1200000},
-                {'date': '2025-01-03', 'open': 107.0, 'high': 110.0, 'low': 105.0, 'close': 108.0, 'volume': 900000},
-                {'date': '2025-01-04', 'open': 108.0, 'high': 112.0, 'low': 106.0, 'close': 110.0, 'volume': 1100000},
-                {'date': '2025-01-05', 'open': 110.0, 'high': 115.0, 'low': 109.0, 'close': 114.0, 'volume': 1300000}
-            ],
-            'trades': [
-                {'date': '2025-01-02', 'type': 'buy', 'price': 102.0, 'volume': 1000},
-                {'date': '2025-01-04', 'type': 'sell', 'price': 110.0, 'volume': 1000}
-            ]
+            'prices': prices,
+            'trades': trades
         }
         
         return jsonify({
