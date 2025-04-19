@@ -12,9 +12,8 @@ from schwab_trader.services.strategy_tester import StrategyTester
 bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 
 # Configure logging
-logger = LoggingService()
+logger = LoggingService('analysis').logger
 volume_analysis = VolumeAnalysisService()
-schwab_api = SchwabAPI()
 strategy_tester = StrategyTester()
 
 def get_alpha_vantage():
@@ -156,6 +155,7 @@ def news():
     """News analysis page."""
     try:
         alpha_vantage = get_alpha_vantage()
+        schwab_api = SchwabAPI()  # Initialize inside route
         return render_template('analysis_dashboard.html', alpha_vantage_available=alpha_vantage is not None)
     except Exception as e:
         logger.error(f"Error in news route: {str(e)}")
@@ -167,6 +167,7 @@ def trading():
     """Trading analysis page."""
     try:
         alpha_vantage = get_alpha_vantage()
+        schwab_api = SchwabAPI()  # Initialize inside route
         return render_template('trading_dashboard.html', alpha_vantage_available=alpha_vantage is not None)
     except Exception as e:
         logger.error(f"Error in trading route: {str(e)}")
@@ -178,6 +179,7 @@ def compare():
     """Stock comparison page."""
     try:
         alpha_vantage = get_alpha_vantage()
+        schwab_api = SchwabAPI()  # Initialize inside route
         return render_template('compare.html', alpha_vantage_available=alpha_vantage is not None)
     except Exception as e:
         logger.error(f"Error in compare route: {str(e)}")

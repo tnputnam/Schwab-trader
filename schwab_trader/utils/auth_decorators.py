@@ -2,13 +2,9 @@
 from functools import wraps
 from flask import session, redirect, url_for, flash
 from flask_login import current_user
-import logging
+from schwab_trader.services.logging_service import LoggingService
 
-logger = logging.getLogger('auth_decorators')
-handler = logging.FileHandler('logs/auth_decorators_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = LoggingService('auth_decorators').logger
 
 def require_schwab_auth(f):
     """Decorator to require Schwab authentication."""

@@ -1,4 +1,4 @@
-from flask import Flask, session, redirect, request, jsonify, url_for, render_template
+from flask import Flask, session, redirect, request, jsonify, url_for, render_template, current_app
 from requests_oauthlib import OAuth2Session
 from flask_socketio import SocketIO, emit
 from flask_migrate import Migrate
@@ -67,12 +67,16 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+def get_schwab_oauth():
+    """Get an instance of SchwabOAuth."""
+    return SchwabOAuth()
+
 # Schwab OAuth routes
 @app.route('/auth/schwab')
 def schwab_auth():
     """Start the Schwab OAuth flow."""
     try:
-        schwab = SchwabOAuth()
+        schwab = get_schwab_oauth()
         auth_url = schwab.get_authorization_url()
         return redirect(auth_url)
     except Exception as e:
@@ -86,7 +90,7 @@ def schwab_auth():
 def schwab_callback():
     """Handle the OAuth callback from Schwab."""
     try:
-        schwab = SchwabOAuth()
+        schwab = get_schwab_oauth()
         token = schwab.fetch_token(request.url)
         
         if token:
@@ -214,7 +218,7 @@ def portfolio():
         return redirect(url_for('schwab_auth'))
         
     try:
-        schwab = SchwabOAuth()
+        schwab = get_schwab_oauth()
         accounts = session.get('schwab_accounts', [])
         
         if not accounts:

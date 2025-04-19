@@ -1,5 +1,5 @@
 """Authentication routes for Schwab Trader."""
-from flask import Blueprint, redirect, url_for, session, request, jsonify
+from flask import Blueprint, redirect, url_for, session, request, jsonify, current_app
 from flask_login import login_user, logout_user, current_user
 from schwab_trader.utils.error_utils import (
     handle_errors, AuthenticationError, ValidationError,
@@ -8,68 +8,83 @@ from schwab_trader.utils.error_utils import (
 from schwab_trader.utils.logging_utils import get_logger
 from schwab_trader.services.auth_service import AuthService
 from schwab_trader.models.user import User
+from schwab_trader.utils.schwab_oauth import SchwabOAuth
 
-bp = Blueprint('auth', __name__)
+bp = Blueprint('auth', __name__, url_prefix='/auth')
 logger = get_logger(__name__)
-auth_service = AuthService()
 
-@bp.route('/login')
-@handle_errors
+def get_auth_service():
+    """Get an instance of AuthService."""
+    return AuthService()
+
+@bp.route('/login', methods=['POST'])
 def login():
-    """Login page."""
-    if current_user.is_authenticated:
-        return redirect(url_for('dashboard.index'))
-    return redirect(auth_service.get_auth_url())
+    """Handle user login."""
+    try:
+        auth_service = get_auth_service()
+        data = request.get_json()
+        result = auth_service.login(data)
+        return jsonify(result)
+    except Exception as e:
+        return handle_error(e)
+
+@bp.route('/logout', methods=['POST'])
+def logout():
+    """Handle user logout."""
+    try:
+        auth_service = get_auth_service()
+        result = auth_service.logout()
+        return jsonify(result)
+    except Exception as e:
+        return handle_error(e)
 
 @bp.route('/callback')
-@handle_errors
 def oauth_callback():
-    """OAuth callback handler."""
+    """Handle OAuth callback."""
     try:
-        code = request.args.get('code')
-        if not code:
-            raise ValidationError("Authorization code is required")
-        
-        # Exchange code for tokens
-        tokens = auth_service.exchange_code(code)
-        if not tokens:
-            raise AuthenticationError("Failed to obtain access token")
-        
-        # Get or create user
-        user_info = auth_service.get_user_info(tokens['access_token'])
-        user = User.get_or_create(
-            email=user_info['email'],
-            name=user_info['name']
-        )
-        
-        # Update user tokens
-        user.update_tokens(tokens)
-        
-        # Log in user
-        login_user(user)
-        
+        auth_service = get_auth_service()
+        result = auth_service.handle_oauth_callback(request)
         return redirect(url_for('dashboard.index'))
     except Exception as e:
-        logger.error(f"Authentication error: {str(e)}")
-        raise AuthenticationError(details=str(e))
+        return handle_error(e)
 
-@bp.route('/logout')
-@handle_errors
-def logout():
-    """Logout user."""
-    logout_user()
-    session.clear()
-    return redirect(url_for('root.index'))
+@bp.route('/refresh', methods=['POST'])
+def refresh_token():
+    """Refresh OAuth token."""
+    try:
+        auth_service = get_auth_service()
+        refresh_token = session.get('refresh_token')
+        if not refresh_token:
+            raise AuthenticationError("No refresh token found")
+        result = auth_service.refresh_token(refresh_token)
+        if result:
+            session['access_token'] = result['access_token']
+            session['refresh_token'] = result['refresh_token']
+            session['expires_at'] = result['expires_at'].isoformat()
+        return jsonify(result)
+    except Exception as e:
+        return handle_error(e)
+
+@bp.route('/status')
+def check_auth_status():
+    """Check authentication status."""
+    try:
+        auth_service = get_auth_service()
+        result = auth_service.check_auth_status()
+        return jsonify(result)
+    except Exception as e:
+        return handle_error(e)
 
 @bp.route('/api/refresh_token')
 @handle_api_error
 @handle_errors
-def refresh_token():
+def refresh_token_api():
     """Refresh access token."""
     if not current_user.is_authenticated:
         raise AuthenticationError()
     
     try:
+        auth_service = get_auth_service()
         tokens = auth_service.refresh_token(current_user.refresh_token)
         if not tokens:
             raise AuthenticationError("Failed to refresh token")

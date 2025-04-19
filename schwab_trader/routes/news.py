@@ -20,13 +20,7 @@ from flask_login import login_required, current_user
 from schwab_trader.services.logging_service import LoggingService
 
 bp = Blueprint('news', __name__, url_prefix='/news')
-logger = LoggingService()
-
-# Configure route-specific logger
-handler = logging.FileHandler('logs/api_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+logger = LoggingService('news').logger
 
 # Initialize rate limiter
 limiter = Limiter(
