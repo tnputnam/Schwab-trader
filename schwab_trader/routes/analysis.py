@@ -28,6 +28,7 @@ def simulate_volume_trading(data, baseline_period=252, initial_budget=2000):
         
     # Calculate baseline volume (average over the baseline period)
     baseline_volume = statistics.mean([d['volume'] for d in data[:baseline_period]])
+    logger.info(f"Baseline volume: {baseline_volume:,.0f}")
     
     trades = []
     position = None
@@ -44,6 +45,7 @@ def simulate_volume_trading(data, baseline_period=252, initial_budget=2000):
         if week != current_week:
             current_week = week
             weekly_trades = 0
+            logger.info(f"New week {week}, resetting trade count")
             
         # Skip if we've reached the weekly trade limit
         if weekly_trades >= 5:
@@ -52,10 +54,10 @@ def simulate_volume_trading(data, baseline_period=252, initial_budget=2000):
         volume = day['volume']
         price = day['close']
         
-        # Buy signal: volume 15% above baseline
-        if not position and volume > baseline_volume * 1.15 and available_budget >= price:
-            # Calculate position size (use 20% of available budget)
-            position_size = min(available_budget * 0.2, available_budget)
+        # Buy signal: volume 10% above baseline (changed from 15%)
+        if not position and volume > baseline_volume * 1.10 and available_budget >= price:
+            # Calculate position size (use 50% of available budget, changed from 20%)
+            position_size = min(available_budget * 0.5, available_budget)
             shares = int(position_size / price)
             
             if shares > 0:  # Only execute if we can buy at least 1 share
@@ -70,9 +72,10 @@ def simulate_volume_trading(data, baseline_period=252, initial_budget=2000):
                 available_budget -= position['cost']
                 weekly_trades += 1
                 trades.append(position)
+                logger.info(f"Buy signal: {day['date']} - Price: ${price:.2f}, Volume: {volume:,.0f} ({(volume/baseline_volume-1)*100:.1f}% above baseline)")
             
-        # Sell signal: volume below 5% of baseline
-        elif position and volume < baseline_volume * 0.05:
+        # Sell signal: volume below 10% of baseline (changed from 5%)
+        elif position and volume < baseline_volume * 0.10:
             trade_value = position['shares'] * price
             profit = ((price - position['price']) / position['price']) * 100
             profit_amount = trade_value - position['cost']
@@ -91,6 +94,8 @@ def simulate_volume_trading(data, baseline_period=252, initial_budget=2000):
             available_budget += trade_value
             weekly_trades += 1
             trades.append(trade)
+            position = None
+            logger.info(f"Sell signal: {day['date']} - Price: ${price:.2f}, Volume: {volume:,.0f} ({(volume/baseline_volume-1)*100:.1f}% below baseline), Profit: {profit:.1f}%")
             
             # Check for $500 milestone
             budget_change = available_budget - last_milestone_budget
@@ -98,30 +103,30 @@ def simulate_volume_trading(data, baseline_period=252, initial_budget=2000):
                 milestone = {
                     'date': day['date'],
                     'type': 'gain' if budget_change > 0 else 'loss',
-                    'amount': abs(budget_change),
+                    'amount': budget_change,
                     'total': available_budget,
-                    'cause': f"{'Gain' if budget_change > 0 else 'Loss'} of ${abs(profit_amount):.2f} from {position['shares']} shares of {position['price']:.2f} → {price:.2f}"
+                    'cause': f"Trade profit: {profit:.1f}%"
                 }
                 milestones.append(milestone)
                 last_milestone_budget = available_budget
-            
-            position = None
-            
+                logger.info(f"Milestone reached: {milestone['type']} of ${milestone['amount']:.2f}")
+    
     # Calculate final metrics
-    total_profit = sum([t['profit_amount'] for t in trades if t['type'] == 'sell'])
-    total_profit_percentage = (total_profit / initial_budget) * 100
+    total_trades = len(trades)
     winning_trades = len([t for t in trades if t['type'] == 'sell' and t['profit'] > 0])
+    total_profit = ((available_budget - initial_budget) / initial_budget) * 100
+    
+    logger.info(f"Simulation complete: {total_trades} trades, {winning_trades} winning trades, {total_profit:.1f}% total profit")
     
     return {
-        'baseline_volume': baseline_volume,
         'trades': trades,
-        'total_trades': len(trades),
-        'winning_trades': winning_trades,
-        'total_profit': total_profit_percentage,
-        'total_profit_amount': total_profit,
-        'final_budget': available_budget,
+        'milestones': milestones,
         'initial_budget': initial_budget,
-        'milestones': milestones
+        'final_budget': available_budget,
+        'total_profit': total_profit,
+        'total_profit_amount': available_budget - initial_budget,
+        'total_trades': total_trades,
+        'winning_trades': winning_trades
     }
 
 @bp.route('/news')

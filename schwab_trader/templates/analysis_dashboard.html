@@ -425,114 +425,138 @@
                 </div>
 
                 {% if symbol == 'TSLA' %}
-                <div class="performance-graph">
-                    <h4>TSLA Trading Performance</h4>
-                    <div class="graph-container" style="height: 400px; width: 100%; position: relative;">
-                        <canvas id="tsla-performance-chart" style="width: 100%; height: 100%;"></canvas>
+                <div class="stock-card">
+                    <div class="stock-header">
+                        <span class="stock-symbol">{{ symbol }}</span>
+                        <span class="stock-price">${{ data[0].close|round(2) }}</span>
                     </div>
-                    <!-- Debug information -->
-                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
-                        <p>Data points: {{ data|length }}</p>
-                        <p>First date: {{ data[0].date if data else 'No data' }}</p>
-                        <p>Last date: {{ data[-1].date if data else 'No data' }}</p>
-                    </div>
-                </div>
-                {% endif %}
-
-                {% if simulation_results[symbol] %}
-                <div class="simulation-results">
-                    <h4>Volume Trading Simulation</h4>
-                    <div class="simulation-metrics">
-                        <div class="simulation-metric">
-                            <div class="label">Initial Budget</div>
-                            <div class="value">${{ simulation_results[symbol].initial_budget|int }}</div>
+                    
+                    <div class="stock-metrics">
+                        <div class="metric">
+                            <span class="metric-label">Average Volume</span>
+                            <span class="metric-value">{{ (data|sum(attribute='volume') / data|length)|int }}</span>
                         </div>
-                        <div class="simulation-metric">
-                            <div class="label">Final Budget</div>
-                            <div class="value {% if simulation_results[symbol].final_budget > simulation_results[symbol].initial_budget %}positive{% else %}negative{% endif %}">
-                                ${{ simulation_results[symbol].final_budget|int }}
-                            </div>
-                        </div>
-                        <div class="simulation-metric">
-                            <div class="label">Total Profit</div>
-                            <div class="value {% if simulation_results[symbol].total_profit > 0 %}positive{% else %}negative{% endif %}">
-                                {{ simulation_results[symbol].total_profit|round(2) }}%
-                            </div>
-                        </div>
-                        <div class="simulation-metric">
-                            <div class="label">Profit Amount</div>
-                            <div class="value {% if simulation_results[symbol].total_profit_amount > 0 %}positive{% else %}negative{% endif %}">
-                                ${{ simulation_results[symbol].total_profit_amount|round(2) }}
-                            </div>
+                        <div class="metric">
+                            <span class="metric-label">Total Days</span>
+                            <span class="metric-value">{{ data|length }}</span>
                         </div>
                     </div>
 
-                    {% if simulation_results[symbol].milestones %}
-                    <div class="milestones-section">
-                        <h5>Significant Milestones ($500+)</h5>
-                        <div class="milestones-list">
-                            {% for milestone in simulation_results[symbol].milestones %}
-                            <div class="milestone-item {% if milestone.type == 'gain' %}positive{% else %}negative{% endif %}">
-                                <div class="milestone-header">
-                                    <span class="milestone-date">{{ milestone.date }}</span>
-                                    <span class="milestone-type">{{ milestone.type|title }}</span>
-                                    <span class="milestone-amount">${{ milestone.amount|round(2) }}</span>
-                                </div>
-                                <div class="milestone-details">
-                                    <div class="milestone-cause">{{ milestone.cause }}</div>
-                                    <div class="milestone-total">New Total: ${{ milestone.total|round(2) }}</div>
+                    <div class="volume-chart">
+                        <canvas id="{{ symbol }}-volume-chart"></canvas>
+                    </div>
+
+                    {% if simulation_results[symbol] %}
+                    <div class="simulation-results">
+                        <h4>Volume Trading Simulation</h4>
+                        <div class="simulation-metrics">
+                            <div class="simulation-metric">
+                                <div class="label">Initial Budget</div>
+                                <div class="value">${{ simulation_results[symbol].initial_budget|int }}</div>
+                            </div>
+                            <div class="simulation-metric">
+                                <div class="label">Final Budget</div>
+                                <div class="value {% if simulation_results[symbol].final_budget > simulation_results[symbol].initial_budget %}positive{% else %}negative{% endif %}">
+                                    ${{ simulation_results[symbol].final_budget|int }}
                                 </div>
                             </div>
-                            {% endfor %}
+                            <div class="simulation-metric">
+                                <div class="label">Total Profit</div>
+                                <div class="value {% if simulation_results[symbol].total_profit > 0 %}positive{% else %}negative{% endif %}">
+                                    {{ simulation_results[symbol].total_profit|round(2) }}%
+                                </div>
+                            </div>
+                            <div class="simulation-metric">
+                                <div class="label">Profit Amount</div>
+                                <div class="value {% if simulation_results[symbol].total_profit_amount > 0 %}positive{% else %}negative{% endif %}">
+                                    ${{ simulation_results[symbol].total_profit_amount|round(2) }}
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if simulation_results[symbol].milestones %}
+                        <div class="milestones-section">
+                            <h5>Significant Milestones ($500+)</h5>
+                            <div class="milestones-list">
+                                {% for milestone in simulation_results[symbol].milestones %}
+                                <div class="milestone-item {% if milestone.type == 'gain' %}positive{% else %}negative{% endif %}">
+                                    <div class="milestone-header">
+                                        <span class="milestone-date">{{ milestone.date }}</span>
+                                        <span class="milestone-type">{{ milestone.type|title }}</span>
+                                        <span class="milestone-amount">${{ milestone.amount|round(2) }}</span>
+                                    </div>
+                                    <div class="milestone-details">
+                                        <div class="milestone-cause">{{ milestone.cause }}</div>
+                                        <div class="milestone-total">New Total: ${{ milestone.total|round(2) }}</div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <div class="trade-history">
+                            <h5>Trade History</h5>
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Price</th>
+                                        <th>Shares</th>
+                                        <th>Value</th>
+                                        <th>Profit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for trade in simulation_results[symbol].trades %}
+                                    <tr>
+                                        <td>{{ trade.date }}</td>
+                                        <td>{{ trade.type|title }}</td>
+                                        <td>${{ trade.price|round(2) }}</td>
+                                        <td>{{ trade.shares }}</td>
+                                        <td>${{ trade.trade_value|round(2) if trade.type == 'sell' else trade.cost|round(2) }}</td>
+                                        <td class="profit {% if trade.type == 'sell' and trade.profit > 0 %}positive{% elif trade.type == 'sell' and trade.profit < 0 %}negative{% endif %}">
+                                            {% if trade.type == 'sell' %}
+                                            {{ trade.profit|round(2) }}%
+                                            {% else %}
+                                            -
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                     {% endif %}
 
-                    <div class="trade-history">
-                        <h5>Trade History</h5>
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Date</th>
-                                    <th>Type</th>
-                                    <th>Price</th>
-                                    <th>Shares</th>
-                                    <th>Value</th>
-                                    <th>Profit</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for trade in simulation_results[symbol].trades %}
-                                <tr>
-                                    <td>{{ trade.date }}</td>
-                                    <td>{{ trade.type|title }}</td>
-                                    <td>${{ trade.price|round(2) }}</td>
-                                    <td>{{ trade.shares }}</td>
-                                    <td>${{ trade.trade_value|round(2) if trade.type == 'sell' else trade.cost|round(2) }}</td>
-                                    <td class="profit {% if trade.type == 'sell' and trade.profit > 0 %}positive{% elif trade.type == 'sell' and trade.profit < 0 %}negative{% endif %}">
-                                        {% if trade.type == 'sell' %}
-                                        {{ trade.profit|round(2) }}%
-                                        {% else %}
-                                        -
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                    <div class="stock-actions">
+                        <button class="action-button details" onclick="showDetails('{{ symbol }}')">
+                            View Details
+                        </button>
                     </div>
                 </div>
                 {% endif %}
-
-                <div class="stock-actions">
-                    <button class="action-button details" onclick="showDetails('{{ symbol }}')">
-                        View Details
-                    </button>
-                </div>
             </div>
             {% endfor %}
         </div>
     </div>
+
+    {% if 'TSLA' in stock_data and simulation_results['TSLA'] %}
+    <div class="performance-graph" style="margin-top: 40px; width: 100%;">
+        <h4 style="text-align: center; margin-bottom: 20px;">TSLA Trading Performance</h4>
+        <div class="graph-container" style="height: 600px; width: 100%; position: relative; margin: 20px 0; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px;">
+            <canvas id="tsla-performance-chart" style="width: 100%; height: 100%;"></canvas>
+        </div>
+        <!-- Debug information -->
+        <div style="margin-top: 10px; font-size: 12px; color: #666; text-align: center;">
+            <p>Data points: {{ stock_data['TSLA']|length }}</p>
+            <p>First date: {{ stock_data['TSLA'][0].date if stock_data['TSLA'] else 'No data' }}</p>
+            <p>Last date: {{ stock_data['TSLA'][-1].date if stock_data['TSLA'] else 'No data' }}</p>
+        </div>
+    </div>
+    {% endif %}
 
     <div id="technical-tab" class="tab-content {% if active_tab == 'technical' %}active{% endif %}">
         <!-- Technical analysis content will go here -->
@@ -612,23 +636,37 @@ document.addEventListener('DOMContentLoaded', function() {
     const tslaPrices = {{ data|map(attribute='close')|list|tojson }};
     const tslaVolumes = {{ data|map(attribute='volume')|list|tojson }};
     
-    console.log('Data points:', tslaDates.length);
-    console.log('First date:', tslaDates[0]);
-    console.log('Last date:', tslaDates[tslaDates.length - 1]);
+    // Sort data in chronological order
+    const sortedData = tslaDates.map((date, index) => ({
+        date: date,
+        price: tslaPrices[index],
+        volume: tslaVolumes[index]
+    })).sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    const sortedDates = sortedData.map(d => d.date);
+    const sortedPrices = sortedData.map(d => d.price);
+    const sortedVolumes = sortedData.map(d => d.volume);
+    
+    console.log('Data points:', sortedDates.length);
+    console.log('First date:', sortedDates[0]);
+    console.log('Last date:', sortedDates[sortedDates.length - 1]);
     
     // Get trade points
     const tslaTrades = {{ simulation_results[symbol].trades|tojson }};
+    console.log('Raw trades:', tslaTrades);
     console.log('Number of trades:', tslaTrades.length);
     
     const tslaBuyPoints = tslaTrades.filter(t => t.type === 'buy').map(t => ({
         x: t.date,
         y: t.price
     }));
+    console.log('Buy points:', tslaBuyPoints);
     
     const tslaSellPoints = tslaTrades.filter(t => t.type === 'sell').map(t => ({
         x: t.date,
         y: t.price
     }));
+    console.log('Sell points:', tslaSellPoints);
     
     // Get milestone points
     const tslaMilestones = {{ simulation_results[symbol].milestones|tojson }};
@@ -636,33 +674,38 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const tslaMilestonePoints = tslaMilestones.map(m => ({
         x: m.date,
-        y: tslaPrices[tslaDates.indexOf(m.date)]
+        y: sortedPrices[sortedDates.indexOf(m.date)]
     }));
     
     const tslaPerformanceData = {
-        labels: tslaDates,
+        labels: sortedDates,
         datasets: [
             {
                 label: 'Price',
-                data: tslaPrices,
+                data: sortedPrices,
                 borderColor: 'rgba(75, 192, 192, 1)',
                 backgroundColor: 'rgba(75, 192, 192, 0.2)',
                 fill: true,
-                yAxisID: 'y'
+                yAxisID: 'y',
+                tension: 0.4
             },
             {
                 label: 'Volume',
-                data: tslaVolumes,
+                data: sortedVolumes,
                 borderColor: 'rgba(54, 162, 235, 0.5)',
                 backgroundColor: 'rgba(54, 162, 235, 0.1)',
                 fill: true,
-                yAxisID: 'y1'
+                yAxisID: 'y1',
+                tension: 0.4
             },
             {
                 label: 'Buy Points',
                 data: tslaBuyPoints,
                 pointBackgroundColor: '#28a745',
-                pointRadius: 6,
+                pointBorderColor: '#fff',
+                pointRadius: 10,
+                pointHoverRadius: 15,
+                pointBorderWidth: 2,
                 showLine: false,
                 yAxisID: 'y'
             },
@@ -670,7 +713,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 label: 'Sell Points',
                 data: tslaSellPoints,
                 pointBackgroundColor: '#dc3545',
-                pointRadius: 6,
+                pointBorderColor: '#fff',
+                pointRadius: 10,
+                pointHoverRadius: 15,
+                pointBorderWidth: 2,
                 showLine: false,
                 yAxisID: 'y'
             },
@@ -678,7 +724,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 label: 'Milestones',
                 data: tslaMilestonePoints,
                 pointBackgroundColor: '#ffc107',
-                pointRadius: 8,
+                pointBorderColor: '#fff',
+                pointRadius: 12,
+                pointHoverRadius: 17,
+                pointBorderWidth: 2,
                 showLine: false,
                 yAxisID: 'y'
             }
@@ -702,7 +751,16 @@ document.addEventListener('DOMContentLoaded', function() {
                     position: 'left',
                     title: {
                         display: true,
-                        text: 'Price ($)'
+                        text: 'Price ($)',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: {
+                        font: {
+                            size: 12
+                        }
                     }
                 },
                 y1: {
@@ -711,10 +769,30 @@ document.addEventListener('DOMContentLoaded', function() {
                     position: 'right',
                     title: {
                         display: true,
-                        text: 'Volume'
+                        text: 'Volume',
+                        font: {
+                            size: 14,
+                            weight: 'bold'
+                        }
+                    },
+                    ticks: {
+                        font: {
+                            size: 12
+                        }
                     },
                     grid: {
                         drawOnChartArea: false
+                    }
+                },
+                x: {
+                    ticks: {
+                        font: {
+                            size: 12
+                        },
+                        maxRotation: 45,
+                        minRotation: 45,
+                        autoSkip: true,
+                        maxTicksLimit: 20
                     }
                 }
             },
@@ -730,9 +808,45 @@ document.addEventListener('DOMContentLoaded', function() {
                                 label += '$' + context.parsed.y.toFixed(2);
                             } else if (context.datasetIndex === 1) {
                                 label += context.parsed.y.toLocaleString();
+                            } else if (context.datasetIndex === 2) {
+                                const trade = tslaTrades.find(t => t.date === context.label && t.type === 'buy');
+                                if (trade) {
+                                    label += `Buy at $${trade.price.toFixed(2)} (${trade.shares} shares)`;
+                                }
+                            } else if (context.datasetIndex === 3) {
+                                const trade = tslaTrades.find(t => t.date === context.label && t.type === 'sell');
+                                if (trade) {
+                                    label += `Sell at $${trade.price.toFixed(2)} (${trade.shares} shares, Profit: ${trade.profit.toFixed(2)}%)`;
+                                }
                             }
                             return label;
                         }
+                    }
+                },
+                legend: {
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        pointStyle: 'circle',
+                        padding: 20,
+                        font: {
+                            size: 14
+                        }
+                    }
+                },
+                zoom: {
+                    zoom: {
+                        wheel: {
+                            enabled: true
+                        },
+                        pinch: {
+                            enabled: true
+                        },
+                        mode: 'xy'
+                    },
+                    pan: {
+                        enabled: true,
+                        mode: 'xy'
                     }
                 }
             }
