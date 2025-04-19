@@ -44,6 +44,8 @@ def trading():
 @bp.route('/volume_analysis')
 def volume_analysis():
     """Display the volume analysis dashboard."""
+    if 'schwab_token' not in session:
+        return redirect(url_for('auth.schwab_auth'))
     return render_template('tesla_dashboard.html')
 
 @bp.route('/api/paper_trade', methods=['POST'])
@@ -100,4 +102,12 @@ def test_alpha_vantage():
         return jsonify({
             'status': 'error',
             'message': str(e)
-        }), 500 
+        }), 500
+
+@bp.route('/api/status')
+def api_status():
+    """API health check endpoint."""
+    return jsonify({
+        'status': 'ok',
+        'timestamp': datetime.now().isoformat()
+    }) 

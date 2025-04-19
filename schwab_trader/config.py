@@ -1,6 +1,7 @@
 """Configuration settings for Schwab Trader."""
 import os
 from dotenv import load_dotenv
+from datetime import timedelta
 
 load_dotenv()
 
@@ -11,11 +12,13 @@ DB_PATH = os.path.join(INSTANCE_DIR, 'schwab_trader.db')
 
 class Config:
     """Base configuration."""
-    # Flask
-    SECRET_KEY = os.getenv('SECRET_KEY', 'dev')
+    SECRET_KEY = os.getenv('FLASK_SECRET_KEY', 'dev_key_123')
+    SESSION_TYPE = 'filesystem'
+    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
     
-    # SQLAlchemy
-    SQLALCHEMY_DATABASE_URI = f'sqlite:///{DB_PATH}'
+    # Flask
+    SECRET_KEY = SECRET_KEY
+    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', f'sqlite:///{DB_PATH}')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Flask-Cache
@@ -34,7 +37,7 @@ class Config:
     # Schwab API Configuration
     SCHWAB_CLIENT_ID = os.getenv('SCHWAB_CLIENT_ID')
     SCHWAB_CLIENT_SECRET = os.getenv('SCHWAB_CLIENT_SECRET')
-    SCHWAB_REDIRECT_URI = os.getenv('SCHWAB_REDIRECT_URI', 'https://e4f9-2605-59c8-7260-b910-5014-515f-580b-296f.ngrok-free.app/auth/callback')
+    SCHWAB_REDIRECT_URI = os.getenv('SCHWAB_REDIRECT_URI')
     SCHWAB_AUTH_URL = "https://api.schwabapi.com/v1/oauth/authorize"
     SCHWAB_TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
     SCHWAB_API_BASE_URL = "https://api.schwabapi.com/v1"

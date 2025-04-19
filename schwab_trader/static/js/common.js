@@ -1,20 +1,28 @@
 // API Status
 function checkAPIStatus() {
     fetch('/api/status')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`API Error: ${response.status}`);
+            }
+            return response.json();
+        })
         .then(data => {
-            const statusElement = document.getElementById('apiStatus');
-            if (data.status === 'connected') {
-                statusElement.className = 'api-status connected';
-                statusElement.innerHTML = '<i class="bi bi-check-circle-fill"></i> API Connected';
-            } else {
-                statusElement.className = 'api-status error';
-                statusElement.innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error: ' + data.message;
+            console.log('API Status:', data);
+            const statusElement = document.getElementById('api-status');
+            if (statusElement) {
+                statusElement.classList.add('connected');
+                statusElement.textContent = 'API Connected';
             }
         })
         .catch(error => {
-            document.getElementById('apiStatus').className = 'api-status error';
-            document.getElementById('apiStatus').innerHTML = '<i class="bi bi-x-circle-fill"></i> API Error';
+            console.error('Error checking API status:', error);
+            const statusElement = document.getElementById('api-status');
+            if (statusElement) {
+                statusElement.classList.add('error');
+                statusElement.textContent = 'API Error';
+            }
+            showNotification('Unable to connect to API. Please check if the server is running.', 'error');
         });
 }
 
@@ -153,6 +161,20 @@ function setupAutoRefresh(interval = 300000) { // 5 minutes default
             window.location.reload();
         }
     }, interval);
+}
+
+// Add notification function
+function showNotification(message, type = 'info') {
+    const notification = document.createElement('div');
+    notification.className = `notification ${type}`;
+    notification.textContent = message;
+    
+    document.body.appendChild(notification);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
 }
 
 // Initialize common functionality
