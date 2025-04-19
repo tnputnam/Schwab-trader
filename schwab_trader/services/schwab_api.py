@@ -1,7 +1,7 @@
 """Schwab API service for handling API interactions."""
 import logging
 import requests
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask import current_app, session
 
 logger = logging.getLogger(__name__)
@@ -62,4 +62,41 @@ class SchwabAPI:
             return response.json()
         except requests.exceptions.RequestException as e:
             logger.error(f"Error getting quotes: {str(e)}")
+            raise
+    
+    def get_historical_prices(self, symbol, period="1y", frequency="daily"):
+        """Get historical price data for a symbol."""
+        try:
+            # Convert period to start date
+            end_date = datetime.now()
+            if period == "1m":
+                start_date = end_date - timedelta(days=30)
+            elif period == "3m":
+                start_date = end_date - timedelta(days=90)
+            elif period == "6m":
+                start_date = end_date - timedelta(days=180)
+            elif period == "1y":
+                start_date = end_date - timedelta(days=365)
+            elif period == "2y":
+                start_date = end_date - timedelta(days=730)
+            elif period == "5y":
+                start_date = end_date - timedelta(days=1825)
+            else:
+                start_date = end_date - timedelta(days=365)  # Default to 1 year
+            
+            response = requests.get(
+                f"{self.base_url}/marketdata/pricehistory",
+                headers=self._get_headers(),
+                params={
+                    'symbol': symbol,
+                    'startDate': start_date.strftime('%Y-%m-%d'),
+                    'endDate': end_date.strftime('%Y-%m-%d'),
+                    'frequencyType': frequency,
+                    'needExtendedHoursData': 'false'
+                }
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error getting historical prices for {symbol}: {str(e)}")
             raise 

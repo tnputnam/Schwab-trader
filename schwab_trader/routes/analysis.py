@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash
 import logging
 from datetime import datetime, timedelta
-from schwab_trader.services.alpha_vantage import AlphaVantageAPI
+from schwab_trader.services.schwab_api import SchwabAPI
 import statistics
 import os
 
@@ -23,6 +23,8 @@ def get_alpha_vantage():
             logger.error("ALPHA_VANTAGE_API_KEY environment variable not set")
             raise ValueError("ALPHA_VANTAGE_API_KEY environment variable not set")
         logger.info(f"API key found: {api_key[:4]}...{api_key[-4:]}")
+        logger.info(f"API key length: {len(api_key)}")
+        logger.info(f"API key type: {type(api_key)}")
         return AlphaVantageAPI()
     except ValueError as e:
         logger.error(f"Alpha Vantage API configuration error: {str(e)}")
@@ -184,69 +186,77 @@ def volume_analysis():
     """Volume analysis page."""
     try:
         logger.info("Starting volume analysis...")
-        alpha_vantage = get_alpha_vantage()
-        if not alpha_vantage:
-            logger.error("Alpha Vantage API not configured")
+        try:
+            schwab_api = SchwabAPI()
+        except ValueError as e:
+            logger.error("Schwab API not configured")
             return render_template('analysis_dashboard.html', 
                                 alpha_vantage_available=False,
-                                error="Alpha Vantage API not configured",
+                                error="Please log in to access market data",
                                 stock_data={},
                                 simulation_results={},
                                 active_tab='volume')
         
-        logger.info("Alpha Vantage API configured successfully")
+        logger.info("Schwab API configured successfully")
         # Define stocks to analyze
         stocks = ['TSLA', 'NVDA', 'AAPL']
         stock_data = {}
         simulation_results = {}
+        api_errors = []
         
         for symbol in stocks:
             try:
                 logger.info(f"Fetching data for {symbol}...")
-                # Get daily data with full output size for 12 months
-                data = alpha_vantage.get_daily_data(symbol, outputsize="full")
+                # Get historical data for 1 year
+                data = schwab_api.get_historical_prices(symbol, period="1y")
                 logger.info(f"Raw API response for {symbol}: {data.keys()}")
                 
-                if "Time Series (Daily)" in data:
-                    daily_data = data["Time Series (Daily)"]
+                if "candles" in data:
+                    daily_data = data["candles"]
                     logger.info(f"Found {len(daily_data)} days of data for {symbol}")
                     
                     # Convert to list of daily records
                     stock_data[symbol] = [
                         {
-                            'date': date,
-                            'open': float(day_data['1. open']),
-                            'high': float(day_data['2. high']),
-                            'low': float(day_data['3. low']),
-                            'close': float(day_data['4. close']),
-                            'volume': int(day_data['5. volume'])
+                            'date': candle['datetime'],
+                            'open': float(candle['open']),
+                            'high': float(candle['high']),
+                            'low': float(candle['low']),
+                            'close': float(candle['close']),
+                            'volume': int(candle['volume'])
                         }
-                        for date, day_data in daily_data.items()
+                        for candle in daily_data
                     ]
                     # Sort by date
                     stock_data[symbol].sort(key=lambda x: x['date'])
                     logger.info(f"Processed {len(stock_data[symbol])} days of data for {symbol}")
-                    logger.info(f"Date range for {symbol}: {stock_data[symbol][0]['date']} to {stock_data[symbol][-1]['date']}")
                     
-                    # Run simulation
-                    simulation_results[symbol] = simulate_volume_trading(stock_data[symbol])
-                    if simulation_results[symbol]:
-                        logger.info(f"Simulation results for {symbol}: {len(simulation_results[symbol]['trades'])} trades")
+                    # Run simulation only if we have enough data
+                    if len(stock_data[symbol]) >= 252:  # Need at least 252 days for baseline
+                        simulation_results[symbol] = simulate_volume_trading(stock_data[symbol])
+                        if simulation_results[symbol]:
+                            logger.info(f"Simulation results for {symbol}: {len(simulation_results[symbol]['trades'])} trades")
+                    else:
+                        logger.warning(f"Not enough data points for {symbol}. Have {len(stock_data[symbol])}, need 252")
+                        api_errors.append(f"Not enough data points for {symbol} to run simulation")
                 else:
                     logger.error(f"No time series data found for {symbol}. API response: {data}")
                     stock_data[symbol] = []
                     simulation_results[symbol] = None
+                    api_errors.append(f"No time series data found for {symbol}")
             except Exception as e:
                 logger.error(f"Error fetching data for {symbol}: {str(e)}", exc_info=True)
                 stock_data[symbol] = []
                 simulation_results[symbol] = None
+                api_errors.append(f"Error fetching data for {symbol}: {str(e)}")
         
         logger.info("Rendering template with data...")
         return render_template('analysis_dashboard.html', 
                             alpha_vantage_available=True,
                             stock_data=stock_data,
                             simulation_results=simulation_results,
-                            active_tab='volume')
+                            active_tab='volume',
+                            api_errors=api_errors)
     except Exception as e:
         logger.error(f"Error in volume_analysis route: {str(e)}", exc_info=True)
         flash(f"Error loading volume analysis page: {str(e)}", "error")

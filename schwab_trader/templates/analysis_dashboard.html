@@ -402,73 +402,61 @@
         </div>
 
         <div class="stock-grid">
-            {% for symbol, data in stock_data.items() %}
-            <div class="stock-card">
-                <div class="stock-header">
-                    <span class="stock-symbol">{{ symbol }}</span>
-                    <span class="stock-price">
-                        {% if data and data|length > 0 %}
-                            ${{ data[0].close|round(2) }}
-                        {% else %}
-                            No data available
-                        {% endif %}
-                    </span>
-                </div>
-                
-                <div class="stock-metrics">
-                    <div class="metric">
-                        <span class="metric-label">Average Volume</span>
-                        <span class="metric-value">
-                            {% if data and data|length > 0 %}
-                                {{ (data|sum(attribute='volume') / data|length)|int }}
-                            {% else %}
-                                N/A
-                            {% endif %}
-                        </span>
-                    </div>
-                    <div class="metric">
-                        <span class="metric-label">Total Days</span>
-                        <span class="metric-value">
-                            {% if data %}
-                                {{ data|length }}
-                            {% else %}
-                                0
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-
-                <div class="volume-chart">
-                    {% if data and data|length > 0 %}
-                        <canvas id="{{ symbol }}-volume-chart"></canvas>
-                    {% else %}
-                        <div class="alert alert-warning">No data available for chart</div>
-                    {% endif %}
-                </div>
-
-                {% if symbol == 'TSLA' %}
+            {% if stock_data %}
+                {% for symbol, data in stock_data.items() %}
                 <div class="stock-card">
                     <div class="stock-header">
                         <span class="stock-symbol">{{ symbol }}</span>
-                        <span class="stock-price">${{ data[0].close|round(2) }}</span>
+                        <span class="stock-price">
+                            {% if data and data|length > 0 %}
+                                ${{ data[0].close|round(2) }}
+                            {% else %}
+                                No data available
+                            {% endif %}
+                        </span>
                     </div>
                     
                     <div class="stock-metrics">
                         <div class="metric">
                             <span class="metric-label">Average Volume</span>
-                            <span class="metric-value">{{ (data|sum(attribute='volume') / data|length)|int }}</span>
+                            <span class="metric-value">
+                                {% if data and data|length > 0 %}
+                                    {{ (data|sum(attribute='volume') / data|length)|int }}
+                                {% else %}
+                                    N/A
+                                {% endif %}
+                            </span>
                         </div>
                         <div class="metric">
                             <span class="metric-label">Total Days</span>
-                            <span class="metric-value">{{ data|length }}</span>
+                            <span class="metric-value">
+                                {% if data %}
+                                    {{ data|length }}
+                                {% else %}
+                                    0
+                                {% endif %}
+                            </span>
                         </div>
                     </div>
 
                     <div class="volume-chart">
-                        <canvas id="{{ symbol }}-volume-chart"></canvas>
+                        {% if data and data|length > 0 %}
+                            <canvas id="{{ symbol }}-volume-chart"></canvas>
+                        {% else %}
+                            <div class="alert alert-warning">No data available for chart</div>
+                        {% endif %}
                     </div>
 
-                    {% if simulation_results[symbol] %}
+                    {% if symbol == 'TSLA' and simulation_results and simulation_results[symbol] %}
+                    <div class="performance-graph">
+                        <h4>TSLA Trading Performance</h4>
+                        <div class="graph-container">
+                            <canvas id="tsla-performance-chart"></canvas>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    {% if simulation_results and simulation_results[symbol] %}
                     <div class="simulation-results">
                         <h4>Volume Trading Simulation</h4>
                         <div class="simulation-metrics">
@@ -559,26 +547,14 @@
                         </button>
                     </div>
                 </div>
-                {% endif %}
-            </div>
-            {% endfor %}
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info">
+                    No stock data available. Please check your API configuration.
+                </div>
+            {% endif %}
         </div>
     </div>
-
-    {% if 'TSLA' in stock_data and simulation_results['TSLA'] %}
-    <div class="performance-graph" style="margin-top: 40px; width: 100%;">
-        <h4 style="text-align: center; margin-bottom: 20px;">TSLA Trading Performance</h4>
-        <div class="graph-container" style="height: 600px; width: 100%; position: relative; margin: 20px 0; background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 20px;">
-            <canvas id="tsla-performance-chart" style="width: 100%; height: 100%;"></canvas>
-        </div>
-        <!-- Debug information -->
-        <div style="margin-top: 10px; font-size: 12px; color: #666; text-align: center;">
-            <p>Data points: {{ stock_data['TSLA']|length }}</p>
-            <p>First date: {{ stock_data['TSLA'][0].date if stock_data['TSLA'] else 'No data' }}</p>
-            <p>Last date: {{ stock_data['TSLA'][-1].date if stock_data['TSLA'] else 'No data' }}</p>
-        </div>
-    </div>
-    {% endif %}
 
     <div id="technical-tab" class="tab-content {% if active_tab == 'technical' %}active{% endif %}">
         <!-- Technical analysis content will go here -->
@@ -616,266 +592,270 @@ function showDetails(symbol) {
 }
 
 document.addEventListener('DOMContentLoaded', function() {
-    {% for symbol, data in stock_data.items() %}
-    // Volume Chart
-    const {{ symbol }}VolumeCtx = document.getElementById('{{ symbol }}-volume-chart').getContext('2d');
-    const {{ symbol }}VolumeData = {
-        labels: {{ data|map(attribute='date')|list|tojson }},
-        datasets: [{
-            label: 'Volume',
-            data: {{ data|map(attribute='volume')|list|tojson }},
-            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            borderWidth: 1
-        }]
-    };
-    
-    new Chart({{ symbol }}VolumeCtx, {
-        type: 'bar',
-        data: {{ symbol }}VolumeData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true
+    {% if stock_data %}
+        {% for symbol, data in stock_data.items() %}
+            {% if data and data|length > 0 %}
+            // Volume Chart
+            const {{ symbol }}VolumeCtx = document.getElementById('{{ symbol }}-volume-chart').getContext('2d');
+            const {{ symbol }}VolumeData = {
+                labels: {{ data|map(attribute='date')|list|tojson }},
+                datasets: [{
+                    label: 'Volume',
+                    data: {{ data|map(attribute='volume')|list|tojson }},
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            };
+            
+            new Chart({{ symbol }}VolumeCtx, {
+                type: 'bar',
+                data: {{ symbol }}VolumeData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
                 }
-            }
-        }
-    });
+            });
 
-    {% if symbol == 'TSLA' and simulation_results[symbol] %}
-    // TSLA Performance Chart
-    console.log('Creating TSLA performance chart...');
-    const tslaPerformanceCtx = document.getElementById('tsla-performance-chart');
-    if (!tslaPerformanceCtx) {
-        console.error('Could not find performance chart canvas');
-        return;
-    }
-    
-    // Prepare data for the performance chart
-    const tslaDates = {{ data|map(attribute='date')|list|tojson }};
-    const tslaPrices = {{ data|map(attribute='close')|list|tojson }};
-    const tslaVolumes = {{ data|map(attribute='volume')|list|tojson }};
-    
-    // Sort data in chronological order
-    const sortedData = tslaDates.map((date, index) => ({
-        date: date,
-        price: tslaPrices[index],
-        volume: tslaVolumes[index]
-    })).sort((a, b) => new Date(a.date) - new Date(b.date));
-    
-    const sortedDates = sortedData.map(d => d.date);
-    const sortedPrices = sortedData.map(d => d.price);
-    const sortedVolumes = sortedData.map(d => d.volume);
-    
-    console.log('Data points:', sortedDates.length);
-    console.log('First date:', sortedDates[0]);
-    console.log('Last date:', sortedDates[sortedDates.length - 1]);
-    
-    // Get trade points
-    const tslaTrades = {{ simulation_results[symbol].trades|tojson }};
-    console.log('Raw trades:', tslaTrades);
-    console.log('Number of trades:', tslaTrades.length);
-    
-    const tslaBuyPoints = tslaTrades.filter(t => t.type === 'buy').map(t => ({
-        x: t.date,
-        y: t.price
-    }));
-    console.log('Buy points:', tslaBuyPoints);
-    
-    const tslaSellPoints = tslaTrades.filter(t => t.type === 'sell').map(t => ({
-        x: t.date,
-        y: t.price
-    }));
-    console.log('Sell points:', tslaSellPoints);
-    
-    // Get milestone points
-    const tslaMilestones = {{ simulation_results[symbol].milestones|tojson }};
-    console.log('Number of milestones:', tslaMilestones.length);
-    
-    const tslaMilestonePoints = tslaMilestones.map(m => ({
-        x: m.date,
-        y: sortedPrices[sortedDates.indexOf(m.date)]
-    }));
-    
-    const tslaPerformanceData = {
-        labels: sortedDates,
-        datasets: [
-            {
-                label: 'Price',
-                data: sortedPrices,
-                borderColor: 'rgba(75, 192, 192, 1)',
-                backgroundColor: 'rgba(75, 192, 192, 0.2)',
-                fill: true,
-                yAxisID: 'y',
-                tension: 0.4
-            },
-            {
-                label: 'Volume',
-                data: sortedVolumes,
-                borderColor: 'rgba(54, 162, 235, 0.5)',
-                backgroundColor: 'rgba(54, 162, 235, 0.1)',
-                fill: true,
-                yAxisID: 'y1',
-                tension: 0.4
-            },
-            {
-                label: 'Buy Points',
-                data: tslaBuyPoints,
-                pointBackgroundColor: '#28a745',
-                pointBorderColor: '#fff',
-                pointRadius: 10,
-                pointHoverRadius: 15,
-                pointBorderWidth: 2,
-                showLine: false,
-                yAxisID: 'y'
-            },
-            {
-                label: 'Sell Points',
-                data: tslaSellPoints,
-                pointBackgroundColor: '#dc3545',
-                pointBorderColor: '#fff',
-                pointRadius: 10,
-                pointHoverRadius: 15,
-                pointBorderWidth: 2,
-                showLine: false,
-                yAxisID: 'y'
-            },
-            {
-                label: 'Milestones',
-                data: tslaMilestonePoints,
-                pointBackgroundColor: '#ffc107',
-                pointBorderColor: '#fff',
-                pointRadius: 12,
-                pointHoverRadius: 17,
-                pointBorderWidth: 2,
-                showLine: false,
-                yAxisID: 'y'
+            {% if symbol == 'TSLA' and simulation_results and simulation_results[symbol] %}
+            // TSLA Performance Chart
+            console.log('Creating TSLA performance chart...');
+            const tslaPerformanceCtx = document.getElementById('tsla-performance-chart');
+            if (!tslaPerformanceCtx) {
+                console.error('Could not find performance chart canvas');
+                return;
             }
-        ]
-    };
-    
-    new Chart(tslaPerformanceCtx, {
-        type: 'line',
-        data: tslaPerformanceData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: {
-                mode: 'index',
-                intersect: false
-            },
-            scales: {
-                y: {
-                    type: 'linear',
-                    display: true,
-                    position: 'left',
-                    title: {
-                        display: true,
-                        text: 'Price ($)',
-                        font: {
-                            size: 14,
-                            weight: 'bold'
-                        }
+            
+            // Prepare data for the performance chart
+            const tslaDates = {{ data|map(attribute='date')|list|tojson }};
+            const tslaPrices = {{ data|map(attribute='close')|list|tojson }};
+            const tslaVolumes = {{ data|map(attribute='volume')|list|tojson }};
+            
+            // Sort data in chronological order
+            const sortedData = tslaDates.map((date, index) => ({
+                date: date,
+                price: tslaPrices[index],
+                volume: tslaVolumes[index]
+            })).sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            const sortedDates = sortedData.map(d => d.date);
+            const sortedPrices = sortedData.map(d => d.price);
+            const sortedVolumes = sortedData.map(d => d.volume);
+            
+            console.log('Data points:', sortedDates.length);
+            console.log('First date:', sortedDates[0]);
+            console.log('Last date:', sortedDates[sortedDates.length - 1]);
+            
+            // Get trade points
+            const tslaTrades = {{ simulation_results[symbol].trades|tojson }};
+            console.log('Raw trades:', tslaTrades);
+            console.log('Number of trades:', tslaTrades.length);
+            
+            const tslaBuyPoints = tslaTrades.filter(t => t.type === 'buy').map(t => ({
+                x: t.date,
+                y: t.price
+            }));
+            console.log('Buy points:', tslaBuyPoints);
+            
+            const tslaSellPoints = tslaTrades.filter(t => t.type === 'sell').map(t => ({
+                x: t.date,
+                y: t.price
+            }));
+            console.log('Sell points:', tslaSellPoints);
+            
+            // Get milestone points
+            const tslaMilestones = {{ simulation_results[symbol].milestones|tojson }};
+            console.log('Number of milestones:', tslaMilestones.length);
+            
+            const tslaMilestonePoints = tslaMilestones.map(m => ({
+                x: m.date,
+                y: sortedPrices[sortedDates.indexOf(m.date)]
+            }));
+            
+            const tslaPerformanceData = {
+                labels: sortedDates,
+                datasets: [
+                    {
+                        label: 'Price',
+                        data: sortedPrices,
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        fill: true,
+                        yAxisID: 'y',
+                        tension: 0.4
                     },
-                    ticks: {
-                        font: {
-                            size: 12
-                        }
-                    }
-                },
-                y1: {
-                    type: 'linear',
-                    display: true,
-                    position: 'right',
-                    title: {
-                        display: true,
-                        text: 'Volume',
-                        font: {
-                            size: 14,
-                            weight: 'bold'
-                        }
+                    {
+                        label: 'Volume',
+                        data: sortedVolumes,
+                        borderColor: 'rgba(54, 162, 235, 0.5)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                        fill: true,
+                        yAxisID: 'y1',
+                        tension: 0.4
                     },
-                    ticks: {
-                        font: {
-                            size: 12
-                        }
+                    {
+                        label: 'Buy Points',
+                        data: tslaBuyPoints,
+                        pointBackgroundColor: '#28a745',
+                        pointBorderColor: '#fff',
+                        pointRadius: 10,
+                        pointHoverRadius: 15,
+                        pointBorderWidth: 2,
+                        showLine: false,
+                        yAxisID: 'y'
                     },
-                    grid: {
-                        drawOnChartArea: false
+                    {
+                        label: 'Sell Points',
+                        data: tslaSellPoints,
+                        pointBackgroundColor: '#dc3545',
+                        pointBorderColor: '#fff',
+                        pointRadius: 10,
+                        pointHoverRadius: 15,
+                        pointBorderWidth: 2,
+                        showLine: false,
+                        yAxisID: 'y'
+                    },
+                    {
+                        label: 'Milestones',
+                        data: tslaMilestonePoints,
+                        pointBackgroundColor: '#ffc107',
+                        pointBorderColor: '#fff',
+                        pointRadius: 12,
+                        pointHoverRadius: 17,
+                        pointBorderWidth: 2,
+                        showLine: false,
+                        yAxisID: 'y'
                     }
-                },
-                x: {
-                    ticks: {
-                        font: {
-                            size: 12
-                        },
-                        maxRotation: 45,
-                        minRotation: 45,
-                        autoSkip: true,
-                        maxTicksLimit: 20
-                    }
-                }
-            },
-            plugins: {
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.datasetIndex === 0) {
-                                label += '$' + context.parsed.y.toFixed(2);
-                            } else if (context.datasetIndex === 1) {
-                                label += context.parsed.y.toLocaleString();
-                            } else if (context.datasetIndex === 2) {
-                                const trade = tslaTrades.find(t => t.date === context.label && t.type === 'buy');
-                                if (trade) {
-                                    label += `Buy at $${trade.price.toFixed(2)} (${trade.shares} shares)`;
+                ]
+            };
+            
+            new Chart(tslaPerformanceCtx, {
+                type: 'line',
+                data: tslaPerformanceData,
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Price ($)',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
                                 }
-                            } else if (context.datasetIndex === 3) {
-                                const trade = tslaTrades.find(t => t.date === context.label && t.type === 'sell');
-                                if (trade) {
-                                    label += `Sell at $${trade.price.toFixed(2)} (${trade.shares} shares, Profit: ${trade.profit.toFixed(2)}%)`;
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12
                                 }
                             }
-                            return label;
-                        }
-                    }
-                },
-                legend: {
-                    position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        pointStyle: 'circle',
-                        padding: 20,
-                        font: {
-                            size: 14
-                        }
-                    }
-                },
-                zoom: {
-                    zoom: {
-                        wheel: {
-                            enabled: true
                         },
-                        pinch: {
-                            enabled: true
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Volume',
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                }
+                            },
+                            ticks: {
+                                font: {
+                                    size: 12
+                                }
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
                         },
-                        mode: 'xy'
+                        x: {
+                            ticks: {
+                                font: {
+                                    size: 12
+                                },
+                                maxRotation: 45,
+                                minRotation: 45,
+                                autoSkip: true,
+                                maxTicksLimit: 20
+                            }
+                        }
                     },
-                    pan: {
-                        enabled: true,
-                        mode: 'xy'
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) {
+                                        label += ': ';
+                                    }
+                                    if (context.datasetIndex === 0) {
+                                        label += '$' + context.parsed.y.toFixed(2);
+                                    } else if (context.datasetIndex === 1) {
+                                        label += context.parsed.y.toLocaleString();
+                                    } else if (context.datasetIndex === 2) {
+                                        const trade = tslaTrades.find(t => t.date === context.label && t.type === 'buy');
+                                        if (trade) {
+                                            label += `Buy at $${trade.price.toFixed(2)} (${trade.shares} shares)`;
+                                        }
+                                    } else if (context.datasetIndex === 3) {
+                                        const trade = tslaTrades.find(t => t.date === context.label && t.type === 'sell');
+                                        if (trade) {
+                                            label += `Sell at $${trade.price.toFixed(2)} (${trade.shares} shares, Profit: ${trade.profit.toFixed(2)}%)`;
+                                        }
+                                    }
+                                    return label;
+                                }
+                            }
+                        },
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                usePointStyle: true,
+                                pointStyle: 'circle',
+                                padding: 20,
+                                font: {
+                                    size: 14
+                                }
+                            }
+                        },
+                        zoom: {
+                            zoom: {
+                                wheel: {
+                                    enabled: true
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'xy'
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'xy'
+                            }
+                        }
                     }
                 }
-            }
-        }
-    });
+            });
+            {% endif %}
+            {% endif %}
+        {% endfor %}
     {% endif %}
-    {% endfor %}
 });
 </script>
 {% endblock %} 
