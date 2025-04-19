@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}Error - {{ error.code }}{% endblock %}
+
+{% block content %}
+<div class="error-container">
+    <div class="error-card">
+        <h1 class="error-title">{{ error.code }}</h1>
+        <p class="error-message">{{ error.message }}</p>
+        {% if error.details %}
+        <div class="error-details">
+            <h2>Details</h2>
+            <pre>{{ error.details }}</pre>
+        </div>
+        {% endif %}
+        <div class="error-actions">
+            <a href="{{ url_for('root.index') }}" class="btn btn-primary">Return Home</a>
+            <button onclick="history.back()" class="btn btn-secondary">Go Back</button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .error-container {
+        max-width: 800px;
+        margin: 2rem auto;
+        padding: 0 1rem;
+    }
+
+    .error-card {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .error-title {
+        color: #dc3545;
+        margin-bottom: 1rem;
+        font-size: 2rem;
+    }
+
+    .error-message {
+        color: #666;
+        margin-bottom: 1.5rem;
+        font-size: 1.1rem;
+    }
+
+    .error-details {
+        background: #f8f9fa;
+        border-radius: 4px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .error-details h2 {
+        color: #495057;
+        font-size: 1.2rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .error-details pre {
+        color: #6c757d;
+        font-size: 0.9rem;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+    }
+
+    .error-actions {
+        display: flex;
+        gap: 1rem;
+    }
+
+    .btn {
+        padding: 0.5rem 1rem;
+        border-radius: 4px;
+        text-decoration: none;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .btn-primary {
+        background: #1a237e;
+        color: white;
+        border: none;
+    }
+
+    .btn-primary:hover {
+        background: #0d47a1;
+    }
+
+    .btn-secondary {
+        background: #f8f9fa;
+        color: #495057;
+        border: 1px solid #dee2e6;
+    }
+
+    .btn-secondary:hover {
+        background: #e9ecef;
+    }
+
+    @media (max-width: 768px) {
+        .error-container {
+            margin: 1rem auto;
+        }
+
+        .error-card {
+            padding: 1.5rem;
+        }
+
+        .error-title {
+            font-size: 1.5rem;
+        }
+
+        .error-actions {
+            flex-direction: column;
+        }
+
+        .btn {
+            width: 100%;
+            text-align: center;
+        }
+    }
+</style>
+{% endblock %} 

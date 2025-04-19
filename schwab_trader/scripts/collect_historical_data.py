@@ -4,10 +4,12 @@ import logging
 from datetime import datetime
 import requests
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import shutil
+import psutil
+from tqdm import tqdm
 
 from schwab_trader.config.market_config import (
     MARKET_PERIODS,
@@ -37,10 +39,32 @@ class DataCollector:
         self.timeout = DATA_COLLECTION_CONFIG['timeout']
         self.batch_size = DATA_COLLECTION_CONFIG['batch_size']
         self.failed_files: List[Path] = []
+        self.validation_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
+    
+    def check_disk_space(self, required_bytes: int) -> bool:
+        """Check if there's enough disk space for data collection."""
+        try:
+            free_space = psutil.disk_usage('/').free
+            return free_space > required_bytes * 2  # Require 2x the space for safety
+        except Exception as e:
+            logger.error(f"Error checking disk space: {str(e)}")
+            return False
+    
+    def estimate_required_space(self) -> int:
+        """Estimate required disk space for data collection."""
+        # Rough estimate: 1KB per day per stock * 365 days * number of stocks * number of conditions
+        bytes_per_day = 1024
+        total_days = sum(period['expected_days'] for period in MARKET_PERIODS.values())
+        total_stocks = len(STOCKS)
+        return bytes_per_day * total_days * total_stocks
     
     def create_data_directory(self) -> Path:
         """Create directory structure for storing historical data."""
         try:
+            required_space = self.estimate_required_space()
+            if not self.check_disk_space(required_space):
+                raise Exception(f"Insufficient disk space. Required: {required_space/1024/1024:.2f} MB")
+            
             base_dir = Path(get_directory_path('historical'))
             for stock in STOCKS:
                 stock_dir = base_dir / stock
@@ -77,6 +101,12 @@ class DataCollector:
         if not self.validate_input(symbol, market_condition):
             return None
             
+        # Check cache first
+        cache_key = (symbol, market_condition)
+        if cache_key in self.validation_cache:
+            logger.info(f"Using cached validation results for {symbol} ({market_condition})")
+            return self.validation_cache[cache_key]
+            
         for attempt in range(self.retry_attempts):
             try:
                 response = requests.get(
@@ -102,8 +132,18 @@ class DataCollector:
                 
                 # Add validation stats to the data
                 data['data']['validation_stats'] = stats
+                
+                # Cache the validated data
+                self.validation_cache[cache_key] = data['data']
                 return data['data']
                 
+            except requests.Timeout:
+                if attempt < self.retry_attempts - 1:
+                    logger.warning(f"Timeout on attempt {attempt + 1} for {symbol} ({market_condition})")
+                    time.sleep(self.retry_delay)
+                else:
+                    logger.error(f"All attempts timed out for {symbol} ({market_condition})")
+                    return None
             except Exception as e:
                 if attempt < self.retry_attempts - 1:
                     logger.warning(f"Attempt {attempt + 1} failed for {symbol} ({market_condition}): {str(e)}")
@@ -123,6 +163,12 @@ class DataCollector:
             temp_filepath = filepath.with_suffix('.tmp')
             with open(temp_filepath, 'w') as f:
                 json.dump(data, f, indent=2)
+            
+            # Verify the temporary file
+            with open(temp_filepath, 'r') as f:
+                loaded_data = json.load(f)
+                if loaded_data != data:
+                    raise Exception("Data corruption detected during save")
             
             # Rename temp file to final file
             temp_filepath.rename(filepath)
@@ -161,7 +207,7 @@ class DataCollector:
             'error': 'Failed to process data'
         }
     
-    def collect_all_data(self):
+    def collect_all_data(self) -> bool:
         """Collect historical data for all stocks and market conditions using parallel processing."""
         try:
             base_dir = self.create_data_directory()
@@ -169,6 +215,9 @@ class DataCollector:
                 'successful': [],
                 'failed': []
             }
+            
+            # Calculate total tasks for progress bar
+            total_tasks = len(STOCKS) * len(MARKET_PERIODS)
             
             # Process data in parallel
             with ThreadPoolExecutor(max_workers=DATA_COLLECTION_CONFIG['max_workers']) as executor:
@@ -184,12 +233,15 @@ class DataCollector:
                             )
                         )
                 
-                for future in as_completed(futures):
-                    result = future.result()
-                    if result['status'] == 'success':
-                        results['successful'].append(result)
-                    else:
-                        results['failed'].append(result)
+                # Use tqdm for progress tracking
+                with tqdm(total=total_tasks, desc="Collecting data") as pbar:
+                    for future in as_completed(futures):
+                        result = future.result()
+                        if result['status'] == 'success':
+                            results['successful'].append(result)
+                        else:
+                            results['failed'].append(result)
+                        pbar.update(1)
             
             # Clean up failed files
             self.cleanup_failed_files()

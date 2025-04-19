@@ -1,20 +1,15 @@
 """Flask application factory for Schwab Trader."""
 import os
-import logging
-from datetime import datetime
 from flask import Flask
 from flask_caching import Cache
 from schwab_trader.database import init_db, db
-
-# Configure logging
-logger = logging.getLogger('schwab_trader')
-handler = logging.FileHandler('logs/schwab_trader_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
+from schwab_trader.utils.logging_utils import setup_logger
 
 # Initialize extensions
 cache = Cache()
+
+# Configure root logger
+logger = setup_logger('schwab_trader')
 
 def create_app(test_config=None):
     """Create and configure the Flask application."""
@@ -36,18 +31,6 @@ def create_app(test_config=None):
     init_db(app)
     cache.init_app(app)
     
-    # Configure logging
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
-    
-    file_handler = logging.FileHandler('logs/app_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-    file_handler.setFormatter(logging.Formatter(
-        '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
-    ))
-    file_handler.setLevel(logging.INFO)
-    app.logger.addHandler(file_handler)
-    app.logger.setLevel(logging.INFO)
-    
     # Register blueprints
     from schwab_trader.routes import (
         root, news, strategies, compare, 
@@ -63,18 +46,43 @@ def create_app(test_config=None):
     app.register_blueprint(analysis.bp)
     app.register_blueprint(alerts.bp)
     app.register_blueprint(watchlist.bp)
-    app.register_blueprint(auth)
+    app.register_blueprint(auth.bp)
     
-    # Add custom Jinja2 filters
-    @app.template_filter('format_number')
-    def format_number(value):
-        """Format a number with commas and 2 decimal places."""
-        try:
-            return "{:,.2f}".format(float(value))
-        except (ValueError, TypeError):
-            return value
+    # Register error handlers
+    from schwab_trader.utils.error_utils import AppError
     
-    logger.info('Schwab Trader startup')
+    @app.errorhandler(AppError)
+    def handle_app_error(error):
+        if request.is_json:
+            return jsonify({
+                'status': 'error',
+                'code': error.code,
+                'message': error.message,
+                'details': error.details
+            }), error.status_code
+        return render_template('error.html', error=error), error.status_code
+    
+    @app.errorhandler(404)
+    def handle_not_found(error):
+        if request.is_json:
+            return jsonify({
+                'status': 'error',
+                'code': 'NOT_FOUND',
+                'message': 'Resource not found'
+            }), 404
+        return render_template('error.html', error=error), 404
+    
+    @app.errorhandler(500)
+    def handle_internal_error(error):
+        logger.error(f"Internal server error: {str(error)}", exc_info=True)
+        if request.is_json:
+            return jsonify({
+                'status': 'error',
+                'code': 'INTERNAL_ERROR',
+                'message': 'An unexpected error occurred'
+            }), 500
+        return render_template('error.html', error=error), 500
+    
     return app
 
 # Minimal initialization for now

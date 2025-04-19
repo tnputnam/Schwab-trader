@@ -70,6 +70,86 @@
         font-style: italic;
     }
 
+    .news-category {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 12px;
+        background: #e3f2fd;
+        color: #1976d2;
+        font-size: 0.7rem;
+        margin-right: 8px;
+    }
+
+    .error-message {
+        color: #dc3545;
+        padding: 10px;
+        background-color: #f8d7da;
+        border-radius: 4px;
+        margin: 10px 0;
+    }
+
+    .loading {
+        text-align: center;
+        padding: 20px;
+        color: #6c757d;
+    }
+
+    .news-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .search-box {
+        display: flex;
+        gap: 10px;
+    }
+
+    .search-box input {
+        padding: 8px;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        min-width: 200px;
+    }
+
+    .search-box button {
+        padding: 8px 16px;
+        background: #1a237e;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .refresh-button {
+        padding: 8px 16px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .pagination {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 20px;
+    }
+
+    .pagination button {
+        padding: 8px 16px;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+    .pagination button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
     @media (max-width: 768px) {
         .news-container {
             padding: 15px;
@@ -82,31 +162,83 @@
         .news-grid {
             grid-template-columns: 1fr;
         }
+
+        .news-controls {
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .search-box {
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="news-container">
+    <div class="news-controls">
+        <div class="search-box">
+            <input type="text" id="search-input" placeholder="Search news...">
+            <button onclick="searchNews()">Search</button>
+        </div>
+        <button class="refresh-button" onclick="refreshAll()">Refresh All</button>
+    </div>
+
     <div class="news-section">
         <h2>Market News</h2>
         <div class="news-grid" id="market-news">
-            <!-- Market news will be populated by JavaScript -->
+            <div class="loading">Loading market news...</div>
         </div>
     </div>
 
     <div class="news-section">
         <h2>Business Headlines</h2>
         <div class="news-grid" id="business-headlines">
-            <!-- Business headlines will be populated by JavaScript -->
+            <div class="loading">Loading business headlines...</div>
         </div>
+    </div>
+
+    <div class="news-section" id="search-results" style="display: none;">
+        <h2>Search Results</h2>
+        <div class="news-grid" id="search-news">
+            <div class="loading">Enter a search term to find news...</div>
+        </div>
+        <div class="pagination" id="search-pagination"></div>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    // Function to format news items
+    // Configuration
+    const CONFIG = {
+        updateInterval: 300000, // 5 minutes
+        maxRetries: 3,
+        retryDelay: 5000,
+        itemsPerPage: 10
+    };
+
+    // State management
+    const state = {
+        marketNews: [],
+        headlines: [],
+        searchResults: {
+            articles: [],
+            total: 0,
+            page: 1
+        }
+    };
+
+    // Utility functions
+    function showError(container, message) {
+        container.innerHTML = `<div class="error-message">${message}</div>`;
+    }
+
+    function showLoading(container) {
+        container.innerHTML = '<div class="loading">Loading...</div>';
+    }
+
     function createNewsCard(news) {
         const card = document.createElement('div');
         card.className = 'news-card';
@@ -120,6 +252,10 @@
         const meta = document.createElement('div');
         meta.className = 'news-meta';
         
+        const category = document.createElement('span');
+        category.className = 'news-category';
+        category.textContent = news.category || 'general';
+        
         const source = document.createElement('span');
         source.className = 'news-source';
         source.textContent = news.source;
@@ -128,6 +264,7 @@
         time.className = 'news-time';
         time.textContent = new Date(news.published_at).toLocaleString();
         
+        meta.appendChild(category);
         meta.appendChild(source);
         meta.appendChild(time);
         
@@ -138,44 +275,117 @@
         return card;
     }
 
-    // Function to update market news
-    async function updateMarketNews() {
+    // News fetching functions
+    async function fetchNews(endpoint, params = {}) {
+        const url = new URL(`/news/${endpoint}`, window.location.origin);
+        Object.entries(params).forEach(([key, value]) => {
+            url.searchParams.append(key, value);
+        });
+
+        const response = await fetch(url);
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.message || 'Failed to fetch news');
+        }
+        return await response.json();
+    }
+
+    async function updateNews(endpoint, containerId, retryCount = 0) {
+        const container = document.getElementById(containerId);
+        
         try {
-            const response = await fetch('/news/market-news');
-            const news = await response.json();
-            const container = document.getElementById('market-news');
+            const data = await fetchNews(endpoint);
             container.innerHTML = '';
             
-            news.forEach(item => {
+            if (data.length === 0) {
+                container.innerHTML = '<div class="loading">No news available</div>';
+                return;
+            }
+            
+            data.forEach(item => {
                 container.appendChild(createNewsCard(item));
             });
         } catch (error) {
-            console.error('Error updating market news:', error);
+            console.error(`Error updating ${endpoint}:`, error);
+            if (retryCount < CONFIG.maxRetries) {
+                showLoading(container);
+                setTimeout(() => updateNews(endpoint, containerId, retryCount + 1), CONFIG.retryDelay);
+            } else {
+                showError(container, `Failed to load ${endpoint}. Please try again later.`);
+            }
         }
     }
 
-    // Function to update business headlines
-    async function updateHeadlines() {
+    async function searchNews() {
+        const query = document.getElementById('search-input').value.trim();
+        if (!query) return;
+
+        const container = document.getElementById('search-news');
+        const resultsSection = document.getElementById('search-results');
+        showLoading(container);
+        resultsSection.style.display = 'block';
+
         try {
-            const response = await fetch('/news/headlines');
-            const headlines = await response.json();
-            const container = document.getElementById('business-headlines');
+            const data = await fetchNews('search', {
+                q: query,
+                page: state.searchResults.page,
+                per_page: CONFIG.itemsPerPage
+            });
+
+            state.searchResults = {
+                articles: data.articles,
+                total: data.total,
+                page: data.page
+            };
+
             container.innerHTML = '';
-            
-            headlines.forEach(item => {
+            data.articles.forEach(item => {
                 container.appendChild(createNewsCard(item));
             });
+
+            updatePagination();
         } catch (error) {
-            console.error('Error updating headlines:', error);
+            showError(container, 'Failed to search news. Please try again.');
+        }
+    }
+
+    function updatePagination() {
+        const pagination = document.getElementById('search-pagination');
+        const totalPages = Math.ceil(state.searchResults.total / CONFIG.itemsPerPage);
+        
+        pagination.innerHTML = `
+            <button onclick="changePage(${state.searchResults.page - 1})" 
+                    ${state.searchResults.page === 1 ? 'disabled' : ''}>
+                Previous
+            </button>
+            <span>Page ${state.searchResults.page} of ${totalPages}</span>
+            <button onclick="changePage(${state.searchResults.page + 1})"
+                    ${state.searchResults.page === totalPages ? 'disabled' : ''}>
+                Next
+            </button>
+        `;
+    }
+
+    function changePage(page) {
+        if (page < 1 || page > Math.ceil(state.searchResults.total / CONFIG.itemsPerPage)) return;
+        state.searchResults.page = page;
+        searchNews();
+    }
+
+    function refreshAll() {
+        updateNews('market', 'market-news');
+        updateNews('headlines', 'business-headlines');
+        if (document.getElementById('search-input').value.trim()) {
+            searchNews();
         }
     }
 
     // Initial data load
-    updateMarketNews();
-    updateHeadlines();
+    updateNews('market', 'market-news');
+    updateNews('headlines', 'business-headlines');
 
     // Set up periodic updates
-    setInterval(updateMarketNews, 300000); // Update every 5 minutes
-    setInterval(updateHeadlines, 300000); // Update every 5 minutes
+    setInterval(() => updateNews('market', 'market-news'), CONFIG.updateInterval);
+    setInterval(() => updateNews('headlines', 'business-headlines'), CONFIG.updateInterval);
 </script>
 {% endblock %} 
