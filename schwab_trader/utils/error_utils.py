@@ -100,6 +100,26 @@ class APIError(AppError):
             details=details
         )
 
+class NetworkError(AppError):
+    """Raised when a network operation fails."""
+    def __init__(self, message: str = "Network operation failed", details: Any = None):
+        super().__init__(
+            message=message,
+            status_code=503,
+            code="NETWORK_ERROR",
+            details=details
+        )
+
+class TimeoutError(AppError):
+    """Raised when an operation times out."""
+    def __init__(self, message: str = "Operation timed out", details: Any = None):
+        super().__init__(
+            message=message,
+            status_code=504,
+            code="TIMEOUT_ERROR",
+            details=details
+        )
+
 class ConfigurationError(AppError):
     """Raised when there's a configuration error."""
     def __init__(self, message: str = "Configuration error", details: Any = None):

@@ -4,7 +4,7 @@ import requests
 from datetime import datetime, timedelta
 from schwab_trader.utils.logging_utils import get_logger
 from schwab_trader.utils.config_utils import get_config
-from schwab_trader.exceptions import APIError, ConfigurationError
+from schwab_trader.utils.error_utils import APIError, ConfigurationError
 
 logger = get_logger(__name__)
 

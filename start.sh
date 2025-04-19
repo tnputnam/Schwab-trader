@@ -7,7 +7,8 @@ command_exists() {
 
 # Function to log messages with timestamps
 log_message() {
-    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$timestamp] $1"
 }
 
 # Function to check if a port is available
@@ -152,26 +153,6 @@ log_message "Upgrading pip..."
 pip install --upgrade pip
 
 # Install requirements if needed
-if [ ! -f "requirements.txt" ]; then
-    log_message "Creating requirements.txt..."
-    cat > requirements.txt << EOL
-Flask==2.2.5
-Flask-SQLAlchemy==3.0.5
-Flask-Login==0.6.2
-Flask-Caching==2.0.2
-Werkzeug==2.2.3
-pandas==2.1.3
-numpy==1.26.2
-matplotlib==3.8.2
-yfinance==0.2.31
-python-dotenv==1.0.0
-requests==2.31.0
-requests_oauthlib==1.3.1
-sqlalchemy==2.0.23
-alembic==1.12.1
-EOL
-fi
-
 if ! check_requirements; then
     log_message "Installing/updating requirements..."
     if ! pip install -r requirements.txt; then
@@ -186,7 +167,7 @@ if [ ! -f "$CONFIG_FILE" ]; then
     log_message "Creating .env file..."
     cat > "$CONFIG_FILE" << EOL
 # Flask Configuration
-FLASK_APP=schwab_trader
+FLASK_APP=auth_app.py
 FLASK_ENV=development
 SECRET_KEY=$(openssl rand -hex 32)
 
@@ -209,30 +190,23 @@ SCHWAB_API_SECRET=your_api_secret_here
 SCHWAB_API_BASE_URL=https://api.schwab.com
 EOL
     chmod 600 "$CONFIG_FILE"  # Make it readable only by the user
+else
+    log_message "Using existing .env file"
 fi
 
 # Load environment variables
 eval "$(load_env_vars)"
 
-# Validate environment variables
-if ! validate_env_vars; then
-    log_message "Error: Missing required environment variables. Please check your .env file."
-    exit 1
-fi
-
 # Initialize database
 if ! initialize_database; then
-    exit 1
-fi
-
-# Check if port is available
-if ! check_port 5000; then
-    log_message "Error: Port 5000 is already in use. Please free up the port and try again."
+    log_message "Error: Database initialization failed"
     exit 1
 fi
 
 # Start the Flask server
 log_message "Starting Flask server..."
+export FLASK_APP=auth_app.py
+export FLASK_ENV=development
 python -m flask run --host=0.0.0.0 --port=5000 --no-reload 2>&1 | tee -a logs/server.log
 
 # If the server crashes, log the error
