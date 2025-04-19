@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "components.html" as components %}
 
-{% block title %}Analysis Dashboard{% endblock %}
+{% block title %}Stock Analysis Dashboard{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -11,38 +11,7 @@
         padding: 20px;
     }
 
-    .tab-navigation {
-        display: flex;
-        gap: 10px;
-        margin-bottom: 20px;
-        border-bottom: 1px solid #dee2e6;
-        padding-bottom: 10px;
-    }
-
-    .tab-button {
-        padding: 10px 20px;
-        border: none;
-        background: none;
-        cursor: pointer;
-        font-weight: 500;
-        color: #6c757d;
-        transition: all 0.3s ease;
-    }
-
-    .tab-button.active {
-        color: #0d6efd;
-        border-bottom: 2px solid #0d6efd;
-    }
-
-    .tab-content {
-        display: none;
-    }
-
-    .tab-content.active {
-        display: block;
-    }
-
-    .filter-section {
+    .control-panel {
         background: white;
         border-radius: 8px;
         padding: 20px;
@@ -50,10 +19,11 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
-    .filter-grid {
+    .control-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
         gap: 15px;
+        margin-bottom: 15px;
     }
 
     .stock-grid {
@@ -182,38 +152,7 @@
         margin-top: 20px;
     }
 
-    .test-section {
-        background: white;
-        border-radius: 8px;
-        padding: 20px;
-        margin-top: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-
-    .test-controls {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-        gap: 15px;
-        margin-bottom: 20px;
-    }
-
-    .test-results {
-        margin-top: 20px;
-    }
-
-    .test-metrics {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 10px;
-        margin-bottom: 15px;
-    }
-
-    .test-chart {
-        height: 300px;
-        margin-top: 20px;
-    }
-
-    .new-data-section {
+    .stream-section {
         background: white;
         border-radius: 8px;
         padding: 20px;
@@ -277,12 +216,253 @@
         color: white;
     }
 
+    .technical-indicators {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .indicator-card {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        border-left: 4px solid #6c757d;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .indicator-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .indicator-card.positive {
+        border-left-color: #198754;
+    }
+
+    .indicator-card.negative {
+        border-left-color: #dc3545;
+    }
+
+    .indicator-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .indicator-value {
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+
+    .indicator-change {
+        font-size: 0.8rem;
+        margin-left: 5px;
+    }
+
+    .indicator-change.positive {
+        color: #198754;
+    }
+
+    .indicator-change.negative {
+        color: #dc3545;
+    }
+
+    .correlation-matrix {
+        margin-top: 20px;
+        overflow-x: auto;
+    }
+
+    .correlation-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    .correlation-table th,
+    .correlation-table td {
+        padding: 8px;
+        text-align: center;
+        border: 1px solid #dee2e6;
+    }
+
+    .correlation-table th {
+        background: #f8f9fa;
+        font-weight: 500;
+    }
+
+    .correlation-value {
+        font-weight: 500;
+    }
+
+    .correlation-value.high {
+        color: #198754;
+    }
+
+    .correlation-value.low {
+        color: #dc3545;
+    }
+
+    .sector-comparison {
+        margin-top: 20px;
+    }
+
+    .sector-chart {
+        height: 300px;
+        margin-top: 15px;
+    }
+
+    .real-time-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .metric-change {
+        font-size: 0.8rem;
+        margin-left: 5px;
+    }
+
+    .metric-change.positive {
+        color: #198754;
+    }
+
+    .metric-change.negative {
+        color: #dc3545;
+    }
+
+    .trend-indicator {
+        display: inline-block;
+        width: 0;
+        height: 0;
+        margin-left: 5px;
+        vertical-align: middle;
+    }
+
+    .trend-up {
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-bottom: 5px solid #198754;
+    }
+
+    .trend-down {
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 5px solid #dc3545;
+    }
+
+    .volatility-indicator {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-left: 5px;
+    }
+
+    .volatility-high {
+        background-color: #dc3545;
+    }
+
+    .volatility-medium {
+        background-color: #ffc107;
+    }
+
+    .volatility-low {
+        background-color: #198754;
+    }
+
+    .performance-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+        margin-top: 15px;
+    }
+
+    .performance-card {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+        text-align: center;
+    }
+
+    .performance-value {
+        font-size: 1.2rem;
+        font-weight: 500;
+        margin: 5px 0;
+    }
+
+    .performance-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+    }
+
+    .beta-indicator {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        margin-left: 5px;
+    }
+
+    .beta-high {
+        background-color: #dc3545;
+        color: white;
+    }
+
+    .beta-low {
+        background-color: #198754;
+        color: white;
+    }
+
+    .beta-neutral {
+        background-color: #6c757d;
+        color: white;
+    }
+
+    .volume-profile {
+        margin-top: 20px;
+    }
+
+    .profile-chart {
+        height: 300px;
+        margin-top: 15px;
+    }
+
+    .market-depth {
+        margin-top: 20px;
+    }
+
+    .depth-chart {
+        height: 300px;
+        margin-top: 15px;
+    }
+
+    .sector-analysis {
+        margin-top: 20px;
+    }
+
+    .sector-metrics {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 10px;
+    }
+
+    .metric-card {
+        background: #f8f9fa;
+        padding: 10px;
+        border-radius: 4px;
+    }
+
+    .metric-value {
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+
     @media (max-width: 768px) {
         .stock-grid {
             grid-template-columns: 1fr;
         }
 
-        .filter-grid {
+        .control-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -304,201 +484,363 @@
         <hr>
         <p class="mb-0">You can still view the dashboard, but real-time data and analysis features will be limited.</p>
     </div>
-    {% else %}
-    <div class="tab-navigation">
-        <button class="tab-button {% if active_tab == 'volume' %}active{% endif %}" 
-                onclick="showTab('volume')">Volume Analysis</button>
-        <button class="tab-button {% if active_tab == 'technical' %}active{% endif %}" 
-                onclick="showTab('technical')">Technical Analysis</button>
-        <button class="tab-button {% if active_tab == 'fundamental' %}active{% endif %}" 
-                onclick="showTab('fundamental')">Fundamental Analysis</button>
-        <button class="tab-button {% if active_tab == 'testing' %}active{% endif %}" 
-                onclick="showTab('testing')">Historical Testing</button>
-        <button class="tab-button {% if active_tab == 'stream' %}active{% endif %}" 
-                onclick="showTab('stream')">Live Data Stream</button>
-    </div>
+    {% endif %}
 
-    <div id="volume-tab" class="tab-content {% if active_tab == 'volume' %}active{% endif %}">
-        <div class="filter-section">
-            <div class="filter-grid">
-                <div class="filter-group">
-                    <label for="timeframe">Timeframe</label>
-                    <select id="timeframe" class="form-select">
-                        <option value="1m" {% if timeframe == '1m' %}selected{% endif %}>1 Month</option>
-                        <option value="3m" {% if timeframe == '3m' %}selected{% endif %}>3 Months</option>
-                        <option value="6m" {% if timeframe == '6m' %}selected{% endif %}>6 Months</option>
-                        <option value="1y" {% if timeframe == '1y' %}selected{% endif %}>1 Year</option>
-                        <option value="2y" {% if timeframe == '2y' %}selected{% endif %}>2 Years</option>
-                        <option value="5y" {% if timeframe == '5y' %}selected{% endif %}>5 Years</option>
-                    </select>
-                </div>
-                <div class="filter-group">
-                    <label for="volume-type">Volume Type</label>
-                    <select id="volume-type" class="form-select">
-                        <option value="raw" {% if volume_type == 'raw' %}selected{% endif %}>Raw Volume</option>
-                        <option value="relative" {% if volume_type == 'relative' %}selected{% endif %}>Relative Volume</option>
-                        <option value="sma" {% if volume_type == 'sma' %}selected{% endif %}>Volume SMA</option>
-                    </select>
-                </div>
-            </div>
-        </div>
-
-        {% if api_errors %}
-        <div class="error-message">
-            <h5>API Errors</h5>
-            <ul>
-                {% for error in api_errors %}
-                <li>{{ error }}</li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %}
-
-        <div class="stock-grid">
-            {% for symbol, data in stock_data.items() %}
-            <div class="stock-card">
-                <div class="stock-header">
-                    <h3 class="stock-title">{{ symbol }}</h3>
-                    <span class="stock-signal signal-{{ data.analysis.signal|lower }}">
-                        {{ data.analysis.signal }}
-                    </span>
-                </div>
-
-                <div class="metrics-grid">
-                    <div class="metric-card">
-                        <div class="metric-label">Current Volume</div>
-                        <div class="metric-value">{{ data.analysis.current_volume|int }}</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Volume Baseline</div>
-                        <div class="metric-value">{{ data.analysis.baseline|int }}</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Volume Ratio</div>
-                        <div class="metric-value">{{ data.analysis.volume_ratio|round(2) }}x</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Momentum</div>
-                        <div class="metric-value">{{ (data.analysis.details.volume_momentum * 100)|round(1) }}%</div>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <canvas id="{{ symbol }}-volume-chart"></canvas>
-                </div>
-
-                {% if data.alerts %}
-                <div class="alerts-section">
-                    <h4>Volume Alerts</h4>
-                    {% for alert in data.alerts %}
-                    <div class="alert-card">
-                        <div class="alert-message">{{ alert }}</div>
-                    </div>
+    <div class="control-panel">
+        <div class="control-grid">
+            <div class="control-group">
+                <label for="symbol">Symbol</label>
+                <select id="symbol" class="form-select">
+                    {% for symbol in stock_data.keys() %}
+                    <option value="{{ symbol }}">{{ symbol }}</option>
                     {% endfor %}
-                </div>
-                {% endif %}
+                </select>
             </div>
+            <div class="control-group">
+                <label for="timeframe">Timeframe</label>
+                <select id="timeframe" class="form-select">
+                    <option value="1m">1 Month</option>
+                    <option value="3m">3 Months</option>
+                    <option value="6m">6 Months</option>
+                    <option value="1y">1 Year</option>
+                    <option value="2y">2 Years</option>
+                    <option value="5y">5 Years</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="analysis-type">Analysis Type</label>
+                <select id="analysis-type" class="form-select">
+                    <option value="volume">Volume Analysis</option>
+                    <option value="technical">Technical Analysis</option>
+                    <option value="combined">Combined Analysis</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="volume-type">Volume Type</label>
+                <select id="volume-type" class="form-select">
+                    <option value="raw">Raw Volume</option>
+                    <option value="relative">Relative Volume</option>
+                    <option value="sma">Volume SMA</option>
+                </select>
+            </div>
+            <div class="control-group">
+                <label for="indicators">Technical Indicators</label>
+                <select id="indicators" class="form-select" multiple>
+                    <option value="sma">Simple Moving Average</option>
+                    <option value="ema">Exponential Moving Average</option>
+                    <option value="macd">MACD</option>
+                    <option value="bollinger">Bollinger Bands</option>
+                    <option value="stochastic">Stochastic Oscillator</option>
+                    <option value="atr">Average True Range</option>
+                    <option value="ichimoku">Ichimoku Cloud</option>
+                    <option value="fibonacci">Fibonacci Retracement</option>
+                    <option value="volume-profile">Volume Profile</option>
+                    <option value="obv">On-Balance Volume</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    {% if api_errors %}
+    <div class="error-message">
+        <h5>API Errors</h5>
+        <ul>
+            {% for error in api_errors %}
+            <li>{{ error }}</li>
             {% endfor %}
-        </div>
-
-        <div class="comparison-section">
-            <h3>Volume Comparison</h3>
-            <div class="comparison-chart">
-                <canvas id="volume-comparison-chart"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <div id="technical-tab" class="tab-content {% if active_tab == 'technical' %}active{% endif %}">
-        <!-- Technical analysis content will go here -->
-    </div>
-
-    <div id="fundamental-tab" class="tab-content {% if active_tab == 'fundamental' %}active{% endif %}">
-        <!-- Fundamental analysis content will go here -->
-    </div>
-
-    <div id="testing-tab" class="tab-content {% if active_tab == 'testing' %}active{% endif %}">
-        <div class="test-section">
-            <h3>Historical Data Testing</h3>
-            <div class="test-controls">
-                <div class="control-group">
-                    <label for="test-symbol">Symbol</label>
-                    <select id="test-symbol" class="form-select">
-                        {% for symbol in stock_data.keys() %}
-                        <option value="{{ symbol }}">{{ symbol }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label for="test-period">Test Period</label>
-                    <select id="test-period" class="form-select">
-                        <option value="1m">1 Month</option>
-                        <option value="3m">3 Months</option>
-                        <option value="6m">6 Months</option>
-                        <option value="1y">1 Year</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <label for="test-strategy">Strategy</label>
-                    <select id="test-strategy" class="form-select">
-                        <option value="volume">Volume Analysis</option>
-                        <option value="technical">Technical Analysis</option>
-                        <option value="combined">Combined Analysis</option>
-                    </select>
-                </div>
-                <div class="control-group">
-                    <button class="btn btn-primary" onclick="runTest()">Run Test</button>
-                </div>
-            </div>
-
-            <div class="test-results" id="test-results" style="display: none;">
-                <div class="test-metrics">
-                    <div class="metric-card">
-                        <div class="metric-label">Total Trades</div>
-                        <div class="metric-value" id="total-trades">0</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Win Rate</div>
-                        <div class="metric-value" id="win-rate">0%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Average Return</div>
-                        <div class="metric-value" id="avg-return">0%</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-label">Max Drawdown</div>
-                        <div class="metric-value" id="max-drawdown">0%</div>
-                    </div>
-                </div>
-
-                <div class="test-chart">
-                    <canvas id="test-performance-chart"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="stream-tab" class="tab-content {% if active_tab == 'stream' %}active{% endif %}">
-        <div class="new-data-section">
-            <h3>Live Data Stream</h3>
-            <div class="stream-controls">
-                <button class="stream-button start-stream" onclick="startStream()">Start Stream</button>
-                <button class="stream-button stop-stream" onclick="stopStream()">Stop Stream</button>
-                <button class="stream-button clear-stream" onclick="clearStream()">Clear Data</button>
-            </div>
-
-            <div class="data-stream" id="data-stream">
-                <div class="data-point">
-                    <span class="data-label">Time</span>
-                    <span class="data-label">Symbol</span>
-                    <span class="data-label">Price</span>
-                    <span class="data-label">Volume</span>
-                    <span class="data-label">Signal</span>
-                </div>
-            </div>
-        </div>
+        </ul>
     </div>
     {% endif %}
+
+    <div class="stock-grid">
+        {% for symbol, data in stock_data.items() %}
+        <div class="stock-card" data-symbol="{{ symbol }}">
+            <div class="stock-header">
+                <h3 class="stock-title">{{ symbol }}</h3>
+                <span class="stock-signal signal-{{ data.analysis.signal|lower }}">
+                    {{ data.analysis.signal }}
+                </span>
+            </div>
+            
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Current Price</div>
+                    <div class="metric-value">${{ data.analysis.current_price|round(2) }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Current Volume</div>
+                    <div class="metric-value">{{ data.analysis.current_volume|int }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Volume Baseline</div>
+                    <div class="metric-value">{{ data.analysis.baseline|int }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Volume Ratio</div>
+                    <div class="metric-value">{{ data.analysis.volume_ratio|round(2) }}x</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Momentum</div>
+                    <div class="metric-value">{{ (data.analysis.details.volume_momentum * 100)|round(1) }}%</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">RSI</div>
+                    <div class="metric-value">{{ data.analysis.details.rsi|round(1) }}</div>
+                </div>
+            </div>
+
+            <div class="technical-indicators">
+                <div class="indicator-card" data-indicator="sma">
+                    <div class="indicator-label">SMA (20)</div>
+                    <div class="indicator-value">${{ data.analysis.indicators.sma|round(2) }}</div>
+                    <div class="indicator-change {% if data.analysis.indicators.sma_change > 0 %}positive{% else %}negative{% endif %}">
+                        {{ data.analysis.indicators.sma_change|round(2) }}%
+                    </div>
+                </div>
+                <div class="indicator-card" data-indicator="ema">
+                    <div class="indicator-label">EMA (20)</div>
+                    <div class="indicator-value">${{ data.analysis.indicators.ema|round(2) }}</div>
+                    <div class="indicator-change {% if data.analysis.indicators.ema_change > 0 %}positive{% else %}negative{% endif %}">
+                        {{ data.analysis.indicators.ema_change|round(2) }}%
+                    </div>
+                </div>
+                <div class="indicator-card" data-indicator="macd">
+                    <div class="indicator-label">MACD</div>
+                    <div class="indicator-value">{{ data.analysis.indicators.macd|round(2) }}</div>
+                    <div class="indicator-change {% if data.analysis.indicators.macd_signal > 0 %}positive{% else %}negative{% endif %}">
+                        {{ data.analysis.indicators.macd_signal|round(2) }}
+                    </div>
+                </div>
+                <div class="indicator-card" data-indicator="stochastic">
+                    <div class="indicator-label">Stochastic</div>
+                    <div class="indicator-value">{{ data.analysis.indicators.stochastic|round(2) }}</div>
+                    <div class="indicator-change {% if data.analysis.indicators.stochastic_signal > 0 %}positive{% else %}negative{% endif %}">
+                        {{ data.analysis.indicators.stochastic_signal|round(2) }}
+                    </div>
+                </div>
+                <div class="indicator-card" data-indicator="atr">
+                    <div class="indicator-label">ATR</div>
+                    <div class="indicator-value">{{ data.analysis.indicators.atr|round(2) }}</div>
+                    <div class="indicator-change {% if data.analysis.indicators.atr_change > 0 %}positive{% else %}negative{% endif %}">
+                        {{ data.analysis.indicators.atr_change|round(2) }}%
+                    </div>
+                </div>
+                <div class="indicator-card" data-indicator="ichimoku">
+                    <div class="indicator-label">Ichimoku Cloud</div>
+                    <div class="indicator-value">
+                        <span class="trend-indicator {% if data.analysis.indicators.ichimoku_signal == 'bullish' %}trend-up{% else %}trend-down{% endif %}"></span>
+                        {{ data.analysis.indicators.ichimoku_signal|title }}
+                    </div>
+                </div>
+                <div class="indicator-card" data-indicator="fibonacci">
+                    <div class="indicator-label">Fibonacci Levels</div>
+                    <div class="indicator-value">
+                        {{ data.analysis.indicators.fibonacci_level|round(2) }}
+                        <span class="trend-indicator {% if data.analysis.indicators.fibonacci_signal == 'support' %}trend-up{% else %}trend-down{% endif %}"></span>
+                    </div>
+                </div>
+                <div class="indicator-card" data-indicator="obv">
+                    <div class="indicator-label">OBV</div>
+                    <div class="indicator-value">
+                        {{ data.analysis.indicators.obv|int }}
+                        <span class="trend-indicator {% if data.analysis.indicators.obv_change > 0 %}trend-up{% else %}trend-down{% endif %}"></span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="performance-metrics">
+                <div class="performance-card">
+                    <div class="performance-label">Volatility</div>
+                    <div class="performance-value">
+                        {{ data.analysis.indicators.volatility|round(2) }}%
+                        <span class="volatility-indicator {% if data.analysis.indicators.volatility > 2 %}volatility-high{% elif data.analysis.indicators.volatility > 1 %}volatility-medium{% else %}volatility-low{% endif %}"></span>
+                    </div>
+                </div>
+                <div class="performance-card">
+                    <div class="performance-label">Beta</div>
+                    <div class="performance-value">
+                        {{ data.analysis.indicators.beta|round(2) }}
+                        <span class="beta-indicator {% if data.analysis.indicators.beta > 1.5 %}beta-high{% elif data.analysis.indicators.beta < 0.5 %}beta-low{% else %}beta-neutral{% endif %}">
+                            {% if data.analysis.indicators.beta > 1.5 %}High{% elif data.analysis.indicators.beta < 0.5 %}Low{% else %}Neutral{% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="performance-card">
+                    <div class="performance-label">Sharpe Ratio</div>
+                    <div class="performance-value">{{ data.analysis.indicators.sharpe_ratio|round(2) }}</div>
+                </div>
+                <div class="performance-card">
+                    <div class="performance-label">Max Drawdown</div>
+                    <div class="performance-value">{{ data.analysis.indicators.max_drawdown|round(2) }}%</div>
+                </div>
+            </div>
+
+            <div class="chart-container">
+                <canvas id="{{ symbol }}-chart"></canvas>
+            </div>
+
+            {% if data.alerts %}
+            <div class="alerts-section">
+                <h4>Alerts</h4>
+                {% for alert in data.alerts %}
+                <div class="alert-card">
+                    <div class="alert-message">{{ alert }}</div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="comparison-section">
+        <h3>Stock Comparison</h3>
+        
+        <div class="correlation-matrix">
+            <table class="correlation-table">
+                <thead>
+                    <tr>
+                        <th>Symbol</th>
+                        {% for symbol in stock_data.keys() %}
+                        <th>{{ symbol }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for symbol1 in stock_data.keys() %}
+                    <tr>
+                        <td>{{ symbol1 }}</td>
+                        {% for symbol2 in stock_data.keys() %}
+                        <td>
+                            <span class="correlation-value {% if stock_data[symbol1].correlation[symbol2] > 0.7 %}high{% elif stock_data[symbol1].correlation[symbol2] < -0.7 %}low{% endif %}">
+                                {{ stock_data[symbol1].correlation[symbol2]|round(2) }}
+                            </span>
+                        </td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="comparison-chart">
+            <canvas id="comparison-chart"></canvas>
+        </div>
+
+        <div class="sector-comparison">
+            <h4>Sector Performance</h4>
+            <div class="sector-chart">
+                <canvas id="sector-chart"></canvas>
+            </div>
+        </div>
+
+        <div class="sector-analysis">
+            <h4>Sector Analysis</h4>
+            <div class="sector-metrics">
+                <div class="metric-card">
+                    <div class="metric-label">Sector Correlation</div>
+                    <div class="metric-value">{{ data.analysis.sector.correlation|round(2) }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Sector Beta</div>
+                    <div class="metric-value">{{ data.analysis.sector.beta|round(2) }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Sector Performance</div>
+                    <div class="metric-value">{{ data.analysis.sector.performance|round(2) }}%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="stream-section">
+        <h3>Real-time Data Stream</h3>
+        <div class="stream-controls">
+            <button class="stream-button start-stream" onclick="startStream()">Start Stream</button>
+            <button class="stream-button stop-stream" onclick="stopStream()">Stop Stream</button>
+            <button class="stream-button clear-stream" onclick="clearStream()">Clear Data</button>
+        </div>
+
+        <div class="real-time-metrics">
+            <div class="metric-card">
+                <div class="metric-label">Price Change</div>
+                <div class="metric-value">
+                    <span id="price-change">-</span>
+                    <span class="trend-indicator" id="price-trend"></span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Volume Change</div>
+                <div class="metric-value">
+                    <span id="volume-change">-</span>
+                    <span class="trend-indicator" id="volume-trend"></span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">RSI Change</div>
+                <div class="metric-value">
+                    <span id="rsi-change">-</span>
+                    <span class="trend-indicator" id="rsi-trend"></span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">MACD Signal</div>
+                <div class="metric-value">
+                    <span id="macd-signal">-</span>
+                    <span class="trend-indicator" id="macd-trend"></span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Volatility</div>
+                <div class="metric-value">
+                    <span id="volatility">-</span>
+                    <span class="volatility-indicator" id="volatility-level"></span>
+                </div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Beta</div>
+                <div class="metric-value">
+                    <span id="beta">-</span>
+                    <span class="beta-indicator" id="beta-level">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="data-stream" id="data-stream">
+            <div class="data-point">
+                <span class="data-label">Time</span>
+                <span class="data-label">Symbol</span>
+                <span class="data-label">Price</span>
+                <span class="data-label">Volume</span>
+                <span class="data-label">RSI</span>
+                <span class="data-label">MACD</span>
+                <span class="data-label">Volatility</span>
+                <span class="data-label">Beta</span>
+                <span class="data-label">Signal</span>
+            </div>
+        </div>
+
+        <div class="price-alerts">
+            <h4>Price Alerts</h4>
+            <div class="alert-list" id="price-alerts">
+                <!-- Alerts will be populated dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <div class="volume-profile">
+        <h4>Volume Profile</h4>
+        <div class="profile-chart">
+            <canvas id="volume-profile-chart"></canvas>
+        </div>
+    </div>
+
+    <div class="market-depth">
+        <h4>Market Depth</h4>
+        <div class="depth-chart">
+            <canvas id="market-depth-chart"></canvas>
+        </div>
+    </div>
 </div>
 
 {{ components.api_status() }}
@@ -507,102 +849,279 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-function showTab(tabName) {
-    // Hide all tabs
-    document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
-    });
-    document.querySelectorAll('.tab-button').forEach(button => {
-        button.classList.remove('active');
-    });
-    
-    // Show selected tab
-    document.getElementById(`${tabName}-tab`).classList.add('active');
-    document.querySelector(`.tab-button[onclick="showTab('${tabName}')"]`).classList.add('active');
-}
+// Configuration
+const CONFIG = {
+    updateInterval: 5000, // 5 seconds
+    maxRetries: 3,
+    retryDelay: 5000,
+    endpoints: {
+        analysis: '/analysis/data',
+        stream: '/analysis/stream-data'
+    }
+};
 
-function runTest() {
-    const symbol = document.getElementById('test-symbol').value;
-    const period = document.getElementById('test-period').value;
-    const strategy = document.getElementById('test-strategy').value;
+// State management
+const state = {
+    charts: {},
+    streamInterval: null,
+    isLoading: false,
+    error: null,
+    lastPrice: null
+};
 
-    // Show loading state
-    const results = document.getElementById('test-results');
-    results.style.display = 'block';
-    results.innerHTML = '<div class="loading">Running test...</div>';
-
-    // Fetch test results
-    fetch(`/api/test-strategy?symbol=${symbol}&period=${period}&strategy=${strategy}`)
-        .then(response => response.json())
-        .then(data => {
-            // Update metrics
-            document.getElementById('total-trades').textContent = data.total_trades;
-            document.getElementById('win-rate').textContent = `${(data.win_rate * 100).toFixed(1)}%`;
-            document.getElementById('avg-return').textContent = `${(data.avg_return * 100).toFixed(1)}%`;
-            document.getElementById('max-drawdown').textContent = `${(data.max_drawdown * 100).toFixed(1)}%`;
-
-            // Update performance chart
-            const ctx = document.getElementById('test-performance-chart').getContext('2d');
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: data.performance.labels,
-                    datasets: [{
-                        label: 'Portfolio Value',
-                        data: data.performance.values,
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 2,
-                        fill: false
-                    }]
+// Initialize charts with technical indicators
+function initCharts() {
+    {% for symbol, data in stock_data.items() %}
+    const ctx = document.getElementById('{{ symbol }}-chart').getContext('2d');
+    state.charts['{{ symbol }}'] = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: {{ data.historical_data|map(attribute='date')|list|tojson }},
+            datasets: [
+                {
+                    label: 'Price',
+                    data: {{ data.historical_data|map(attribute='close')|list|tojson }},
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 2,
+                    yAxisID: 'y'
                 },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: false,
-                            title: {
-                                display: true,
-                                text: 'Portfolio Value ($)'
-                            }
-                        }
+                {
+                    label: 'Volume',
+                    data: {{ data.volumes|tojson }},
+                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y1'
+                },
+                {
+                    label: 'SMA (20)',
+                    data: {{ data.analysis.indicators.sma_values|tojson }},
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'EMA (20)',
+                    data: {{ data.analysis.indicators.ema_values|tojson }},
+                    borderColor: 'rgba(153, 102, 255, 1)',
+                    borderWidth: 1,
+                    borderDash: [5, 5],
+                    yAxisID: 'y'
+                },
+                {
+                    label: 'MACD',
+                    data: {{ data.analysis.indicators.macd_values|tojson }},
+                    borderColor: 'rgba(255, 159, 64, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y2'
+                },
+                {
+                    label: 'Stochastic',
+                    data: {{ data.analysis.indicators.stochastic_values|tojson }},
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y3'
+                },
+                {
+                    label: 'ATR',
+                    data: {{ data.analysis.indicators.atr_values|tojson }},
+                    borderColor: 'rgba(201, 203, 207, 1)',
+                    borderWidth: 1,
+                    yAxisID: 'y4'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Price ($)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Volume'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                y2: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'MACD'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                y3: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Stochastic'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                },
+                y4: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'ATR'
+                    },
+                    grid: {
+                        drawOnChartArea: false
                     }
                 }
-            });
-        })
-        .catch(error => {
-            results.innerHTML = `<div class="error-message">Error running test: ${error.message}</div>`;
-        });
+            }
+        }
+    });
+    {% endfor %}
+
+    // Initialize comparison charts
+    initComparisonCharts();
 }
 
-let streamInterval;
-function startStream() {
-    if (streamInterval) return;
+function initComparisonCharts() {
+    // Initialize comparison chart
+    const comparisonCtx = document.getElementById('comparison-chart').getContext('2d');
+    state.charts.comparison = new Chart(comparisonCtx, {
+        type: 'line',
+        data: {
+            labels: {{ stock_data.values()|first|attr('historical_data')|map(attribute='date')|list|tojson }},
+            datasets: [
+                {% for symbol, data in stock_data.items() %}
+                {
+                    label: '{{ symbol }}',
+                    data: {{ data.historical_data|map(attribute='close')|list|tojson }},
+                    borderColor: getRandomColor(),
+                    borderWidth: 2,
+                    fill: false
+                }{% if not loop.last %},{% endif %}
+                {% endfor %}
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: 'Price ($)'
+                    }
+                }
+            }
+        }
+    });
+
+    // Initialize sector chart
+    const sectorCtx = document.getElementById('sector-chart').getContext('2d');
+    state.charts.sector = new Chart(sectorCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ sector_data.keys()|list|tojson }},
+            datasets: [{
+                label: 'Sector Performance',
+                data: {{ sector_data.values()|list|tojson }},
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: 'Performance (%)'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Update data
+async function updateData() {
+    if (state.isLoading) return;
     
-    streamInterval = setInterval(() => {
-        fetch('/api/stream-data')
-            .then(response => response.json())
-            .then(data => {
-                const stream = document.getElementById('data-stream');
-                const point = document.createElement('div');
-                point.className = 'data-point';
-                point.innerHTML = `
-                    <span class="data-value">${new Date().toLocaleTimeString()}</span>
-                    <span class="data-value">${data.symbol}</span>
-                    <span class="data-value">$${data.price.toFixed(2)}</span>
-                    <span class="data-value">${data.volume.toLocaleString()}</span>
-                    <span class="data-value signal-${data.signal.toLowerCase()}">${data.signal}</span>
-                `;
-                stream.insertBefore(point, stream.firstChild.nextSibling);
-            })
-            .catch(error => console.error('Stream error:', error));
-    }, 1000);
+    state.isLoading = true;
+    const symbol = document.getElementById('symbol').value;
+    const timeframe = document.getElementById('timeframe').value;
+    const analysisType = document.getElementById('analysis-type').value;
+    const volumeType = document.getElementById('volume-type').value;
+    
+    try {
+        const response = await fetch(`${CONFIG.endpoints.analysis}?symbol=${symbol}&timeframe=${timeframe}&analysis_type=${analysisType}&volume_type=${volumeType}`);
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to fetch data');
+        }
+        
+        // Update charts and metrics
+        updateCharts(data);
+        updateMetrics(data);
+        
+    } catch (error) {
+        console.error('Error updating data:', error);
+        showError(error.message);
+    } finally {
+        state.isLoading = false;
+    }
+}
+
+// Stream data
+function startStream() {
+    if (state.streamInterval) return;
+    
+    state.streamInterval = setInterval(async () => {
+        try {
+            const response = await fetch(CONFIG.endpoints.stream);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to fetch stream data');
+            }
+            
+            updateStream(data);
+            
+        } catch (error) {
+            console.error('Stream error:', error);
+            stopStream();
+        }
+    }, CONFIG.updateInterval);
 }
 
 function stopStream() {
-    if (streamInterval) {
-        clearInterval(streamInterval);
-        streamInterval = null;
+    if (state.streamInterval) {
+        clearInterval(state.streamInterval);
+        state.streamInterval = null;
     }
 }
 
@@ -613,37 +1132,254 @@ function clearStream() {
     }
 }
 
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize individual stock charts
-    {% for symbol, data in stock_data.items() %}
-    const ctx = document.getElementById('{{ symbol }}-volume-chart').getContext('2d');
-    const chartData = {
-        labels: {{ data.historical_data|map(attribute='date')|list|tojson }},
-        datasets: [{
-            label: 'Volume',
-            data: {{ data.volumes|tojson }},
-            backgroundColor: 'rgba(54, 162, 235, 0.5)',
-            borderColor: 'rgba(54, 162, 235, 1)',
-            borderWidth: 1
-        }, {
-            label: 'Volume Baseline',
-            data: {{ data.historical_data|map(attribute='volume_analysis.baseline')|list|tojson }},
-            borderColor: 'rgba(255, 99, 132, 1)',
+// Utility functions
+function updateCharts(data) {
+    // Update individual stock charts
+    Object.entries(data.stock_data).forEach(([symbol, stockData]) => {
+        const chart = state.charts[symbol];
+        if (chart) {
+            chart.data.labels = stockData.historical_data.map(d => d.date);
+            chart.data.datasets[0].data = stockData.historical_data.map(d => d.close);
+            chart.data.datasets[1].data = stockData.volumes;
+            chart.update();
+        }
+    });
+    
+    // Update comparison chart
+    const comparisonChart = state.charts.comparison;
+    if (comparisonChart) {
+        comparisonChart.data.labels = data.stock_data[Object.keys(data.stock_data)[0]].historical_data.map(d => d.date);
+        comparisonChart.data.datasets = Object.entries(data.stock_data).map(([symbol, stockData]) => ({
+            label: symbol,
+            data: stockData.historical_data.map(d => d.close),
+            borderColor: getRandomColor(),
             borderWidth: 2,
-            fill: false,
-            type: 'line'
-        }]
-    };
+            fill: false
+        }));
+        comparisonChart.update();
+    }
+}
+
+function updateMetrics(data) {
+    Object.entries(data.stock_data).forEach(([symbol, stockData]) => {
+        const card = document.querySelector(`.stock-card[data-symbol="${symbol}"]`);
+        if (card) {
+            card.querySelector('.stock-signal').className = `stock-signal signal-${stockData.analysis.signal.toLowerCase()}`;
+            card.querySelector('.stock-signal').textContent = stockData.analysis.signal;
+            
+            // Update metric values
+            card.querySelector('[data-metric="price"]').textContent = `$${stockData.analysis.current_price.toFixed(2)}`;
+            card.querySelector('[data-metric="volume"]').textContent = stockData.analysis.current_volume.toLocaleString();
+            card.querySelector('[data-metric="baseline"]').textContent = stockData.analysis.baseline.toLocaleString();
+            card.querySelector('[data-metric="ratio"]').textContent = `${stockData.analysis.volume_ratio.toFixed(2)}x`;
+            card.querySelector('[data-metric="momentum"]').textContent = `${(stockData.analysis.details.volume_momentum * 100).toFixed(1)}%`;
+            card.querySelector('[data-metric="rsi"]').textContent = stockData.analysis.details.rsi.toFixed(1);
+        }
+    });
+}
+
+// Update real-time metrics
+function updateRealTimeMetrics(data) {
+    const priceChange = document.getElementById('price-change');
+    const volumeChange = document.getElementById('volume-change');
+    const rsiChange = document.getElementById('rsi-change');
+    const macdSignal = document.getElementById('macd-signal');
+    const volatility = document.getElementById('volatility');
+    const beta = document.getElementById('beta');
+
+    const priceTrend = document.getElementById('price-trend');
+    const volumeTrend = document.getElementById('volume-trend');
+    const rsiTrend = document.getElementById('rsi-trend');
+    const macdTrend = document.getElementById('macd-trend');
+    const volatilityLevel = document.getElementById('volatility-level');
+    const betaLevel = document.getElementById('beta-level');
+
+    // Update values
+    priceChange.textContent = `${data.price_change.toFixed(2)}%`;
+    volumeChange.textContent = `${data.volume_change.toFixed(2)}%`;
+    rsiChange.textContent = data.rsi_change.toFixed(2);
+    macdSignal.textContent = data.macd_signal.toFixed(2);
+    volatility.textContent = `${data.volatility.toFixed(2)}%`;
+    beta.textContent = data.beta.toFixed(2);
+
+    // Update trends
+    updateTrendIndicator(priceTrend, data.price_change);
+    updateTrendIndicator(volumeTrend, data.volume_change);
+    updateTrendIndicator(rsiTrend, data.rsi_change);
+    updateTrendIndicator(macdTrend, data.macd_signal);
+
+    // Update volatility indicator
+    volatilityLevel.className = 'volatility-indicator';
+    if (data.volatility > 2) {
+        volatilityLevel.classList.add('volatility-high');
+    } else if (data.volatility > 1) {
+        volatilityLevel.classList.add('volatility-medium');
+    } else {
+        volatilityLevel.classList.add('volatility-low');
+    }
+
+    // Update beta indicator
+    betaLevel.className = 'beta-indicator';
+    if (data.beta > 1.5) {
+        betaLevel.classList.add('beta-high');
+        betaLevel.textContent = 'High';
+    } else if (data.beta < 0.5) {
+        betaLevel.classList.add('beta-low');
+        betaLevel.textContent = 'Low';
+    } else {
+        betaLevel.classList.add('beta-neutral');
+        betaLevel.textContent = 'Neutral';
+    }
+}
+
+function updateTrendIndicator(element, value) {
+    element.className = 'trend-indicator';
+    if (value > 0) {
+        element.classList.add('trend-up');
+    } else if (value < 0) {
+        element.classList.add('trend-down');
+    }
+}
+
+// Enhanced stream update
+function updateStream(data) {
+    const stream = document.getElementById('data-stream');
+    const point = document.createElement('div');
+    point.className = 'data-point';
+    point.innerHTML = `
+        <span class="data-value">${new Date().toLocaleTimeString()}</span>
+        <span class="data-value">${data.symbol}</span>
+        <span class="data-value">$${data.price.toFixed(2)}</span>
+        <span class="data-value">${data.volume.toLocaleString()}</span>
+        <span class="data-value">${data.rsi.toFixed(2)}</span>
+        <span class="data-value">${data.macd.toFixed(2)}</span>
+        <span class="data-value">${data.volatility.toFixed(2)}%</span>
+        <span class="data-value">${data.beta.toFixed(2)}</span>
+        <span class="data-value signal-${data.signal.toLowerCase()}">${data.signal}</span>
+    `;
+    stream.insertBefore(point, stream.firstChild.nextSibling);
+
+    // Update real-time metrics
+    updateRealTimeMetrics(data);
+
+    // Check for price alerts
+    checkPriceAlerts(data);
+}
+
+function checkPriceAlerts(data) {
+    const alerts = document.getElementById('price-alerts');
+    const price = data.price;
+    const previousPrice = state.lastPrice || price;
     
-    new Chart(ctx, {
+    // Check for significant price movements
+    const priceChange = Math.abs((price - previousPrice) / previousPrice * 100);
+    if (priceChange > 1) { // 1% threshold
+        const alert = document.createElement('div');
+        alert.className = 'alert-card';
+        alert.innerHTML = `
+            <div class="alert-time">${new Date().toLocaleTimeString()}</div>
+            <div class="alert-message">
+                ${data.symbol} price ${price > previousPrice ? 'increased' : 'decreased'} by ${priceChange.toFixed(2)}%
+            </div>
+        `;
+        alerts.insertBefore(alert, alerts.firstChild);
+    }
+    
+    state.lastPrice = price;
+}
+
+function showError(message) {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = message;
+    document.querySelector('.dashboard-container').insertBefore(errorDiv, document.querySelector('.control-panel'));
+    setTimeout(() => errorDiv.remove(), 5000);
+}
+
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+
+// Initialize volume profile chart
+function initVolumeProfileChart() {
+    const ctx = document.getElementById('volume-profile-chart').getContext('2d');
+    state.charts.volumeProfile = new Chart(ctx, {
         type: 'bar',
-        data: chartData,
+        data: {
+            labels: {{ volume_profile.keys()|list|tojson }},
+            datasets: [{
+                label: 'Volume Profile',
+                data: {{ volume_profile.values()|list|tojson }},
+                backgroundColor: 'rgba(75, 192, 192, 0.5)',
+                borderColor: 'rgba(75, 192, 192, 1)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+                x: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Volume'
+                    }
+                },
+                y: {
+                    title: {
+                        display: true,
+                        text: 'Price Level'
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Initialize market depth chart
+function initMarketDepthChart() {
+    const ctx = document.getElementById('market-depth-chart').getContext('2d');
+    state.charts.marketDepth = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ market_depth.labels|tojson }},
+            datasets: [
+                {
+                    label: 'Bids',
+                    data: {{ market_depth.bids|tojson }},
+                    backgroundColor: 'rgba(40, 167, 69, 0.5)',
+                    borderColor: 'rgba(40, 167, 69, 1)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Asks',
+                    data: {{ market_depth.asks|tojson }},
+                    backgroundColor: 'rgba(220, 53, 69, 0.5)',
+                    borderColor: 'rgba(220, 53, 69, 1)',
+                    borderWidth: 1
+                }
+            ]
+        },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             scales: {
+                x: {
+                    stacked: true,
+                    title: {
+                        display: true,
+                        text: 'Price'
+                    }
+                },
                 y: {
-                    beginAtZero: true,
+                    stacked: true,
                     title: {
                         display: true,
                         text: 'Volume'
@@ -652,61 +1388,27 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
-    {% endfor %}
+}
 
-    // Initialize comparison chart
-    const comparisonCtx = document.getElementById('volume-comparison-chart').getContext('2d');
-    const comparisonData = {
-        labels: {{ stock_data.values()|first|attr('historical_data')|map(attribute='date')|list|tojson }},
-        datasets: [
-            {% for symbol, data in stock_data.items() %}
-            {
-                label: '{{ symbol }}',
-                data: {{ data.volumes|tojson }},
-                borderColor: getRandomColor(),
-                borderWidth: 2,
-                fill: false
-            }{% if not loop.last %},{% endif %}
-            {% endfor %}
-        ]
-    };
+// Event listeners
+document.addEventListener('DOMContentLoaded', () => {
+    initCharts();
+    initVolumeProfileChart();
+    initMarketDepthChart();
     
-    new Chart(comparisonCtx, {
-        type: 'line',
-        data: comparisonData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Volume'
-                    }
-                }
-            }
-        }
-    });
+    // Add event listeners for controls
+    document.getElementById('symbol').addEventListener('change', updateData);
+    document.getElementById('timeframe').addEventListener('change', updateData);
+    document.getElementById('analysis-type').addEventListener('change', updateData);
+    document.getElementById('volume-type').addEventListener('change', updateData);
+    
+    // Initial data load
+    updateData();
+});
 
-    // Filter change handlers
-    document.getElementById('timeframe').addEventListener('change', updateFilters);
-    document.getElementById('volume-type').addEventListener('change', updateFilters);
-
-    function updateFilters() {
-        const timeframe = document.getElementById('timeframe').value;
-        const volumeType = document.getElementById('volume-type').value;
-        window.location.href = `{{ url_for('analysis.volume_analysis') }}?timeframe=${timeframe}&volume_type=${volumeType}`;
-    }
-
-    function getRandomColor() {
-        const letters = '0123456789ABCDEF';
-        let color = '#';
-        for (let i = 0; i < 6; i++) {
-            color += letters[Math.floor(Math.random() * 16)];
-        }
-        return color;
-    }
+// Cleanup
+window.addEventListener('beforeunload', () => {
+    stopStream();
 });
 </script>
 {% endblock %} 
