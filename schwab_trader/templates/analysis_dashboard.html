@@ -329,6 +329,25 @@
     .milestone-total {
         font-weight: 500;
     }
+
+    .performance-graph {
+        margin-top: 20px;
+        background: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        padding: 15px;
+    }
+
+    .graph-container {
+        height: 400px;
+        position: relative;
+    }
+
+    .performance-graph h4 {
+        color: #1a237e;
+        margin-bottom: 15px;
+        font-size: 1.2rem;
+    }
 </style>
 {% endblock %}
 
@@ -404,6 +423,21 @@
                 <div class="volume-chart">
                     <canvas id="{{ symbol }}-volume-chart"></canvas>
                 </div>
+
+                {% if symbol == 'TSLA' %}
+                <div class="performance-graph">
+                    <h4>TSLA Trading Performance</h4>
+                    <div class="graph-container" style="height: 400px; width: 100%; position: relative;">
+                        <canvas id="tsla-performance-chart" style="width: 100%; height: 100%;"></canvas>
+                    </div>
+                    <!-- Debug information -->
+                    <div style="margin-top: 10px; font-size: 12px; color: #666;">
+                        <p>Data points: {{ data|length }}</p>
+                        <p>First date: {{ data[0].date if data else 'No data' }}</p>
+                        <p>Last date: {{ data[-1].date if data else 'No data' }}</p>
+                    </div>
+                </div>
+                {% endif %}
 
                 {% if simulation_results[symbol] %}
                 <div class="simulation-results">
@@ -538,19 +572,21 @@ function showDetails(symbol) {
 document.addEventListener('DOMContentLoaded', function() {
     {% for symbol, data in stock_data.items() %}
     // Volume Chart
-    const volumeCtx = document.getElementById('{{ symbol }}-volume-chart').getContext('2d');
-    new Chart(volumeCtx, {
+    const {{ symbol }}VolumeCtx = document.getElementById('{{ symbol }}-volume-chart').getContext('2d');
+    const {{ symbol }}VolumeData = {
+        labels: {{ data|map(attribute='date')|list|tojson }},
+        datasets: [{
+            label: 'Volume',
+            data: {{ data|map(attribute='volume')|list|tojson }},
+            backgroundColor: 'rgba(54, 162, 235, 0.5)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    };
+    
+    new Chart({{ symbol }}VolumeCtx, {
         type: 'bar',
-        data: {
-            labels: {{ data|map(attribute='date')|list|tojson }},
-            datasets: [{
-                label: 'Volume',
-                data: {{ data|map(attribute='volume')|list|tojson }},
-                backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                borderColor: 'rgba(54, 162, 235, 1)',
-                borderWidth: 1
-            }]
-        },
+        data: {{ symbol }}VolumeData,
         options: {
             responsive: true,
             maintainAspectRatio: false,
@@ -561,6 +597,148 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
     });
+
+    {% if symbol == 'TSLA' and simulation_results[symbol] %}
+    // TSLA Performance Chart
+    console.log('Creating TSLA performance chart...');
+    const tslaPerformanceCtx = document.getElementById('tsla-performance-chart');
+    if (!tslaPerformanceCtx) {
+        console.error('Could not find performance chart canvas');
+        return;
+    }
+    
+    // Prepare data for the performance chart
+    const tslaDates = {{ data|map(attribute='date')|list|tojson }};
+    const tslaPrices = {{ data|map(attribute='close')|list|tojson }};
+    const tslaVolumes = {{ data|map(attribute='volume')|list|tojson }};
+    
+    console.log('Data points:', tslaDates.length);
+    console.log('First date:', tslaDates[0]);
+    console.log('Last date:', tslaDates[tslaDates.length - 1]);
+    
+    // Get trade points
+    const tslaTrades = {{ simulation_results[symbol].trades|tojson }};
+    console.log('Number of trades:', tslaTrades.length);
+    
+    const tslaBuyPoints = tslaTrades.filter(t => t.type === 'buy').map(t => ({
+        x: t.date,
+        y: t.price
+    }));
+    
+    const tslaSellPoints = tslaTrades.filter(t => t.type === 'sell').map(t => ({
+        x: t.date,
+        y: t.price
+    }));
+    
+    // Get milestone points
+    const tslaMilestones = {{ simulation_results[symbol].milestones|tojson }};
+    console.log('Number of milestones:', tslaMilestones.length);
+    
+    const tslaMilestonePoints = tslaMilestones.map(m => ({
+        x: m.date,
+        y: tslaPrices[tslaDates.indexOf(m.date)]
+    }));
+    
+    const tslaPerformanceData = {
+        labels: tslaDates,
+        datasets: [
+            {
+                label: 'Price',
+                data: tslaPrices,
+                borderColor: 'rgba(75, 192, 192, 1)',
+                backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                fill: true,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Volume',
+                data: tslaVolumes,
+                borderColor: 'rgba(54, 162, 235, 0.5)',
+                backgroundColor: 'rgba(54, 162, 235, 0.1)',
+                fill: true,
+                yAxisID: 'y1'
+            },
+            {
+                label: 'Buy Points',
+                data: tslaBuyPoints,
+                pointBackgroundColor: '#28a745',
+                pointRadius: 6,
+                showLine: false,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Sell Points',
+                data: tslaSellPoints,
+                pointBackgroundColor: '#dc3545',
+                pointRadius: 6,
+                showLine: false,
+                yAxisID: 'y'
+            },
+            {
+                label: 'Milestones',
+                data: tslaMilestonePoints,
+                pointBackgroundColor: '#ffc107',
+                pointRadius: 8,
+                showLine: false,
+                yAxisID: 'y'
+            }
+        ]
+    };
+    
+    new Chart(tslaPerformanceCtx, {
+        type: 'line',
+        data: tslaPerformanceData,
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
+            scales: {
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    title: {
+                        display: true,
+                        text: 'Price ($)'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    title: {
+                        display: true,
+                        text: 'Volume'
+                    },
+                    grid: {
+                        drawOnChartArea: false
+                    }
+                }
+            },
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.datasetIndex === 0) {
+                                label += '$' + context.parsed.y.toFixed(2);
+                            } else if (context.datasetIndex === 1) {
+                                label += context.parsed.y.toLocaleString();
+                            }
+                            return label;
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
     {% endfor %}
 });
 </script>

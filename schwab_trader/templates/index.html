@@ -223,50 +223,24 @@
 
     <div class="quick-actions">
         <div class="action-card">
-            <h3>Market Overview</h3>
-            <p>View real-time market data and trends.</p>
+            <h3><i class="bi bi-speedometer2"></i> Market Dashboard</h3>
+            <p>View real-time market data and key indicators.</p>
             <a href="{{ url_for('dashboard.index') }}" class="action-button">
-                <i class="bi bi-graph-up"></i> View Market
+                <i class="bi bi-arrow-right"></i> Go to Dashboard
             </a>
         </div>
-
         <div class="action-card">
-            <h3>Portfolio</h3>
-            <p>View your positions and track performance.</p>
-            <a href="{{ url_for('dashboard.portfolio') }}" class="action-button">
-                <i class="bi bi-briefcase"></i> Go to Portfolio
-            </a>
-        </div>
-
-        <div class="action-card">
-            <h3>Trading</h3>
-            <p>Execute trades and manage positions.</p>
-            <a href="{{ url_for('analysis.trading') }}" class="action-button">
-                <i class="bi bi-graph-up"></i> Start Trading
-            </a>
-        </div>
-
-        <div class="action-card">
-            <h3>News</h3>
-            <p>Stay updated with market news.</p>
-            <a href="{{ url_for('analysis.news') }}" class="action-button">
-                <i class="bi bi-newspaper"></i> View News
-            </a>
-        </div>
-
-        <div class="action-card">
-            <h3>Compare</h3>
-            <p>Compare stocks and analyze performance.</p>
-            <a href="{{ url_for('analysis.compare') }}" class="action-button">
-                <i class="bi bi-graph-up-arrow"></i> Compare Stocks
-            </a>
-        </div>
-
-        <div class="action-card">
-            <h3>Volume Analysis</h3>
-            <p>Analyze trading volume patterns.</p>
+            <h3><i class="bi bi-bar-chart"></i> Volume Analysis</h3>
+            <p>Analyze trading volume patterns and simulate trades with $2000 budget.</p>
             <a href="{{ url_for('analysis.volume_analysis') }}" class="action-button">
-                <i class="bi bi-bar-chart"></i> View Analysis
+                <i class="bi bi-arrow-right"></i> Start Analysis
+            </a>
+        </div>
+        <div class="action-card">
+            <h3><i class="bi bi-wallet2"></i> Portfolio</h3>
+            <p>Manage your investments and track performance.</p>
+            <a href="{{ url_for('dashboard.portfolio') }}" class="action-button">
+                <i class="bi bi-arrow-right"></i> View Portfolio
             </a>
         </div>
     </div>
