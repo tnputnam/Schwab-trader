@@ -7,7 +7,11 @@ from typing import Dict, Any, Optional, List, Union
 import json
 from datetime import datetime
 
-logger = setup_logger(__name__)
+# Load environment variables
+load_dotenv()
+
+# Setup logger
+logger = setup_logger('config')
 
 class Config:
     # Base configuration
@@ -35,6 +39,7 @@ class Config:
     SCHWAB_API_KEY = os.getenv('SCHWAB_API_KEY')
     SCHWAB_API_SECRET = os.getenv('SCHWAB_API_SECRET')
     SCHWAB_API_BASE_URL = os.getenv('SCHWAB_API_BASE_URL', 'https://api.schwab.com')
+    ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
     
     # Cache configuration
     CACHE_TYPE = os.getenv('CACHE_TYPE', 'simple')
@@ -216,6 +221,12 @@ class ProductionConfig(Config):
         ))
         app.logger.addHandler(file_handler)
         app.logger.setLevel(cls.LOG_LEVEL)
+
+class TestConfig(Config):
+    """Test configuration class."""
+    TESTING = True
+    DATABASE_URL = 'sqlite:///test_schwab_trader.db'
+    LOG_LEVEL = 'DEBUG'
 
 config = {
     'development': DevelopmentConfig,

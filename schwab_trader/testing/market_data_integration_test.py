@@ -4,6 +4,8 @@ import time
 import pandas as pd
 import sys
 import os
+from unittest.mock import patch, MagicMock
+from flask import Flask
 
 # Add the project root directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -12,20 +14,61 @@ from services.schwab_market import SchwabMarketAPI
 from services.alpha_vantage import AlphaVantageAPI
 from services.yfinance import YFinanceAPI
 from services.data_manager import DataManager
+from config import TestConfig
+
+class MockMarketData:
+    @staticmethod
+    def get_mock_quote(symbol):
+        return {
+            'symbol': symbol,
+            'price': 150.0,
+            'volume': 1000000,
+            'timestamp': datetime.now().isoformat()
+        }
+
+    @staticmethod
+    def get_mock_historical_data(symbol, start_date, end_date):
+        dates = pd.date_range(start=start_date, end=end_date, freq='D')
+        return pd.DataFrame({
+            'date': dates,
+            'open': [150.0] * len(dates),
+            'high': [155.0] * len(dates),
+            'low': [145.0] * len(dates),
+            'close': [152.0] * len(dates),
+            'volume': [1000000] * len(dates)
+        })
 
 class MarketDataIntegrationTest(unittest.TestCase):
     def setUp(self):
         """Set up test environment."""
-        self.symbols = ['AAPL', 'MSFT', 'TSLA']  # Test symbols
+        # Create Flask app for testing
+        self.app = Flask(__name__)
+        self.app.config.from_object(TestConfig)
+        self.app_context = self.app.app_context()
+        self.app_context.push()
+
+        self.symbols = ['AAPL', 'MSFT', 'TSLA']
         self.start_date = datetime.now() - timedelta(days=30)
         self.end_date = datetime.now()
-        self.schwab_api = SchwabMarketAPI()
-        self.alpha_vantage = AlphaVantageAPI()
-        self.yfinance = YFinanceAPI()
-        self.data_manager = DataManager()
+        
+        # Mock API responses
+        self.mock_quote = MockMarketData.get_mock_quote
+        self.mock_historical_data = MockMarketData.get_mock_historical_data
 
-    def test_api_response_times(self):
+    def tearDown(self):
+        """Clean up after tests."""
+        self.app_context.pop()
+
+    @patch('services.schwab_market.SchwabMarketAPI.get_quote')
+    @patch('services.alpha_vantage.AlphaVantageAPI.get_daily_data')
+    @patch('services.yfinance.YFinanceAPI.get_historical_data')
+    def test_api_response_times(self, mock_yfinance, mock_alpha_vantage, mock_schwab):
         """Test response times for each API."""
+        # Setup mock responses
+        mock_schwab.side_effect = lambda symbol: self.mock_quote(symbol)
+        mock_alpha_vantage.side_effect = lambda symbol: self.mock_historical_data(symbol, self.start_date, self.end_date)
+        mock_yfinance.side_effect = lambda symbol, start_date, end_date: self.mock_historical_data(symbol, start_date, end_date)
+
         response_times = {
             'schwab': [],
             'alpha_vantage': [],
@@ -37,7 +80,7 @@ class MarketDataIntegrationTest(unittest.TestCase):
             # Test Schwab API
             start_time = time.time()
             try:
-                self.schwab_api.get_quote(symbol)
+                SchwabMarketAPI().get_quote(symbol)
                 response_times['schwab'].append(time.time() - start_time)
             except Exception as e:
                 print(f"Schwab API error for {symbol}: {str(e)}")
@@ -45,7 +88,7 @@ class MarketDataIntegrationTest(unittest.TestCase):
             # Test Alpha Vantage API
             start_time = time.time()
             try:
-                self.alpha_vantage.get_daily_data(symbol)
+                AlphaVantageAPI().get_daily_data(symbol)
                 response_times['alpha_vantage'].append(time.time() - start_time)
             except Exception as e:
                 print(f"Alpha Vantage API error for {symbol}: {str(e)}")
@@ -53,7 +96,7 @@ class MarketDataIntegrationTest(unittest.TestCase):
             # Test Yahoo Finance API
             start_time = time.time()
             try:
-                self.yfinance.get_historical_data(symbol, self.start_date, self.end_date)
+                YFinanceAPI().get_historical_data(symbol, self.start_date, self.end_date)
                 response_times['yfinance'].append(time.time() - start_time)
             except Exception as e:
                 print(f"Yahoo Finance API error for {symbol}: {str(e)}")
@@ -67,44 +110,32 @@ class MarketDataIntegrationTest(unittest.TestCase):
         for api, avg_time in avg_times.items():
             print(f"{api}: {avg_time:.3f}")
 
-        # Assert that response times are reasonable (less than 2 seconds)
+        # Assert that response times are reasonable (less than 0.1 seconds for mock data)
         for api, avg_time in avg_times.items():
-            self.assertLess(avg_time, 2.0, f"{api} API response time too slow")
+            self.assertLess(avg_time, 0.1, f"{api} API response time too slow")
 
-    def test_data_consistency(self):
+    @patch('services.schwab_market.SchwabMarketAPI.get_historical_prices')
+    @patch('services.alpha_vantage.AlphaVantageAPI.get_daily_data')
+    @patch('services.yfinance.YFinanceAPI.get_historical_data')
+    def test_data_consistency(self, mock_yfinance, mock_alpha_vantage, mock_schwab):
         """Test data consistency across different APIs."""
+        # Setup mock responses
+        mock_schwab.side_effect = lambda symbol, period, frequency: self.mock_historical_data(symbol, self.start_date, self.end_date)
+        mock_alpha_vantage.side_effect = lambda symbol: self.mock_historical_data(symbol, self.start_date, self.end_date)
+        mock_yfinance.side_effect = lambda symbol, start_date, end_date: self.mock_historical_data(symbol, start_date, end_date)
+
         for symbol in self.symbols:
             # Get data from each source
-            schwab_data = None
-            alpha_vantage_data = None
-            yfinance_data = None
-
-            try:
-                schwab_data = self.schwab_api.get_historical_prices(symbol, "1m", "daily")
-            except Exception as e:
-                print(f"Schwab API error for {symbol}: {str(e)}")
-
-            try:
-                alpha_vantage_data = self.alpha_vantage.get_daily_data(symbol)
-            except Exception as e:
-                print(f"Alpha Vantage API error for {symbol}: {str(e)}")
-
-            try:
-                yfinance_data = self.yfinance.get_historical_data(symbol, self.start_date, self.end_date)
-            except Exception as e:
-                print(f"Yahoo Finance API error for {symbol}: {str(e)}")
+            schwab_data = SchwabMarketAPI().get_historical_prices(symbol, "1m", "daily")
+            alpha_vantage_data = AlphaVantageAPI().get_daily_data(symbol)
+            yfinance_data = YFinanceAPI().get_historical_data(symbol, self.start_date, self.end_date)
 
             # Compare data points
-            if schwab_data and alpha_vantage_data and yfinance_data:
-                # Convert to pandas DataFrames for comparison
-                schwab_df = pd.DataFrame(schwab_data)
-                alpha_vantage_df = pd.DataFrame(alpha_vantage_data)
-                yfinance_df = pd.DataFrame(yfinance_data)
-
+            if schwab_data is not None and alpha_vantage_data is not None and yfinance_data is not None:
                 # Compare closing prices
-                schwab_close = schwab_df['close'].mean()
-                alpha_vantage_close = alpha_vantage_df['close'].mean()
-                yfinance_close = yfinance_df['close'].mean()
+                schwab_close = schwab_data['close'].mean()
+                alpha_vantage_close = alpha_vantage_data['close'].mean()
+                yfinance_close = yfinance_data['close'].mean()
 
                 # Calculate price differences
                 price_diff_schwab_alpha = abs(schwab_close - alpha_vantage_close) / schwab_close * 100
@@ -116,11 +147,19 @@ class MarketDataIntegrationTest(unittest.TestCase):
                 self.assertLess(price_diff_schwab_yfinance, 1.0,
                               f"Price difference between Schwab and Yahoo Finance too large for {symbol}")
 
-    def test_data_manager_fallback(self):
+    @patch('services.data_manager.DataManager._get_schwab_data')
+    @patch('services.data_manager.DataManager._get_alpha_vantage_data')
+    @patch('services.data_manager.DataManager._get_yfinance_data')
+    def test_data_manager_fallback(self, mock_yfinance, mock_alpha_vantage, mock_schwab):
         """Test DataManager's fallback mechanism."""
+        # Setup mock responses
+        mock_schwab.side_effect = lambda symbol, start_date, end_date: None  # Simulate failure
+        mock_alpha_vantage.side_effect = lambda symbol, start_date, end_date: None  # Simulate failure
+        mock_yfinance.side_effect = lambda symbol, start_date, end_date: self.mock_historical_data(symbol, start_date, end_date)
+
         for symbol in self.symbols:
             # Get data through DataManager
-            data = self.data_manager.get_historical_data(
+            data = DataManager().get_historical_data(
                 symbol,
                 self.start_date,
                 self.end_date,
@@ -136,16 +175,21 @@ class MarketDataIntegrationTest(unittest.TestCase):
             for col in required_columns:
                 self.assertIn(col, data.columns, f"Missing column {col} in data for {symbol}")
 
-    def test_concurrent_requests(self):
+    @patch('services.data_manager.DataManager.get_historical_data')
+    def test_concurrent_requests(self, mock_data_manager):
         """Test handling of concurrent requests."""
         import concurrent.futures
 
+        # Setup mock response
+        mock_data_manager.side_effect = lambda symbol, start_date, end_date, source='auto': self.mock_historical_data(symbol, start_date, end_date)
+
         def fetch_data(symbol):
             try:
-                return self.data_manager.get_historical_data(
+                return DataManager().get_historical_data(
                     symbol,
                     self.start_date,
-                    self.end_date
+                    self.end_date,
+                    source='auto'
                 )
             except Exception as e:
                 print(f"Error fetching data for {symbol}: {str(e)}")

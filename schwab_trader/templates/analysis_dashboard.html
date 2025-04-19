@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% import "components.html" as components %}
 
-{% block title %}Stock Analysis Dashboard{% endblock %}
+{% block title %}Market Analysis Dashboard{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -470,375 +470,95 @@
 {% endblock %}
 
 {% block content %}
-<div class="dashboard-container">
-    {% if error %}
-    <div class="alert alert-danger" role="alert">
-        {{ error }}
-    </div>
-    {% endif %}
-
-    {% if not alpha_vantage_available %}
-    <div class="alert alert-warning" role="alert">
-        <h4 class="alert-heading">Alpha Vantage API Not Configured</h4>
-        <p>To use the technical analysis features, please set the ALPHA_VANTAGE_API_KEY environment variable.</p>
-        <hr>
-        <p class="mb-0">You can still view the dashboard, but real-time data and analysis features will be limited.</p>
-    </div>
-    {% endif %}
-
-    <div class="control-panel">
-        <div class="control-grid">
-            <div class="control-group">
-                <label for="symbol">Symbol</label>
-                <select id="symbol" class="form-select">
-                    {% for symbol in stock_data.keys() %}
-                    <option value="{{ symbol }}">{{ symbol }}</option>
-                    {% endfor %}
-                </select>
+<div class="container-fluid">
+    <!-- Authentication Status -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">API Status</h5>
+                    <div id="authStatus" class="alert" role="alert">
+                        Checking authentication status...
+                    </div>
+                </div>
             </div>
-            <div class="control-group">
+        </div>
+    </div>
+
+    <!-- Market Data Controls -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="symbol">Symbol</label>
+                <input type="text" class="form-control" id="symbol" value="AAPL">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="form-group">
                 <label for="timeframe">Timeframe</label>
-                <select id="timeframe" class="form-select">
+                <select class="form-control" id="timeframe">
+                    <option value="1d">1 Day</option>
+                    <option value="1w">1 Week</option>
                     <option value="1m">1 Month</option>
                     <option value="3m">3 Months</option>
-                    <option value="6m">6 Months</option>
                     <option value="1y">1 Year</option>
-                    <option value="2y">2 Years</option>
-                    <option value="5y">5 Years</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="analysis-type">Analysis Type</label>
-                <select id="analysis-type" class="form-select">
-                    <option value="volume">Volume Analysis</option>
-                    <option value="technical">Technical Analysis</option>
-                    <option value="combined">Combined Analysis</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="volume-type">Volume Type</label>
-                <select id="volume-type" class="form-select">
-                    <option value="raw">Raw Volume</option>
-                    <option value="relative">Relative Volume</option>
-                    <option value="sma">Volume SMA</option>
-                </select>
-            </div>
-            <div class="control-group">
-                <label for="indicators">Technical Indicators</label>
-                <select id="indicators" class="form-select" multiple>
-                    <option value="sma">Simple Moving Average</option>
-                    <option value="ema">Exponential Moving Average</option>
-                    <option value="macd">MACD</option>
-                    <option value="bollinger">Bollinger Bands</option>
-                    <option value="stochastic">Stochastic Oscillator</option>
-                    <option value="atr">Average True Range</option>
-                    <option value="ichimoku">Ichimoku Cloud</option>
-                    <option value="fibonacci">Fibonacci Retracement</option>
-                    <option value="volume-profile">Volume Profile</option>
-                    <option value="obv">On-Balance Volume</option>
                 </select>
             </div>
         </div>
+        <div class="col-md-3">
+            <div class="form-group">
+                <label for="dataType">Data Type</label>
+                <select class="form-control" id="dataType">
+                    <option value="price">Price</option>
+                    <option value="technical">Technical</option>
+                </select>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="form-group">
+                <label>&nbsp;</label>
+                <button class="btn btn-primary btn-block" onclick="updateData()">Update Data</button>
+            </div>
+        </div>
     </div>
 
-    {% if api_errors %}
-    <div class="error-message">
-        <h5>API Errors</h5>
-        <ul>
-            {% for error in api_errors %}
-            <li>{{ error }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-    {% endif %}
-
-    <div class="stock-grid">
-        {% for symbol, data in stock_data.items() %}
-        <div class="stock-card" data-symbol="{{ symbol }}">
-            <div class="stock-header">
-                <h3 class="stock-title">{{ symbol }}</h3>
-                <span class="stock-signal signal-{{ data.analysis.signal|lower }}">
-                    {{ data.analysis.signal }}
-                </span>
-            </div>
-            
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Current Price</div>
-                    <div class="metric-value">${{ data.analysis.current_price|round(2) }}</div>
+    <!-- Charts -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Price Chart</h5>
+                    <canvas id="priceChart"></canvas>
                 </div>
-                <div class="metric-card">
-                    <div class="metric-label">Current Volume</div>
-                    <div class="metric-value">{{ data.analysis.current_volume|int }}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Volume Baseline</div>
-                    <div class="metric-value">{{ data.analysis.baseline|int }}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Volume Ratio</div>
-                    <div class="metric-value">{{ data.analysis.volume_ratio|round(2) }}x</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Momentum</div>
-                    <div class="metric-value">{{ (data.analysis.details.volume_momentum * 100)|round(1) }}%</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">RSI</div>
-                    <div class="metric-value">{{ data.analysis.details.rsi|round(1) }}</div>
-                </div>
-            </div>
-
-            <div class="technical-indicators">
-                <div class="indicator-card" data-indicator="sma">
-                    <div class="indicator-label">SMA (20)</div>
-                    <div class="indicator-value">${{ data.analysis.indicators.sma|round(2) }}</div>
-                    <div class="indicator-change {% if data.analysis.indicators.sma_change > 0 %}positive{% else %}negative{% endif %}">
-                        {{ data.analysis.indicators.sma_change|round(2) }}%
-                    </div>
-                </div>
-                <div class="indicator-card" data-indicator="ema">
-                    <div class="indicator-label">EMA (20)</div>
-                    <div class="indicator-value">${{ data.analysis.indicators.ema|round(2) }}</div>
-                    <div class="indicator-change {% if data.analysis.indicators.ema_change > 0 %}positive{% else %}negative{% endif %}">
-                        {{ data.analysis.indicators.ema_change|round(2) }}%
-                    </div>
-                </div>
-                <div class="indicator-card" data-indicator="macd">
-                    <div class="indicator-label">MACD</div>
-                    <div class="indicator-value">{{ data.analysis.indicators.macd|round(2) }}</div>
-                    <div class="indicator-change {% if data.analysis.indicators.macd_signal > 0 %}positive{% else %}negative{% endif %}">
-                        {{ data.analysis.indicators.macd_signal|round(2) }}
-                    </div>
-                </div>
-                <div class="indicator-card" data-indicator="stochastic">
-                    <div class="indicator-label">Stochastic</div>
-                    <div class="indicator-value">{{ data.analysis.indicators.stochastic|round(2) }}</div>
-                    <div class="indicator-change {% if data.analysis.indicators.stochastic_signal > 0 %}positive{% else %}negative{% endif %}">
-                        {{ data.analysis.indicators.stochastic_signal|round(2) }}
-                    </div>
-                </div>
-                <div class="indicator-card" data-indicator="atr">
-                    <div class="indicator-label">ATR</div>
-                    <div class="indicator-value">{{ data.analysis.indicators.atr|round(2) }}</div>
-                    <div class="indicator-change {% if data.analysis.indicators.atr_change > 0 %}positive{% else %}negative{% endif %}">
-                        {{ data.analysis.indicators.atr_change|round(2) }}%
-                    </div>
-                </div>
-                <div class="indicator-card" data-indicator="ichimoku">
-                    <div class="indicator-label">Ichimoku Cloud</div>
-                    <div class="indicator-value">
-                        <span class="trend-indicator {% if data.analysis.indicators.ichimoku_signal == 'bullish' %}trend-up{% else %}trend-down{% endif %}"></span>
-                        {{ data.analysis.indicators.ichimoku_signal|title }}
-                    </div>
-                </div>
-                <div class="indicator-card" data-indicator="fibonacci">
-                    <div class="indicator-label">Fibonacci Levels</div>
-                    <div class="indicator-value">
-                        {{ data.analysis.indicators.fibonacci_level|round(2) }}
-                        <span class="trend-indicator {% if data.analysis.indicators.fibonacci_signal == 'support' %}trend-up{% else %}trend-down{% endif %}"></span>
-                    </div>
-                </div>
-                <div class="indicator-card" data-indicator="obv">
-                    <div class="indicator-label">OBV</div>
-                    <div class="indicator-value">
-                        {{ data.analysis.indicators.obv|int }}
-                        <span class="trend-indicator {% if data.analysis.indicators.obv_change > 0 %}trend-up{% else %}trend-down{% endif %}"></span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="performance-metrics">
-                <div class="performance-card">
-                    <div class="performance-label">Volatility</div>
-                    <div class="performance-value">
-                        {{ data.analysis.indicators.volatility|round(2) }}%
-                        <span class="volatility-indicator {% if data.analysis.indicators.volatility > 2 %}volatility-high{% elif data.analysis.indicators.volatility > 1 %}volatility-medium{% else %}volatility-low{% endif %}"></span>
-                    </div>
-                </div>
-                <div class="performance-card">
-                    <div class="performance-label">Beta</div>
-                    <div class="performance-value">
-                        {{ data.analysis.indicators.beta|round(2) }}
-                        <span class="beta-indicator {% if data.analysis.indicators.beta > 1.5 %}beta-high{% elif data.analysis.indicators.beta < 0.5 %}beta-low{% else %}beta-neutral{% endif %}">
-                            {% if data.analysis.indicators.beta > 1.5 %}High{% elif data.analysis.indicators.beta < 0.5 %}Low{% else %}Neutral{% endif %}
-                        </span>
-                    </div>
-                </div>
-                <div class="performance-card">
-                    <div class="performance-label">Sharpe Ratio</div>
-                    <div class="performance-value">{{ data.analysis.indicators.sharpe_ratio|round(2) }}</div>
-                </div>
-                <div class="performance-card">
-                    <div class="performance-label">Max Drawdown</div>
-                    <div class="performance-value">{{ data.analysis.indicators.max_drawdown|round(2) }}%</div>
-                </div>
-            </div>
-
-            <div class="chart-container">
-                <canvas id="{{ symbol }}-chart"></canvas>
-            </div>
-
-            {% if data.alerts %}
-            <div class="alerts-section">
-                <h4>Alerts</h4>
-                {% for alert in data.alerts %}
-                <div class="alert-card">
-                    <div class="alert-message">{{ alert }}</div>
-                </div>
-                {% endfor %}
-            </div>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-
-    <div class="comparison-section">
-        <h3>Stock Comparison</h3>
-        
-        <div class="correlation-matrix">
-            <table class="correlation-table">
-                <thead>
-                    <tr>
-                        <th>Symbol</th>
-                        {% for symbol in stock_data.keys() %}
-                        <th>{{ symbol }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for symbol1 in stock_data.keys() %}
-                    <tr>
-                        <td>{{ symbol1 }}</td>
-                        {% for symbol2 in stock_data.keys() %}
-                        <td>
-                            <span class="correlation-value {% if stock_data[symbol1].correlation[symbol2] > 0.7 %}high{% elif stock_data[symbol1].correlation[symbol2] < -0.7 %}low{% endif %}">
-                                {{ stock_data[symbol1].correlation[symbol2]|round(2) }}
-                            </span>
-                        </td>
-                        {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="comparison-chart">
-            <canvas id="comparison-chart"></canvas>
-        </div>
-
-        <div class="sector-comparison">
-            <h4>Sector Performance</h4>
-            <div class="sector-chart">
-                <canvas id="sector-chart"></canvas>
             </div>
         </div>
-
-        <div class="sector-analysis">
-            <h4>Sector Analysis</h4>
-            <div class="sector-metrics">
-                <div class="metric-card">
-                    <div class="metric-label">Sector Correlation</div>
-                    <div class="metric-value">{{ data.analysis.sector.correlation|round(2) }}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Sector Beta</div>
-                    <div class="metric-value">{{ data.analysis.sector.beta|round(2) }}</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Sector Performance</div>
-                    <div class="metric-value">{{ data.analysis.sector.performance|round(2) }}%</div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Volume</h5>
+                    <canvas id="volumeChart"></canvas>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="stream-section">
-        <h3>Real-time Data Stream</h3>
-        <div class="stream-controls">
-            <button class="stream-button start-stream" onclick="startStream()">Start Stream</button>
-            <button class="stream-button stop-stream" onclick="stopStream()">Stop Stream</button>
-            <button class="stream-button clear-stream" onclick="clearStream()">Clear Data</button>
-        </div>
-
-        <div class="real-time-metrics">
-            <div class="metric-card">
-                <div class="metric-label">Price Change</div>
-                <div class="metric-value">
-                    <span id="price-change">-</span>
-                    <span class="trend-indicator" id="price-trend"></span>
-                </div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Volume Change</div>
-                <div class="metric-value">
-                    <span id="volume-change">-</span>
-                    <span class="trend-indicator" id="volume-trend"></span>
-                </div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">RSI Change</div>
-                <div class="metric-value">
-                    <span id="rsi-change">-</span>
-                    <span class="trend-indicator" id="rsi-trend"></span>
-                </div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">MACD Signal</div>
-                <div class="metric-value">
-                    <span id="macd-signal">-</span>
-                    <span class="trend-indicator" id="macd-trend"></span>
-                </div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Volatility</div>
-                <div class="metric-value">
-                    <span id="volatility">-</span>
-                    <span class="volatility-indicator" id="volatility-level"></span>
-                </div>
-            </div>
-            <div class="metric-card">
-                <div class="metric-label">Beta</div>
-                <div class="metric-value">
-                    <span id="beta">-</span>
-                    <span class="beta-indicator" id="beta-level">-</span>
+    <!-- Technical Indicators -->
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Moving Averages</h5>
+                    <canvas id="maChart"></canvas>
                 </div>
             </div>
         </div>
-
-        <div class="data-stream" id="data-stream">
-            <div class="data-point">
-                <span class="data-label">Time</span>
-                <span class="data-label">Symbol</span>
-                <span class="data-label">Price</span>
-                <span class="data-label">Volume</span>
-                <span class="data-label">RSI</span>
-                <span class="data-label">MACD</span>
-                <span class="data-label">Volatility</span>
-                <span class="data-label">Beta</span>
-                <span class="data-label">Signal</span>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">RSI</h5>
+                    <canvas id="rsiChart"></canvas>
+                </div>
             </div>
-        </div>
-
-        <div class="price-alerts">
-            <h4>Price Alerts</h4>
-            <div class="alert-list" id="price-alerts">
-                <!-- Alerts will be populated dynamically -->
-            </div>
-        </div>
-    </div>
-
-    <div class="volume-profile">
-        <h4>Volume Profile</h4>
-        <div class="profile-chart">
-            <canvas id="volume-profile-chart"></canvas>
-        </div>
-    </div>
-
-    <div class="market-depth">
-        <h4>Market Depth</h4>
-        <div class="depth-chart">
-            <canvas id="market-depth-chart"></canvas>
         </div>
     </div>
 </div>
@@ -846,570 +566,157 @@
 {{ components.api_status() }}
 {% endblock %}
 
-{% block extra_js %}
+{% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-// Configuration
-const CONFIG = {
-    updateInterval: 5000, // 5 seconds
-    maxRetries: 3,
-    retryDelay: 5000,
-    endpoints: {
-        analysis: '/analysis/data',
-        stream: '/analysis/stream-data'
-    }
+let priceChart, volumeChart, maChart, rsiChart;
+
+// Check authentication status on page load
+window.onload = function() {
+    checkAuthStatus();
+    updateData();
 };
 
-// State management
-const state = {
-    charts: {},
-    streamInterval: null,
-    isLoading: false,
-    error: null,
-    lastPrice: null,
-    stockData: JSON.parse('{{ stock_data|tojson|safe }}'),
-    sectorData: JSON.parse('{{ sector_data|tojson|safe }}'),
-    volumeProfile: JSON.parse('{{ volume_profile|tojson|safe }}'),
-    marketDepth: JSON.parse('{{ market_depth|tojson|safe }}')
-};
+function checkAuthStatus() {
+    fetch('/analysis/api/verify-auth')
+        .then(response => response.json())
+        .then(data => {
+            const authStatus = document.getElementById('authStatus');
+            if (data.status === 'success') {
+                authStatus.className = 'alert alert-success';
+                authStatus.textContent = 'APIs authenticated and ready';
+            } else {
+                authStatus.className = 'alert alert-danger';
+                authStatus.textContent = `Authentication error: ${data.message}`;
+            }
+        })
+        .catch(error => {
+            const authStatus = document.getElementById('authStatus');
+            authStatus.className = 'alert alert-danger';
+            authStatus.textContent = `Error checking authentication: ${error}`;
+        });
+}
 
-// Initialize charts with technical indicators
-function initCharts() {
-    Object.entries(state.stockData).forEach(([symbol, data]) => {
-        const ctx = document.getElementById(`${symbol}-chart`).getContext('2d');
-        state.charts[symbol] = new Chart(ctx, {
+function updateData() {
+    const symbol = document.getElementById('symbol').value;
+    const timeframe = document.getElementById('timeframe').value;
+    const dataType = document.getElementById('dataType').value;
+
+    fetch(`/analysis/api/market-data?symbol=${symbol}&timeframe=${timeframe}&type=${dataType}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                updateCharts(data.data);
+            } else {
+                showError(data.message);
+            }
+        })
+        .catch(error => {
+            showError(`Error fetching data: ${error}`);
+        });
+}
+
+function updateCharts(data) {
+    // Destroy existing charts
+    if (priceChart) priceChart.destroy();
+    if (volumeChart) volumeChart.destroy();
+    if (maChart) maChart.destroy();
+    if (rsiChart) rsiChart.destroy();
+
+    // Create price chart
+    const priceCtx = document.getElementById('priceChart').getContext('2d');
+    priceChart = new Chart(priceCtx, {
+        type: 'line',
+        data: {
+            labels: data.dates,
+            datasets: [{
+                label: 'Price',
+                data: data.prices,
+                borderColor: 'rgb(75, 192, 192)',
+                tension: 0.1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // Create volume chart
+    const volumeCtx = document.getElementById('volumeChart').getContext('2d');
+    volumeChart = new Chart(volumeCtx, {
+        type: 'bar',
+        data: {
+            labels: data.dates,
+            datasets: [{
+                label: 'Volume',
+                data: data.volumes,
+                backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                borderColor: 'rgb(54, 162, 235)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false
+        }
+    });
+
+    // Create technical charts if available
+    if (data.sma_20) {
+        const maCtx = document.getElementById('maChart').getContext('2d');
+        maChart = new Chart(maCtx, {
             type: 'line',
             data: {
-                labels: data.historical_data.map(d => d.date),
-                datasets: [
-                    {
-                        label: 'Price',
-                        data: data.historical_data.map(d => d.close),
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 2,
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'Volume',
-                        data: data.volumes,
-                        backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1,
-                        yAxisID: 'y1'
-                    },
-                    {
-                        label: 'SMA (20)',
-                        data: data.analysis.indicators.sma_values,
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'EMA (20)',
-                        data: data.analysis.indicators.ema_values,
-                        borderColor: 'rgba(153, 102, 255, 1)',
-                        borderWidth: 1,
-                        borderDash: [5, 5],
-                        yAxisID: 'y'
-                    },
-                    {
-                        label: 'MACD',
-                        data: data.analysis.indicators.macd_values,
-                        borderColor: 'rgba(255, 159, 64, 1)',
-                        borderWidth: 1,
-                        yAxisID: 'y2'
-                    },
-                    {
-                        label: 'Stochastic',
-                        data: data.analysis.indicators.stochastic_values,
-                        borderColor: 'rgba(75, 192, 192, 1)',
-                        borderWidth: 1,
-                        yAxisID: 'y3'
-                    },
-                    {
-                        label: 'ATR',
-                        data: data.analysis.indicators.atr_values,
-                        borderColor: 'rgba(201, 203, 207, 1)',
-                        borderWidth: 1,
-                        yAxisID: 'y4'
-                    }
-                ]
+                labels: data.dates,
+                datasets: [{
+                    label: 'SMA 20',
+                    data: data.sma_20,
+                    borderColor: 'rgb(255, 99, 132)',
+                    tension: 0.1
+                }, {
+                    label: 'SMA 50',
+                    data: data.sma_50,
+                    borderColor: 'rgb(54, 162, 235)',
+                    tension: 0.1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
+
+        const rsiCtx = document.getElementById('rsiChart').getContext('2d');
+        rsiChart = new Chart(rsiCtx, {
+            type: 'line',
+            data: {
+                labels: data.dates,
+                datasets: [{
+                    label: 'RSI',
+                    data: data.rsi,
+                    borderColor: 'rgb(153, 102, 255)',
+                    tension: 0.1
+                }]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
                     y: {
-                        type: 'linear',
-                        display: true,
-                        position: 'left',
-                        title: {
-                            display: true,
-                            text: 'Price ($)'
-                        }
-                    },
-                    y1: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Volume'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    },
-                    y2: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'MACD'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    },
-                    y3: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'Stochastic'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
-                    },
-                    y4: {
-                        type: 'linear',
-                        display: true,
-                        position: 'right',
-                        title: {
-                            display: true,
-                            text: 'ATR'
-                        },
-                        grid: {
-                            drawOnChartArea: false
-                        }
+                        min: 0,
+                        max: 100
                     }
                 }
             }
         });
-    });
-
-    // Initialize comparison charts
-    initComparisonCharts();
-}
-
-function initComparisonCharts() {
-    // Initialize comparison chart
-    const comparisonCtx = document.getElementById('comparison-chart').getContext('2d');
-    const firstStock = Object.values(state.stockData)[0];
-    state.charts.comparison = new Chart(comparisonCtx, {
-        type: 'line',
-        data: {
-            labels: firstStock.historical_data.map(d => d.date),
-            datasets: Object.entries(state.stockData).map(([symbol, data]) => ({
-                label: symbol,
-                data: data.historical_data.map(d => d.close),
-                borderColor: getRandomColor(),
-                borderWidth: 2,
-                fill: false
-            }))
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    title: {
-                        display: true,
-                        text: 'Price ($)'
-                    }
-                }
-            }
-        }
-    });
-
-    // Initialize sector chart
-    const sectorCtx = document.getElementById('sector-chart').getContext('2d');
-    state.charts.sector = new Chart(sectorCtx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(state.sectorData),
-            datasets: [{
-                label: 'Sector Performance',
-                data: Object.values(state.sectorData),
-                backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: {
-                    beginAtZero: false,
-                    title: {
-                        display: true,
-                        text: 'Performance (%)'
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Initialize volume profile chart
-function initVolumeProfileChart() {
-    const ctx = document.getElementById('volume-profile-chart').getContext('2d');
-    state.charts.volumeProfile = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: Object.keys(state.volumeProfile),
-            datasets: [{
-                label: 'Volume Profile',
-                data: Object.values(state.volumeProfile),
-                backgroundColor: 'rgba(75, 192, 192, 0.5)',
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            indexAxis: 'y',
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: 'Volume'
-                    }
-                },
-                y: {
-                    title: {
-                        display: true,
-                        text: 'Price Level'
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Initialize market depth chart
-function initMarketDepthChart() {
-    const ctx = document.getElementById('market-depth-chart').getContext('2d');
-    state.charts.marketDepth = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: state.marketDepth.labels,
-            datasets: [
-                {
-                    label: 'Bids',
-                    data: state.marketDepth.bids,
-                    backgroundColor: 'rgba(40, 167, 69, 0.5)',
-                    borderColor: 'rgba(40, 167, 69, 1)',
-                    borderWidth: 1
-                },
-                {
-                    label: 'Asks',
-                    data: state.marketDepth.asks,
-                    backgroundColor: 'rgba(220, 53, 69, 0.5)',
-                    borderColor: 'rgba(220, 53, 69, 1)',
-                    borderWidth: 1
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                x: {
-                    stacked: true,
-                    title: {
-                        display: true,
-                        text: 'Price'
-                    }
-                },
-                y: {
-                    stacked: true,
-                    title: {
-                        display: true,
-                        text: 'Volume'
-                    }
-                }
-            }
-        }
-    });
-}
-
-// Update data
-async function updateData() {
-    if (state.isLoading) return;
-    
-    state.isLoading = true;
-    const symbol = document.getElementById('symbol').value;
-    const timeframe = document.getElementById('timeframe').value;
-    const analysisType = document.getElementById('analysis-type').value;
-    const volumeType = document.getElementById('volume-type').value;
-    
-    try {
-        const response = await fetch(`${CONFIG.endpoints.analysis}?symbol=${symbol}&timeframe=${timeframe}&analysis_type=${analysisType}&volume_type=${volumeType}`);
-        const data = await response.json();
-        
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to fetch data');
-        }
-        
-        // Update charts and metrics
-        updateCharts(data);
-        updateMetrics(data);
-        
-    } catch (error) {
-        console.error('Error updating data:', error);
-        showError(error.message);
-    } finally {
-        state.isLoading = false;
     }
-}
-
-// Stream data
-function startStream() {
-    if (state.streamInterval) return;
-    
-    state.streamInterval = setInterval(async () => {
-        try {
-            const response = await fetch(CONFIG.endpoints.stream);
-            const data = await response.json();
-            
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to fetch stream data');
-            }
-            
-            updateStream(data);
-            
-        } catch (error) {
-            console.error('Stream error:', error);
-            stopStream();
-        }
-    }, CONFIG.updateInterval);
-}
-
-function stopStream() {
-    if (state.streamInterval) {
-        clearInterval(state.streamInterval);
-        state.streamInterval = null;
-    }
-}
-
-function clearStream() {
-    const stream = document.getElementById('data-stream');
-    while (stream.children.length > 1) {
-        stream.removeChild(stream.lastChild);
-    }
-}
-
-// Utility functions
-function updateCharts(data) {
-    // Update individual stock charts
-    Object.entries(data.stock_data).forEach(([symbol, stockData]) => {
-        const chart = state.charts[symbol];
-        if (chart) {
-            chart.data.labels = stockData.historical_data.map(d => d.date);
-            chart.data.datasets[0].data = stockData.historical_data.map(d => d.close);
-            chart.data.datasets[1].data = stockData.volumes;
-            chart.update();
-        }
-    });
-    
-    // Update comparison chart
-    const comparisonChart = state.charts.comparison;
-    if (comparisonChart) {
-        comparisonChart.data.labels = data.stock_data[Object.keys(data.stock_data)[0]].historical_data.map(d => d.date);
-        comparisonChart.data.datasets = Object.entries(data.stock_data).map(([symbol, stockData]) => ({
-            label: symbol,
-            data: stockData.historical_data.map(d => d.close),
-            borderColor: getRandomColor(),
-            borderWidth: 2,
-            fill: false
-        }));
-        comparisonChart.update();
-    }
-}
-
-function updateMetrics(data) {
-    Object.entries(data.stock_data).forEach(([symbol, stockData]) => {
-        const card = document.querySelector(`.stock-card[data-symbol="${symbol}"]`);
-        if (card) {
-            card.querySelector('.stock-signal').className = `stock-signal signal-${stockData.analysis.signal.toLowerCase()}`;
-            card.querySelector('.stock-signal').textContent = stockData.analysis.signal;
-            
-            // Update metric values
-            card.querySelector('[data-metric="price"]').textContent = `$${stockData.analysis.current_price.toFixed(2)}`;
-            card.querySelector('[data-metric="volume"]').textContent = stockData.analysis.current_volume.toLocaleString();
-            card.querySelector('[data-metric="baseline"]').textContent = stockData.analysis.baseline.toLocaleString();
-            card.querySelector('[data-metric="ratio"]').textContent = `${stockData.analysis.volume_ratio.toFixed(2)}x`;
-            card.querySelector('[data-metric="momentum"]').textContent = `${(stockData.analysis.details.volume_momentum * 100).toFixed(1)}%`;
-            card.querySelector('[data-metric="rsi"]').textContent = stockData.analysis.details.rsi.toFixed(1);
-        }
-    });
-}
-
-// Update real-time metrics
-function updateRealTimeMetrics(data) {
-    const priceChange = document.getElementById('price-change');
-    const volumeChange = document.getElementById('volume-change');
-    const rsiChange = document.getElementById('rsi-change');
-    const macdSignal = document.getElementById('macd-signal');
-    const volatility = document.getElementById('volatility');
-    const beta = document.getElementById('beta');
-
-    const priceTrend = document.getElementById('price-trend');
-    const volumeTrend = document.getElementById('volume-trend');
-    const rsiTrend = document.getElementById('rsi-trend');
-    const macdTrend = document.getElementById('macd-trend');
-    const volatilityLevel = document.getElementById('volatility-level');
-    const betaLevel = document.getElementById('beta-level');
-
-    // Update values
-    priceChange.textContent = `${data.price_change.toFixed(2)}%`;
-    volumeChange.textContent = `${data.volume_change.toFixed(2)}%`;
-    rsiChange.textContent = data.rsi_change.toFixed(2);
-    macdSignal.textContent = data.macd_signal.toFixed(2);
-    volatility.textContent = `${data.volatility.toFixed(2)}%`;
-    beta.textContent = data.beta.toFixed(2);
-
-    // Update trends
-    updateTrendIndicator(priceTrend, data.price_change);
-    updateTrendIndicator(volumeTrend, data.volume_change);
-    updateTrendIndicator(rsiTrend, data.rsi_change);
-    updateTrendIndicator(macdTrend, data.macd_signal);
-
-    // Update volatility indicator
-    volatilityLevel.className = 'volatility-indicator';
-    if (data.volatility > 2) {
-        volatilityLevel.classList.add('volatility-high');
-    } else if (data.volatility > 1) {
-        volatilityLevel.classList.add('volatility-medium');
-    } else {
-        volatilityLevel.classList.add('volatility-low');
-    }
-
-    // Update beta indicator
-    betaLevel.className = 'beta-indicator';
-    if (data.beta > 1.5) {
-        betaLevel.classList.add('beta-high');
-        betaLevel.textContent = 'High';
-    } else if (data.beta < 0.5) {
-        betaLevel.classList.add('beta-low');
-        betaLevel.textContent = 'Low';
-    } else {
-        betaLevel.classList.add('beta-neutral');
-        betaLevel.textContent = 'Neutral';
-    }
-}
-
-function updateTrendIndicator(element, value) {
-    element.className = 'trend-indicator';
-    if (value > 0) {
-        element.classList.add('trend-up');
-    } else if (value < 0) {
-        element.classList.add('trend-down');
-    }
-}
-
-// Enhanced stream update
-function updateStream(data) {
-    const stream = document.getElementById('data-stream');
-    const point = document.createElement('div');
-    point.className = 'data-point';
-    point.innerHTML = `
-        <span class="data-value">${new Date().toLocaleTimeString()}</span>
-        <span class="data-value">${data.symbol}</span>
-        <span class="data-value">$${data.price.toFixed(2)}</span>
-        <span class="data-value">${data.volume.toLocaleString()}</span>
-        <span class="data-value">${data.rsi.toFixed(2)}</span>
-        <span class="data-value">${data.macd.toFixed(2)}</span>
-        <span class="data-value">${data.volatility.toFixed(2)}%</span>
-        <span class="data-value">${data.beta.toFixed(2)}</span>
-        <span class="data-value signal-${data.signal.toLowerCase()}">${data.signal}</span>
-    `;
-    stream.insertBefore(point, stream.firstChild.nextSibling);
-
-    // Update real-time metrics
-    updateRealTimeMetrics(data);
-
-    // Check for price alerts
-    checkPriceAlerts(data);
-}
-
-function checkPriceAlerts(data) {
-    const alerts = document.getElementById('price-alerts');
-    const price = data.price;
-    const previousPrice = state.lastPrice || price;
-    
-    // Check for significant price movements
-    const priceChange = Math.abs((price - previousPrice) / previousPrice * 100);
-    if (priceChange > 1) { // 1% threshold
-        const alert = document.createElement('div');
-        alert.className = 'alert-card';
-        alert.innerHTML = `
-            <div class="alert-time">${new Date().toLocaleTimeString()}</div>
-            <div class="alert-message">
-                ${data.symbol} price ${price > previousPrice ? 'increased' : 'decreased'} by ${priceChange.toFixed(2)}%
-            </div>
-        `;
-        alerts.insertBefore(alert, alerts.firstChild);
-    }
-    
-    state.lastPrice = price;
 }
 
 function showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-message';
-    errorDiv.textContent = message;
-    document.querySelector('.dashboard-container').insertBefore(errorDiv, document.querySelector('.control-panel'));
-    setTimeout(() => errorDiv.remove(), 5000);
+    const authStatus = document.getElementById('authStatus');
+    authStatus.className = 'alert alert-danger';
+    authStatus.textContent = message;
 }
-
-function getRandomColor() {
-    const letters = '0123456789ABCDEF';
-    let color = '#';
-    for (let i = 0; i < 6; i++) {
-        color += letters[Math.floor(Math.random() * 16)];
-    }
-    return color;
-}
-
-// Event listeners
-document.addEventListener('DOMContentLoaded', () => {
-    initCharts();
-    initVolumeProfileChart();
-    initMarketDepthChart();
-    
-    // Add event listeners for controls
-    document.getElementById('symbol').addEventListener('change', updateData);
-    document.getElementById('timeframe').addEventListener('change', updateData);
-    document.getElementById('analysis-type').addEventListener('change', updateData);
-    document.getElementById('volume-type').addEventListener('change', updateData);
-    
-    // Initial data load
-    updateData();
-});
-
-// Cleanup
-window.addEventListener('beforeunload', () => {
-    stopStream();
-});
 </script>
 {% endblock %} 
