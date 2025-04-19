@@ -406,22 +406,44 @@
             <div class="stock-card">
                 <div class="stock-header">
                     <span class="stock-symbol">{{ symbol }}</span>
-                    <span class="stock-price">${{ data[0].close|round(2) }}</span>
+                    <span class="stock-price">
+                        {% if data and data|length > 0 %}
+                            ${{ data[0].close|round(2) }}
+                        {% else %}
+                            No data available
+                        {% endif %}
+                    </span>
                 </div>
                 
                 <div class="stock-metrics">
                     <div class="metric">
                         <span class="metric-label">Average Volume</span>
-                        <span class="metric-value">{{ (data|sum(attribute='volume') / data|length)|int }}</span>
+                        <span class="metric-value">
+                            {% if data and data|length > 0 %}
+                                {{ (data|sum(attribute='volume') / data|length)|int }}
+                            {% else %}
+                                N/A
+                            {% endif %}
+                        </span>
                     </div>
                     <div class="metric">
                         <span class="metric-label">Total Days</span>
-                        <span class="metric-value">{{ data|length }}</span>
+                        <span class="metric-value">
+                            {% if data %}
+                                {{ data|length }}
+                            {% else %}
+                                0
+                            {% endif %}
+                        </span>
                     </div>
                 </div>
 
                 <div class="volume-chart">
-                    <canvas id="{{ symbol }}-volume-chart"></canvas>
+                    {% if data and data|length > 0 %}
+                        <canvas id="{{ symbol }}-volume-chart"></canvas>
+                    {% else %}
+                        <div class="alert alert-warning">No data available for chart</div>
+                    {% endif %}
                 </div>
 
                 {% if symbol == 'TSLA' %}
