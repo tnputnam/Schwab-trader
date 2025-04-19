@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, session, redirect, url_for
 from flask_login import login_required
 import pandas as pd
 import os
@@ -7,10 +7,42 @@ from schwab_trader.services.logging_service import LoggingService
 from schwab_trader.models import db, Portfolio, Position
 from collections import defaultdict
 
-bp = Blueprint('portfolio', __name__, url_prefix='/portfolio')
+portfolio_bp = Blueprint('portfolio', __name__, url_prefix='/portfolio')
 logger = LoggingService()
 
-@bp.route('/')
+@portfolio_bp.route('/')
+def index():
+    """Portfolio page."""
+    try:
+        return render_template('portfolio.html')
+    except Exception as e:
+        logger.error(f"Error in portfolio route: {str(e)}")
+        return render_template('portfolio.html')
+
+@portfolio_bp.route('/api/status')
+def api_status():
+    """Portfolio API health check endpoint."""
+    try:
+        response = {
+            'status': 'ok',
+            'timestamp': datetime.now().isoformat(),
+            'services': {
+                'portfolio_service': {
+                    'status': 'connected',
+                    'last_update': datetime.now().isoformat()
+                }
+            }
+        }
+        return jsonify(response)
+    except Exception as e:
+        logger.error(f"Error in portfolio API status: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e),
+            'timestamp': datetime.now().isoformat()
+        }), 500
+
+@portfolio_bp.route('/')
 def view():
     """Display portfolio view."""
     portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
@@ -49,7 +81,7 @@ def view():
                          asset_type_labels=asset_type_data['labels'],
                          asset_type_values=asset_type_data['values'])
 
-@bp.route('/api/summary')
+@portfolio_bp.route('/api/summary')
 def get_summary():
     """Get portfolio summary data."""
     portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
@@ -68,7 +100,7 @@ def get_summary():
         'last_updated': datetime.now().isoformat()
     })
 
-@bp.route('/api/positions')
+@portfolio_bp.route('/api/positions')
 def get_positions():
     """Get all portfolio positions."""
     portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
@@ -94,7 +126,7 @@ def get_positions():
         'volume': p.volume
     } for p in positions])
 
-@bp.route('/api/sectors')
+@portfolio_bp.route('/api/sectors')
 def get_sectors():
     """Get sector allocation data."""
     portfolio = Portfolio.query.filter_by(name='Schwab Portfolio').first()
@@ -118,7 +150,7 @@ def get_sectors():
     
     return jsonify(sectors)
 
-@bp.route('/import', methods=['POST'])
+@portfolio_bp.route('/import', methods=['POST'])
 @login_required
 def import_portfolio():
     """Import portfolio data from Schwab."""

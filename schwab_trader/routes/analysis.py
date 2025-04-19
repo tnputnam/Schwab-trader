@@ -156,11 +156,11 @@ def news():
     try:
         alpha_vantage = get_alpha_vantage()
         schwab_api = SchwabAPI()  # Initialize inside route
-        return render_template('analysis_dashboard.html', alpha_vantage_available=alpha_vantage is not None)
+        return render_template('analysis.html', alpha_vantage_available=alpha_vantage is not None)
     except Exception as e:
         logger.error(f"Error in news route: {str(e)}")
         flash(f"Error loading news page: {str(e)}", "error")
-        return render_template('analysis_dashboard.html', alpha_vantage_available=False)
+        return render_template('analysis.html', alpha_vantage_available=False)
 
 @analysis_bp.route('/trading')
 def trading():
@@ -168,11 +168,11 @@ def trading():
     try:
         alpha_vantage = get_alpha_vantage()
         schwab_api = SchwabAPI()  # Initialize inside route
-        return render_template('trading_dashboard.html', alpha_vantage_available=alpha_vantage is not None)
+        return render_template('trading.html', alpha_vantage_available=alpha_vantage is not None)
     except Exception as e:
         logger.error(f"Error in trading route: {str(e)}")
         flash(f"Error loading trading page: {str(e)}", "error")
-        return render_template('trading_dashboard.html', alpha_vantage_available=False)
+        return render_template('trading.html', alpha_vantage_available=False)
 
 @analysis_bp.route('/compare')
 def compare():
@@ -180,11 +180,11 @@ def compare():
     try:
         alpha_vantage = get_alpha_vantage()
         schwab_api = SchwabAPI()  # Initialize inside route
-        return render_template('compare.html', alpha_vantage_available=alpha_vantage is not None)
+        return render_template('analysis/compare.html', alpha_vantage_available=alpha_vantage is not None)
     except Exception as e:
         logger.error(f"Error in compare route: {str(e)}")
         flash(f"Error loading comparison page: {str(e)}", "error")
-        return render_template('compare.html', alpha_vantage_available=False)
+        return render_template('analysis/compare.html', alpha_vantage_available=False)
 
 @analysis_bp.route('/volume-analysis')
 def volume_analysis():
