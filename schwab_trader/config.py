@@ -34,7 +34,7 @@ class Config:
     # Schwab API Configuration
     SCHWAB_CLIENT_ID = os.getenv('SCHWAB_CLIENT_ID')
     SCHWAB_CLIENT_SECRET = os.getenv('SCHWAB_CLIENT_SECRET')
-    SCHWAB_REDIRECT_URI = os.getenv('SCHWAB_REDIRECT_URI', 'http://localhost:5000/auth/callback')
+    SCHWAB_REDIRECT_URI = os.getenv('SCHWAB_REDIRECT_URI', 'https://e4f9-2605-59c8-7260-b910-5014-515f-580b-296f.ngrok-free.app/auth/callback')
     SCHWAB_AUTH_URL = "https://api.schwabapi.com/v1/oauth/authorize"
     SCHWAB_TOKEN_URL = "https://api.schwabapi.com/v1/oauth/token"
     SCHWAB_API_BASE_URL = "https://api.schwabapi.com/v1"

@@ -3,6 +3,7 @@ import logging
 import requests
 from datetime import datetime, timedelta
 import json
+from flask import current_app
 
 logger = logging.getLogger('schwab_auth')
 handler = logging.FileHandler('logs/schwab_auth_{}.log'.format(datetime.now().strftime('%Y%m%d')))
@@ -47,15 +48,19 @@ class TokenManager:
         """Get a new token from Schwab API."""
         try:
             # Get credentials from environment variables
-            client_id = os.getenv('SCHWAB_CLIENT_ID')
-            client_secret = os.getenv('SCHWAB_CLIENT_SECRET')
-            refresh_token = os.getenv('SCHWAB_REFRESH_TOKEN')
+            client_id = current_app.config.get('SCHWAB_CLIENT_ID')
+            client_secret = current_app.config.get('SCHWAB_CLIENT_SECRET')
+            refresh_token = current_app.config.get('SCHWAB_REFRESH_TOKEN')
             
             if not all([client_id, client_secret, refresh_token]):
-                raise ValueError("Missing required environment variables for Schwab API")
+                logger.error("Missing required environment variables for Schwab API")
+                logger.error(f"CLIENT_ID: {'present' if client_id else 'missing'}")
+                logger.error(f"CLIENT_SECRET: {'present' if client_secret else 'missing'}")
+                logger.error(f"REFRESH_TOKEN: {'present' if refresh_token else 'missing'}")
+                raise ValueError("Missing required environment variables for Schwab API. Please run get_schwab_token.py to set up tokens.")
             
             # Make request to Schwab token endpoint
-            url = "https://api.schwabapi.com/v1/oauth/token"
+            url = current_app.config.get('SCHWAB_TOKEN_URL')
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
@@ -66,6 +71,7 @@ class TokenManager:
                 'refresh_token': refresh_token
             }
             
+            logger.info("Requesting new token from Schwab API...")
             response = requests.post(url, headers=headers, data=data)
             response.raise_for_status()
             
@@ -82,6 +88,11 @@ class TokenManager:
                 }, f)
             
             logger.info("Successfully refreshed token")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {str(e)}")
+            if hasattr(e.response, 'text'):
+                logger.error(f"Response: {e.response.text}")
+            raise
         except Exception as e:
             logger.error(f"Error refreshing token: {str(e)}")
             raise
