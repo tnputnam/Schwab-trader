@@ -1,0 +1,45 @@
+# Stock Market Program - UTILS Folder Documentation
+
+## Current Files
+
+### Core API Integration
+- `schwab_api.py` - Schwab trading API integration
+- `alpha_vantage_api.py` - Alpha Vantage market data API integration
+- `schwab_oauth.py` - Schwab OAuth authentication handling
+
+### Authentication & Security
+- `auth_decorators.py` - Authentication decorators for route protection
+- `config_utils.py` - Configuration management utilities
+
+### Error Handling & Logging
+- `error_utils.py` - Custom error handling and exceptions
+- `logger.py` - Logging configuration
+- `logging_utils.py` - Additional logging utilities
+
+### Data Processing
+- `data_validation.py` - Data validation and sanitization
+- `api_utils.py` - General API utility functions
+- `visualization.py` - Data visualization utilities
+
+### Trading & Analysis
+- `backtester.py` - Backtesting framework for trading strategies
+
+## Required Files (Missing)
+1. Database utilities (if needed)
+2. Market data processing utilities
+3. Portfolio management utilities
+4. Risk management utilities
+5. Order execution utilities
+
+## Optional Files (Could Add)
+1. Technical analysis utilities
+2. News sentiment analysis
+3. Market calendar utilities
+4. Performance metrics calculation
+5. Report generation utilities
+
+## Notes
+- Current structure focuses on core trading functionality
+- Consider adding more specialized utilities based on specific trading strategies
+- May need to reorganize as the project grows
+- Some utilities might be better placed in separate modules (e.g., analysis, risk management) 
