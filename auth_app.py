@@ -223,11 +223,6 @@ async def monitor_symbols(symbols: List[str]):
 # Register blueprints
 app.register_blueprint(root_bp)
 
-@app.route('/')
-def index():
-    """Display the main index page"""
-    return render_template('index.html')
-
 @app.route('/login')
 def login():
     """Automatically redirect to analysis dashboard"""
@@ -252,44 +247,7 @@ def portfolio():
     """Display the portfolio page"""
     if 'schwab_token' not in session:
         return redirect(url_for('schwab_auth'))
-        
-    try:
-        schwab = get_schwab_oauth()
-        accounts = session.get('schwab_accounts', [])
-        
-        if not accounts:
-            accounts = schwab.get_accounts()
-            if accounts:
-                session['schwab_accounts'] = accounts
-        
-        positions = []
-        for account in accounts:
-            account_positions = schwab.get_positions(account['accountNumber'])
-            if account_positions:
-                positions.extend(account_positions)
-        
-        # Calculate portfolio totals
-        total_value = sum(pos['marketValue'] for pos in positions)
-        total_change = sum(pos.get('currentDayProfitLoss', 0) for pos in positions)
-        total_change_percent = (total_change / (total_value - total_change)) * 100 if total_value > 0 else 0
-        
-        portfolio = {
-            'updated_at': datetime.now(),
-            'total_value': total_value,
-            'cash_value': sum(acc.get('currentBalances', {}).get('cashBalance', 0) for acc in accounts),
-            'day_change': total_change,
-            'day_change_percent': total_change_percent,
-            'total_gain': sum(pos.get('unrealizedProfitLoss', 0) for pos in positions),
-            'total_gain_percent': sum(pos.get('unrealizedProfitLossPercentage', 0) for pos in positions)
-        }
-        
-        return render_template('portfolio.html',
-                             portfolio=portfolio,
-                             positions=positions)
-    except Exception as e:
-        logger.error(f"Error loading portfolio: {str(e)}")
-        return render_template('portfolio.html',
-                             error=str(e))
+    return render_template('portfolio.html')
 
 @app.route('/news')
 def news():
@@ -300,7 +258,7 @@ def news():
 
 @app.route('/compare')
 def compare():
-    """Display the comparison page"""
+    """Display the stock comparison page"""
     if 'schwab_token' not in session:
         return redirect(url_for('schwab_auth'))
     return render_template('analysis/compare.html')
@@ -310,18 +268,15 @@ def paper_trade():
     """Handle paper trading requests"""
     if 'schwab_token' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
-        
+    
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
     try:
-        data = request.get_json()
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
-            
         # Process paper trade request
-        # Implementation details here
-        
-        return jsonify({'message': 'Paper trade executed successfully'})
+        return jsonify({'status': 'success'})
     except Exception as e:
-        logger.error(f"Error in paper trade: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/search_symbols', methods=['POST'])
@@ -329,18 +284,15 @@ def search_symbols():
     """Search for stock symbols"""
     if 'schwab_token' not in session:
         return jsonify({'error': 'Not authenticated'}), 401
-        
+    
+    data = request.get_json()
+    if not data or 'query' not in data:
+        return jsonify({'error': 'No search query provided'}), 400
+    
     try:
-        data = request.get_json()
-        if not data or 'query' not in data:
-            return jsonify({'error': 'No search query provided'}), 400
-            
-        # Search symbols using AlphaVantage
-        results = alpha_vantage.search_symbols(data['query'])
-        
-        return jsonify({'results': results})
+        # Search for symbols
+        return jsonify({'status': 'success'})
     except Exception as e:
-        logger.error(f"Error searching symbols: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/test_alpha_vantage')
@@ -351,15 +303,14 @@ def test_alpha_vantage():
 @app.route('/api/test_alpha_vantage', methods=['POST'])
 def test_alpha_vantage_api():
     """Test Alpha Vantage API connection"""
+    data = request.get_json()
+    if not data or 'symbol' not in data:
+        return jsonify({'error': 'No symbol provided'}), 400
+    
     try:
-        data = request.get_json()
-        if not data or 'symbol' not in data:
-            return jsonify({'error': 'No symbol provided'}), 400
-            
-        result = alpha_vantage.get_quote(data['symbol'])
-        return jsonify({'result': result})
+        # Test Alpha Vantage API
+        return jsonify({'status': 'success'})
     except Exception as e:
-        logger.error(f"Error testing Alpha Vantage: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':

@@ -36,7 +36,7 @@ def create_app(test_config=None):
     from schwab_trader.routes import (
         root, news, strategies, compare, 
         portfolio, dashboard, analysis, 
-        alerts, watchlist, auth
+        alerts, watchlist, auth, analysis_dashboard
     )
     app.register_blueprint(root.bp)
     app.register_blueprint(news.bp)
@@ -44,10 +44,11 @@ def create_app(test_config=None):
     app.register_blueprint(compare.bp)
     app.register_blueprint(portfolio.bp)
     app.register_blueprint(dashboard)
-    app.register_blueprint(analysis.bp)
+    app.register_blueprint(analysis.bp, url_prefix='/analysis')
     app.register_blueprint(alerts.bp)
     app.register_blueprint(watchlist.bp)
     app.register_blueprint(auth.bp)
+    app.register_blueprint(analysis_dashboard.bp, url_prefix='/analysis/dashboard')
     
     # Register error handlers
     @app.errorhandler(AppError)
