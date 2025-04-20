@@ -1,5 +1,5 @@
 """Authentication routes for the Schwab Trader application."""
-from flask import Blueprint, redirect, url_for, session, request, jsonify, current_app
+from flask import Blueprint, redirect, url_for, session, request, jsonify, current_app, render_template, flash
 from flask_login import login_user, logout_user, current_user
 from schwab_trader.utils.error_utils import (
     handle_errors, AuthenticationError, ValidationError,
@@ -12,6 +12,7 @@ from schwab_trader.utils.schwab_oauth import SchwabOAuth
 from schwab_trader.services.market_data_service import MarketDataService
 from schwab_trader.services.schwab_service import get_schwab_oauth
 from schwab_trader.utils.auth import get_auth_url, get_token, refresh_token, is_authenticated
+from schwab_trader.forms.auth import LoginForm
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 logger = get_logger(__name__)
@@ -23,10 +24,25 @@ def get_auth_service():
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Handle user login."""
-    if request.method == 'GET':
-        return redirect(get_auth_url())
-    elif request.method == 'POST':
-        return redirect(get_auth_url())
+    if current_user.is_authenticated:
+        return redirect(url_for('analysis.dashboard'))
+    
+    form = LoginForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.username.data).first()
+        if user is None or not user.check_password(form.password.data):
+            flash('Invalid username or password', 'error')
+            return render_template('auth/login.html', form=form), 401
+        
+        login_user(user, remember=form.remember_me.data)
+        session['schwab_token'] = {'access_token': 'demo_token'}  # For demo purposes
+        
+        next_page = request.args.get('next')
+        if not next_page or not next_page.startswith('/'):
+            next_page = url_for('analysis.dashboard')
+        return redirect(next_page)
+    
+    return render_template('auth/login.html', form=form)
 
 @auth_bp.route('/callback')
 @handle_errors

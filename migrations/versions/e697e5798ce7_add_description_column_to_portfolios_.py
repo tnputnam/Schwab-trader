@@ -1,12 +1,13 @@
-"""Add description column to portfolios table
+"""Add description column to portfolios
 
 Revision ID: e697e5798ce7
 Revises: create_tables
-Create Date: 2025-04-17 16:40:30.091032
+Create Date: 2024-04-20 09:23:00.000000
 
 """
 from alembic import op
 import sqlalchemy as sa
+from datetime import datetime
 
 
 # revision identifiers, used by Alembic.

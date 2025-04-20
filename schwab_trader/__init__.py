@@ -4,46 +4,18 @@ Schwab Trader package initialization.
 
 from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 from flask_login import LoginManager
-from flask_socketio import SocketIO
 from flask_caching import Cache
+from schwab_trader.utils.filters import register_filters
 import os
 
-from schwab_trader.utils.filters import register_filters
-
-# Initialize extensions
 db = SQLAlchemy()
-migrate = Migrate()
-socketio = SocketIO()
-cache = Cache()
 login_manager = LoginManager()
+cache = Cache()
 
 def create_app(test_config=None):
     """Create and configure the Flask application."""
-    app = Flask(__name__)
-    
-    # Load configuration
-    if test_config is None:
-        # Set basic configuration
-        app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
-        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///schwab_trader.db')
-        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-        
-        # Load additional configuration
-        app.config.from_object('schwab_trader.config')
-    else:
-        # Load the test config if passed in
-        if test_config == 'testing':
-            app.config.update({
-                'TESTING': True,
-                'WTF_CSRF_ENABLED': False,
-                'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
-                'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-                'SECRET_KEY': 'test-secret-key'
-            })
-        else:
-            app.config.update(test_config)
+    app = Flask(__name__, instance_relative_config=True)
     
     # Ensure the instance folder exists
     try:
@@ -51,22 +23,32 @@ def create_app(test_config=None):
     except OSError:
         pass
     
+    # Default configuration
+    db_path = os.path.join(app.instance_path, 'schwab_trader.db')
+    app.config.from_mapping(
+        SECRET_KEY='dev',
+        SQLALCHEMY_DATABASE_URI=f'sqlite:///{db_path}',
+        SQLALCHEMY_TRACK_MODIFICATIONS=False,
+        CACHE_TYPE='simple',
+        CACHE_DEFAULT_TIMEOUT=300,
+    )
+    
+    if test_config is None:
+        # Load the instance config, if it exists, when not testing
+        app.config.from_pyfile('config.py', silent=True)
+    else:
+        # Load the test config if passed in
+        app.config.update(test_config)
+    
     # Initialize extensions
     db.init_app(app)
-    migrate.init_app(app, db)
-    socketio.init_app(app)
-    cache.init_app(app)
     login_manager.init_app(app)
+    cache.init_app(app)
     
-    # Configure login
-    login_manager.login_view = 'auth.login'
-    login_manager.login_message_category = 'info'
-    
-    # Register custom filters
+    # Register filters
     register_filters(app)
     
-    # Import and register blueprints
-    from schwab_trader.routes.api import api_bp
+    # Register blueprints
     from schwab_trader.routes.auth import auth_bp
     from schwab_trader.routes.root import root_bp
     from schwab_trader.routes.portfolio import portfolio_bp
@@ -78,7 +60,6 @@ def create_app(test_config=None):
     from schwab_trader.routes.alerts import bp as alerts_bp
     from schwab_trader.routes.compare import bp as compare_bp
     
-    app.register_blueprint(api_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(root_bp)
     app.register_blueprint(portfolio_bp, url_prefix='/portfolio')
@@ -90,11 +71,19 @@ def create_app(test_config=None):
     app.register_blueprint(alerts_bp)
     app.register_blueprint(compare_bp)
     
+    # Register CLI commands
+    from schwab_trader.cli import create_test_user
+    app.cli.add_command(create_test_user)
+    
     # Import models for migrations
     from schwab_trader.models import User, Portfolio, Position
     
     @login_manager.user_loader
     def load_user(user_id):
         return User.query.get(int(user_id))
+    
+    # Create database tables
+    with app.app_context():
+        db.create_all()
     
     return app
