@@ -1,25 +1,21 @@
-from auth_app import app, socketio
+from schwab_trader import create_app
+from schwab_trader.utils.alpha_vantage_api import AlphaVantageAPI
+from schwab_trader.utils.schwab_api import SchwabAPI
+import os
+
+app = create_app({
+    'SECRET_KEY': os.getenv('SECRET_KEY', 'dev'),
+    'ALPHA_VANTAGE_API_KEY': os.getenv('ALPHA_VANTAGE_API_KEY'),
+    'SCHWAB_API_KEY': os.getenv('SCHWAB_API_KEY'),
+    'SCHWAB_API_SECRET': os.getenv('SCHWAB_API_SECRET'),
+    'SQLALCHEMY_DATABASE_URI': 'sqlite:///schwab_trader.db',
+    'SQLALCHEMY_TRACK_MODIFICATIONS': False
+})
+
+# Initialize APIs with app context
+with app.app_context():
+    alpha_vantage = AlphaVantageAPI(app)
+    schwab = SchwabAPI(app)
 
 if __name__ == '__main__':
-    with app.app_context():
-        # Initialize any services that need the app context here
-        from schwab_trader.utils.schwab_oauth import SchwabOAuth
-        from schwab_trader.utils.alpha_vantage_api import AlphaVantageAPI
-        
-        # Initialize services
-        try:
-            schwab_oauth = SchwabOAuth()
-            app.config['SCHWAB_OAUTH'] = schwab_oauth
-            print("INFO - Schwab API initialized successfully")
-        except Exception as e:
-            print(f"WARNING - Could not initialize Schwab API: {str(e)}")
-        
-        try:
-            alpha_vantage = AlphaVantageAPI()
-            app.config['ALPHA_VANTAGE'] = alpha_vantage
-            print("INFO - Alpha Vantage API initialized successfully")
-        except Exception as e:
-            print(f"WARNING - Could not initialize Alpha Vantage: {str(e)}")
-    
-    # Run the application
-    socketio.run(app, host='0.0.0.0', port=5000, debug=True) 
+    app.run(debug=True) 

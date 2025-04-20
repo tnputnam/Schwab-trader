@@ -1,30 +1,56 @@
 """Alpha Vantage API utility class."""
 import os
 import logging
-import requests
-from flask import current_app
-from datetime import datetime, timedelta
-import json
+from alpha_vantage.timeseries import TimeSeries
+from alpha_vantage.techindicators import TechIndicators
 
-logger = logging.getLogger('alpha_vantage')
-handler = logging.FileHandler('logs/alpha_vantage_{}.log'.format(datetime.now().strftime('%Y%m%d')))
-handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
-logger.addHandler(handler)
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class AlphaVantageAPI:
     """Handles Alpha Vantage API interactions."""
     
-    def __init__(self):
-        """Initialize the Alpha Vantage API client."""
-        logger.info("Initializing AlphaVantageAPI...")
-        self.api_key = os.getenv('ALPHA_VANTAGE_API_KEY')
-        if not self.api_key:
-            raise ValueError("ALPHA_VANTAGE_API_KEY not found in environment variables")
+    def __init__(self, app=None):
+        """Initialize the API with Flask app context"""
+        self.api_key = None
+        self.ts = None
+        self.ti = None
         
-        logger.info(f"API key found: {self.api_key[:4]}...{self.api_key[-4:]}")
-        self.base_url = "https://www.alphavantage.co/query"
-        logger.info("AlphaVantageAPI initialized successfully")
+        if app is not None:
+            self.init_app(app)
+    
+    def init_app(self, app):
+        """Initialize the API with Flask app context"""
+        self.api_key = app.config.get('ALPHA_VANTAGE_API_KEY')
+        if not self.api_key:
+            logger.warning("No Alpha Vantage API key found in configuration")
+            return
+            
+        logger.info("Initializing AlphaVantageAPI...")
+        try:
+            self.ts = TimeSeries(key=self.api_key, output_format='pandas')
+            self.ti = TechIndicators(key=self.api_key, output_format='pandas')
+            logger.info("AlphaVantageAPI initialized successfully")
+        except Exception as e:
+            logger.error(f"Error initializing AlphaVantageAPI: {str(e)}")
+            raise
+    
+    def get_stock_data(self, symbol, interval='1min', outputsize='compact'):
+        """Get stock time series data"""
+        try:
+            data, meta_data = self.ts.get_intraday(symbol=symbol, interval=interval, outputsize=outputsize)
+            return data, meta_data
+        except Exception as e:
+            logger.error(f"Error getting stock data for {symbol}: {str(e)}")
+            return None, None
+    
+    def get_technical_indicators(self, symbol, interval='1min', time_period=60):
+        """Get technical indicators for a stock"""
+        try:
+            data, meta_data = self.ti.get_sma(symbol=symbol, interval=interval, time_period=time_period)
+            return data, meta_data
+        except Exception as e:
+            logger.error(f"Error getting technical indicators for {symbol}: {str(e)}")
+            return None, None
     
     def get_quote(self, symbol):
         """Get real-time quote for a symbol."""
