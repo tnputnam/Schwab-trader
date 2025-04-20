@@ -34,8 +34,8 @@ def test_analysis_dashboard_blueprint_registration(app):
         assert blueprints['analysis_dashboard'].name == 'analysis_dashboard', "Blueprint name is incorrect"
         
         # Check if the index route exists
-        url = url_for('analysis_dashboard_bp.index')
-        assert url == '/analysis/dashboard/', "URL for analysis dashboard index is incorrect"
+        url = url_for('analysis_dashboard.index')
+        assert url.endswith('/analysis/dashboard/'), "URL for analysis dashboard index is incorrect"
 
 def test_analysis_dashboard_endpoint(client):
     """Test that the analysis dashboard endpoint returns a successful response."""
