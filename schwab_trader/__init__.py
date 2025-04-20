@@ -42,10 +42,10 @@ def create_app(test_config=None):
     from schwab_trader.routes.trading import trading_bp
     from schwab_trader.routes.analysis import analysis_bp
     from schwab_trader.routes.news import news_bp
-    from schwab_trader.routes.strategies import strategies_bp
-    from schwab_trader.routes.watchlist import watchlist_bp
-    from schwab_trader.routes.alerts import alerts_bp
-    from schwab_trader.routes.compare import compare_bp
+    from schwab_trader.routes.strategies import bp as strategies_bp
+    from schwab_trader.routes.watchlist import bp as watchlist_bp
+    from schwab_trader.routes.alerts import bp as alerts_bp
+    from schwab_trader.routes.compare import bp as compare_bp
     
     app.register_blueprint(api_bp)
     app.register_blueprint(auth_bp)

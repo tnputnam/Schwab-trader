@@ -1,5 +1,60 @@
-from datetime import datetime
+"""Database models for the Schwab Trader application."""
+from datetime import datetime, timedelta
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
 from schwab_trader import db
+
+class User(db.Model):
+    """User model for authentication and profile management."""
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    password_hash = db.Column(db.String(128))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    last_login = db.Column(db.DateTime)
+    
+    def set_password(self, password):
+        """Set the user's password."""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check if the provided password matches the user's password."""
+        return check_password_hash(self.password_hash, password)
+    
+    def update_last_login(self):
+        """Update the user's last login timestamp."""
+        self.last_login = datetime.utcnow()
+        db.session.commit()
+
+class Session(db.Model):
+    """Session model for managing user sessions."""
+    __tablename__ = 'sessions'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    session_token = db.Column(db.String(64), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    user = db.relationship('User', backref=db.backref('sessions', lazy=True))
+    
+    def is_expired(self):
+        """Check if the session has expired."""
+        return datetime.utcnow() > self.expires_at
+    
+    @classmethod
+    def create_session(cls, user_id, duration_hours=24):
+        """Create a new session for a user."""
+        session = cls(
+            user_id=user_id,
+            session_token=generate_password_hash(str(user_id) + str(datetime.utcnow())),
+            expires_at=datetime.utcnow() + timedelta(hours=duration_hours)
+        )
+        db.session.add(session)
+        db.session.commit()
+        return session
 
 class Portfolio(db.Model):
     id = db.Column(db.Integer, primary_key=True)

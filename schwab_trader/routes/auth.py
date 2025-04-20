@@ -1,4 +1,4 @@
-"""Authentication routes for Schwab Trader."""
+"""Authentication routes for the Schwab Trader application."""
 from flask import Blueprint, redirect, url_for, session, request, jsonify, current_app
 from flask_login import login_user, logout_user, current_user
 from schwab_trader.utils.error_utils import (
@@ -11,73 +11,58 @@ from schwab_trader.models.user import User
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
 from schwab_trader.services.market_data_service import MarketDataService
 from schwab_trader.services.schwab_service import get_schwab_oauth
+from schwab_trader.utils.auth import get_auth_url, get_token, refresh_token, is_authenticated
 
-bp = Blueprint('auth', __name__, url_prefix='/auth')
+auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 logger = get_logger(__name__)
 
 def get_auth_service():
     """Get an instance of AuthService."""
     return AuthService()
 
-@bp.route('/login', methods=['POST'])
+@auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     """Handle user login."""
-    try:
-        auth_service = get_auth_service()
-        data = request.get_json()
-        result = auth_service.login(data)
-        return jsonify(result)
-    except Exception as e:
-        return handle_error(e)
+    if request.method == 'GET':
+        return redirect(get_auth_url())
+    elif request.method == 'POST':
+        return redirect(get_auth_url())
 
-@bp.route('/logout', methods=['POST'])
+@auth_bp.route('/callback')
+@handle_errors
+def callback():
+    """Handle OAuth callback."""
+    code = request.args.get('code')
+    if not code:
+        return jsonify({'error': 'No authorization code provided'}), 400
+    
+    token = get_token(code)
+    session['schwab_token'] = token
+    return redirect(url_for('main.index'))
+
+@auth_bp.route('/logout')
 def logout():
     """Handle user logout."""
-    try:
-        auth_service = get_auth_service()
-        result = auth_service.logout()
-        return jsonify(result)
-    except Exception as e:
-        return handle_error(e)
+    session.pop('schwab_token', None)
+    return redirect(url_for('main.index'))
 
-@bp.route('/callback')
-def oauth_callback():
-    """Handle OAuth callback."""
-    try:
-        auth_service = get_auth_service()
-        result = auth_service.handle_oauth_callback(request)
-        return redirect(url_for('dashboard.index'))
-    except Exception as e:
-        return handle_error(e)
+@auth_bp.route('/refresh')
+@handle_errors
+def refresh():
+    """Refresh the access token."""
+    if 'schwab_token' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    token = refresh_token(session['schwab_token'])
+    session['schwab_token'] = token
+    return jsonify({'status': 'success'})
 
-@bp.route('/refresh', methods=['POST'])
-def refresh_token():
-    """Refresh OAuth token."""
-    try:
-        auth_service = get_auth_service()
-        refresh_token = session.get('refresh_token')
-        if not refresh_token:
-            raise AuthenticationError("No refresh token found")
-        result = auth_service.refresh_token(refresh_token)
-        if result:
-            session['access_token'] = result['access_token']
-            session['refresh_token'] = result['refresh_token']
-            session['expires_at'] = result['expires_at'].isoformat()
-        return jsonify(result)
-    except Exception as e:
-        return handle_error(e)
-
-@bp.route('/status')
-def check_auth_status():
+@auth_bp.route('/status')
+def status():
     """Check authentication status."""
-    try:
-        auth_service = get_auth_service()
-        result = auth_service.check_auth_status()
-        return jsonify(result)
-    except Exception as e:
-        return handle_error(e)
+    return jsonify({'authenticated': is_authenticated()})
 
-@bp.route('/api/refresh_token')
+@auth_bp.route('/api/refresh_token')
 @handle_api_error
 @handle_errors
 def refresh_token_api():
@@ -100,7 +85,7 @@ def refresh_token_api():
         logger.error(f"Token refresh error: {str(e)}")
         raise AuthenticationError(details=str(e))
 
-@bp.route('/api/check_auth')
+@auth_bp.route('/api/check_auth')
 @handle_errors
 def check_auth():
     """Check authentication status."""
@@ -113,7 +98,7 @@ def check_auth():
         }
     })
 
-@bp.route('/bypass', methods=['POST'])
+@auth_bp.route('/bypass', methods=['POST'])
 def toggle_bypass():
     """Toggle the Schwab bypass mode."""
     try:
@@ -133,7 +118,7 @@ def toggle_bypass():
             'message': str(e)
         }), 500
 
-@bp.route('/force_bypass_off', methods=['POST'])
+@auth_bp.route('/force_bypass_off', methods=['POST'])
 def force_bypass_off():
     """Force the Schwab bypass mode to be turned off."""
     try:
@@ -153,7 +138,7 @@ def force_bypass_off():
             'message': str(e)
         }), 500
 
-@bp.route('/schwab')
+@auth_bp.route('/schwab')
 def schwab_auth():
     """Initiate Schwab OAuth flow."""
     try:
