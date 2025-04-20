@@ -54,6 +54,17 @@ check_disk_space() {
     return 0
 }
 
+# Function to load environment variables
+load_env() {
+    if [ -f ".env" ]; then
+        log_message "Loading environment variables from .env"
+        export $(grep -v '^#' .env | xargs)
+    else
+        log_message "Error: .env file not found"
+        return 1
+    fi
+}
+
 # Function to start the application
 start_application() {
     local port=$1
@@ -68,6 +79,16 @@ start_application() {
         log_message "Error: Virtual environment not found"
         return 1
     fi
+    
+    # Load environment variables
+    if ! load_env; then
+        return 1
+    fi
+    
+    # Set Flask environment variables
+    export FLASK_APP=auth_app.py
+    export FLASK_ENV=development
+    export FLASK_DEBUG=1
     
     # Start the application using wsgi.py
     python wsgi.py &
