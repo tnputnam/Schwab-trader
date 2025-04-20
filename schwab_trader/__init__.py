@@ -8,7 +8,7 @@ from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_socketio import SocketIO
 from flask_caching import Cache
-from schwab_trader.utils.config_utils import get_config
+import os
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -23,9 +23,17 @@ def create_app(test_config=None):
     
     # Load configuration
     if test_config is None:
-        app.config.from_object(get_config())
+        # Load the instance config, if it exists, when not testing
+        app.config.from_pyfile('config.py', silent=True)
     else:
+        # Load the test config if passed in
         app.config.update(test_config)
+    
+    # Ensure the instance folder exists
+    try:
+        os.makedirs(app.instance_path)
+    except OSError:
+        pass
     
     # Initialize extensions
     db.init_app(app)
@@ -36,7 +44,7 @@ def create_app(test_config=None):
     
     # Import and register blueprints
     from schwab_trader.routes.api import api_bp
-    from schwab_trader.routes.auth import bp as auth_bp
+    from schwab_trader.routes.auth import auth_bp
     from schwab_trader.routes.root import root_bp
     from schwab_trader.routes.portfolio import portfolio_bp
     from schwab_trader.routes.trading import trading_bp
@@ -60,7 +68,7 @@ def create_app(test_config=None):
     app.register_blueprint(compare_bp)
     
     # Import models for migrations
-    from schwab_trader.models import User, Portfolio, Position, Alert
+    from schwab_trader.models import User, Portfolio, Position
     
     @login_manager.user_loader
     def load_user(user_id):

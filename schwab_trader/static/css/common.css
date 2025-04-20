@@ -317,4 +317,87 @@
 .status-indicator.disconnected {
     background-color: #FF9800;
     color: white;
+}
+
+/* Common styles for Schwab Trader */
+
+/* General styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+}
+
+/* Custom container padding */
+.container {
+    padding: 2rem 1rem;
+}
+
+/* Custom button styles */
+.btn-primary {
+    background-color: #0066cc;
+    border-color: #0066cc;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #0052a3;
+    border-color: #0052a3;
+}
+
+/* Custom alert styles */
+.alert {
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+/* Custom form styles */
+.form-control:focus {
+    border-color: #0066cc;
+    box-shadow: 0 0 0 0.2rem rgba(0,102,204,0.25);
+}
+
+/* Custom table styles */
+.table {
+    background-color: white;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.table thead th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+/* Custom navigation styles */
+.nav-link {
+    padding: 0.5rem 1rem;
+    color: #495057;
+    transition: color 0.3s ease;
+}
+
+.nav-link:hover {
+    color: #0066cc;
+}
+
+/* Custom footer styles */
+.footer {
+    background-color: #f8f9fa;
+    padding: 1rem 0;
+    margin-top: 2rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .container {
+        padding: 1rem;
+    }
+    
+    h1 {
+        font-size: 2rem;
+    }
+    
+    .lead {
+        font-size: 1.1rem;
+    }
 } 
