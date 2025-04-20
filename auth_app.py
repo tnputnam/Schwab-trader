@@ -28,7 +28,7 @@ from typing import List
 from types import SimpleNamespace
 from dotenv import load_dotenv
 from schwab_trader.routes.root import root_bp
-from schwab_trader.routes.analysis_dashboard import analysis_dashboard_bp
+from schwab_trader.routes.analysis import analysis_bp
 
 # Load environment variables
 load_dotenv()
@@ -54,7 +54,7 @@ CORS(app)
 
 # Register blueprints
 app.register_blueprint(root_bp)
-app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis-dashboard')
+app.register_blueprint(analysis_bp, url_prefix='/analysis')
 
 # Load configuration from environment variables
 config = {
@@ -175,7 +175,7 @@ def schwab_callback():
             accounts = schwab.get_accounts()
             if accounts:
                 session['schwab_accounts'] = accounts
-                return redirect(url_for('analysis_dashboard.index'))
+                return redirect(url_for('analysis.dashboard'))
             else:
                 logger.error("Failed to get accounts")
                 return render_template('error.html', error_message="Failed to get account information")
@@ -237,14 +237,14 @@ async def monitor_symbols(symbols: List[str]):
 @app.route('/login')
 def login():
     """Automatically redirect to analysis dashboard"""
-    return redirect(url_for('analysis_dashboard.index'))
+    return redirect(url_for('analysis.dashboard'))
 
 @app.route('/analysis')
 def analysis():
     """Display the analysis dashboard page"""
     if 'schwab_token' not in session:
         return redirect(url_for('manual_auth'))
-    return redirect(url_for('analysis_dashboard.index'))
+    return redirect(url_for('analysis.dashboard'))
 
 @app.route('/trading')
 def trading():

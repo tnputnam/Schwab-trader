@@ -5,7 +5,7 @@ from pathlib import Path
 from schwab_trader.utils.logger import setup_logger
 from typing import Dict, Any, Optional, List, Union
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
@@ -33,7 +33,7 @@ class Config:
     SESSION_TYPE = os.getenv('SESSION_TYPE', 'filesystem')
     SESSION_FILE_DIR = os.getenv('SESSION_FILE_DIR', 'sessions')
     SESSION_PERMANENT = os.getenv('SESSION_PERMANENT', 'true').lower() == 'true'
-    PERMANENT_SESSION_LIFETIME = int(os.getenv('PERMANENT_SESSION_LIFETIME', '3600'))
+    PERMANENT_SESSION_LIFETIME = timedelta(days=1)
     
     # API configuration
     SCHWAB_API_KEY = os.getenv('SCHWAB_API_KEY')

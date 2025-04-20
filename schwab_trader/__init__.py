@@ -23,8 +23,13 @@ def create_app(test_config=None):
     
     # Load configuration
     if test_config is None:
-        # Load the instance config, if it exists, when not testing
-        app.config.from_pyfile('config.py', silent=True)
+        # Set basic configuration
+        app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev')
+        app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///schwab_trader.db')
+        app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+        
+        # Load additional configuration
+        app.config.from_object('schwab_trader.config')
     else:
         # Load the test config if passed in
         app.config.update(test_config)
