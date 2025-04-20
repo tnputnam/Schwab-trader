@@ -1,11 +1,12 @@
 """User model for Schwab Trader."""
 from datetime import datetime
 from flask_login import UserMixin
-from schwab_trader import db
+from flask_sqlalchemy import SQLAlchemy
 from schwab_trader.utils.error_utils import DatabaseError
 from schwab_trader.utils.logging_utils import get_logger
 
 logger = get_logger(__name__)
+db = SQLAlchemy()
 
 class User(UserMixin, db.Model):
     """User model."""

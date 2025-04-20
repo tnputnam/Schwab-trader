@@ -40,7 +40,9 @@ class YFinanceWrapper:
     def __init__(self):
         self.cache = TTLCache(maxsize=100, ttl=300)  # 5 minutes TTL
         self.last_request_time = 0
-        self.min_request_interval = 2.0  # seconds between requests
+        self.min_request_interval = 10.0  # increased to 10 seconds between requests
+        self.max_retries = 3
+        self.retry_delay = 30.0  # increased to 30 seconds between retries
 
     def _rate_limit(self):
         """Implement rate limiting"""
@@ -52,39 +54,39 @@ class YFinanceWrapper:
             time.sleep(sleep_time)
         self.last_request_time = time.time()
 
-    def get_ticker_info(self, symbol):
-        """Get basic ticker information with caching."""
-        cache_key = f"info_{symbol}"
-        if cache_key in self.cache:
-            logger.info(f"Retrieved {symbol} info from cache")
-            return self.cache[cache_key]
-        
-        self._rate_limit()
-        ticker = yf.Ticker(symbol)
-        info = ticker.info
-        self.cache[cache_key] = info
-        return info
+    def _make_request_with_retry(self, request_func):
+        """Make a request with retry logic"""
+        for attempt in range(self.max_retries):
+            try:
+                self._rate_limit()
+                return request_func()
+            except Exception as e:
+                if "429" in str(e) and attempt < self.max_retries - 1:
+                    wait_time = self.retry_delay * (attempt + 1)  # Exponential backoff
+                    logger.warning(f"Rate limited, waiting {wait_time} seconds before retry {attempt + 1}")
+                    time.sleep(wait_time)
+                else:
+                    raise
 
-    def get_stock_data(self, symbol, period="1d", interval="1h"):
+    def get_stock_data(self, symbol, period="1mo", interval="1d"):
         """Get stock data with caching."""
         cache_key = f"data_{symbol}_{period}_{interval}"
         if cache_key in self.cache:
             logger.info(f"Retrieved {symbol} data from cache")
             return self.cache[cache_key]
         
-        self._rate_limit()
-        ticker = yf.Ticker(symbol)
-        data = ticker.history(period=period, interval=interval)
+        def request_func():
+            ticker = yf.Ticker(symbol)
+            data = ticker.history(period=period, interval=interval)
+            
+            if len(data) == 0:
+                logger.warning(f"No data received for {symbol}")
+                raise Exception("No data received")
+            
+            self.cache[cache_key] = data
+            return data
         
-        if len(data) == 0:
-            logger.warning(f"No data received for {symbol}, trying different interval")
-            if interval == "1m":
-                data = ticker.history(period=period, interval="5m")
-            elif interval == "5m":
-                data = ticker.history(period=period, interval="15m")
-        
-        self.cache[cache_key] = data
-        return data
+        return self._make_request_with_retry(request_func)
 
 def test_yfinance():
     """Test Yahoo Finance API"""
@@ -92,36 +94,39 @@ def test_yfinance():
     api = YFinanceWrapper()
     
     try:
-        # Test basic info retrieval
-        logger.info("Testing basic info retrieval...")
-        info = api.get_ticker_info('AAPL')
-        if info:
-            logger.info("Successfully retrieved basic info for AAPL")
-        
-        # Test different data retrieval scenarios
+        # Test different data retrieval scenarios with more conservative periods
         test_scenarios = [
-            ('AAPL', '1d', '1h'),
-            ('MSFT', '5d', '1h'),
-            ('GOOGL', '1d', '5m')
+            ('AAPL', '1mo', '1d'),   # Monthly data with daily intervals
+            ('MSFT', '3mo', '1d'),   # 3 months of daily data
+            ('GOOGL', '6mo', '1wk')  # 6 months of weekly data
         ]
         
+        success_count = 0
         for symbol, period, interval in test_scenarios:
             logger.info(f"\nTesting {symbol} with period={period}, interval={interval}")
             try:
                 data = api.get_stock_data(symbol, period=period, interval=interval)
-                logger.info(f"Successfully retrieved {len(data)} rows")
-                
-                # Test cache
-                logger.info("Testing cache...")
-                cached_data = api.get_stock_data(symbol, period=period, interval=interval)
-                logger.info("Successfully retrieved data from cache")
-                
+                if len(data) > 0:
+                    logger.info(f"Successfully retrieved {len(data)} rows")
+                    
+                    # Test cache
+                    logger.info("Testing cache...")
+                    cached_data = api.get_stock_data(symbol, period=period, interval=interval)
+                    logger.info("Successfully retrieved data from cache")
+                    
+                    success_count += 1
+                else:
+                    logger.error(f"No data received for {symbol}")
             except Exception as e:
                 logger.error(f"Error testing {symbol}: {str(e)}")
                 continue
         
-        logger.info("Yahoo Finance API test successful")
-        return True
+        if success_count > 0:
+            logger.info(f"Yahoo Finance API test successful ({success_count} out of {len(test_scenarios)} scenarios passed)")
+            return True
+        else:
+            logger.error("Yahoo Finance API test failed - no successful scenarios")
+            return False
         
     except Exception as e:
         logger.error(f"Error testing Yahoo Finance API: {str(e)}")

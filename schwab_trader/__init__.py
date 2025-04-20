@@ -3,43 +3,51 @@ Schwab Trader package initialization.
 """
 
 from flask import Flask
-from flask_socketio import SocketIO
-from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from schwab_trader.routes.api import api_bp
+from flask_login import LoginManager
+from flask_socketio import SocketIO
+from flask_caching import Cache
+from schwab_trader.utils.config_utils import get_config
 
-# Initialize Flask extensions
+# Initialize extensions
 db = SQLAlchemy()
 migrate = Migrate()
 socketio = SocketIO()
+cache = Cache()
+login_manager = LoginManager()
 
-def create_app(config=None):
+def create_app(test_config=None):
+    """Create and configure the Flask application."""
     app = Flask(__name__)
     
-    # Apply configuration
-    if config is None:
-        app.config.from_object('schwab_trader.config.Config')
+    # Load configuration
+    if test_config is None:
+        app.config.from_object(get_config())
     else:
-        app.config.update(config)
-    
-    # Enable CORS
-    CORS(app)
+        app.config.update(test_config)
     
     # Initialize extensions
     db.init_app(app)
     migrate.init_app(app, db)
     socketio.init_app(app)
+    cache.init_app(app)
+    login_manager.init_app(app)
     
-    # Register blueprints
-    from .routes.root import root_bp
-    from .routes.analysis_dashboard import analysis_dashboard_bp
-    from .routes.news import news_bp
-    from .routes.data import data_bp
-    app.register_blueprint(root_bp)
-    app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis/dashboard')
-    app.register_blueprint(news_bp)
-    app.register_blueprint(data_bp)
+    # Import and register blueprints
+    from schwab_trader.routes.api import api_bp
+    from schwab_trader.routes.auth import auth_bp
+    from schwab_trader.routes.main import main_bp
+    
     app.register_blueprint(api_bp)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(main_bp)
+    
+    # Import models for migrations
+    from schwab_trader.models import User, Portfolio, Position, Alert
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
     
     return app
