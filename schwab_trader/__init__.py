@@ -6,97 +6,64 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_caching import Cache
-from schwab_trader.utils.filters import register_filters
-import os
+from config import Config
 
+# Initialize extensions
 db = SQLAlchemy()
 login_manager = LoginManager()
 cache = Cache()
 
-def create_app(test_config=None):
-    """Create and configure the Flask application."""
-    app = Flask(__name__, instance_relative_config=True)
-    
-    # Ensure the instance folder exists
-    try:
-        os.makedirs(app.instance_path)
-    except OSError:
-        pass
-    
-    # Default configuration
-    db_path = os.path.join(app.instance_path, 'schwab_trader.db')
-    app.config.from_mapping(
-        SECRET_KEY='dev',
-        SQLALCHEMY_DATABASE_URI=f'sqlite:///{db_path}',
-        SQLALCHEMY_TRACK_MODIFICATIONS=False,
-        CACHE_TYPE='simple',
-        CACHE_DEFAULT_TIMEOUT=300,
-    )
-    
-    if test_config is None:
-        # Load the instance config, if it exists, when not testing
-        app.config.from_pyfile('config.py', silent=True)
-    else:
-        # Load the test config if passed in
-        app.config.update(test_config)
+def create_app(config_class=Config):
+    app = Flask(__name__)
+    app.config.from_object(config_class)
     
     # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
     cache.init_app(app)
     
-    # Register filters
-    register_filters(app)
-    
-    # Register blueprints
-    from schwab_trader.routes.auth import auth_bp
-    from schwab_trader.routes.root import root_bp
-    from schwab_trader.routes.portfolio import portfolio_bp
-    from schwab_trader.routes.trading import trading_bp
-    from schwab_trader.routes.analysis import analysis_bp
-    from schwab_trader.routes.news import news_bp
-    from schwab_trader.routes.strategies import bp as strategies_bp
-    from schwab_trader.routes.watchlist import bp as watchlist_bp
-    from schwab_trader.routes.alerts import bp as alerts_bp
-    from schwab_trader.routes.compare import bp as compare_bp
-    
-    app.register_blueprint(auth_bp, url_prefix='/auth')
-    app.register_blueprint(root_bp)
-    app.register_blueprint(portfolio_bp, url_prefix='/portfolio')
-    app.register_blueprint(trading_bp, url_prefix='/trading')
-    app.register_blueprint(analysis_bp, url_prefix='/analysis')
-    app.register_blueprint(news_bp)
-    app.register_blueprint(strategies_bp)
-    app.register_blueprint(watchlist_bp)
-    app.register_blueprint(alerts_bp)
-    app.register_blueprint(compare_bp)
-    
-    # Register CLI commands
-    from schwab_trader.cli import create_test_user
-    app.cli.add_command(create_test_user)
-    
-    # Import models for migrations
-    from schwab_trader.models import User, Portfolio, Position
-    
-    @login_manager.user_loader
-    def load_user(user_id):
-        return User.query.get(int(user_id))
+    # Check Schwab configuration
+    missing_config = config_class.check_schwab_config()
+    if missing_config:
+        app.logger.warning(f"Missing Schwab configuration: {', '.join(missing_config)}")
     
     # Initialize services within application context
     with app.app_context():
-        # Create database tables
-        db.create_all()
-        
-        # Initialize services
+        from schwab_trader.services.alpha_vantage import AlphaVantageAPI
+        from schwab_trader.services.schwab import SchwabAPI
+        from schwab_trader.services.data_manager import DataManager
         from schwab_trader.services.volume_analysis import VolumeAnalysisService
         from schwab_trader.services.strategy_tester import StrategyTester
-        from schwab_trader.services.schwab_market import SchwabMarketAPI
         
-        try:
-            app.volume_analysis = VolumeAnalysisService()
-            app.strategy_tester = StrategyTester()
-            app.schwab_market = SchwabMarketAPI()
-        except Exception as e:
-            app.logger.warning(f"Could not initialize some services: {str(e)}")
+        # Initialize and cache services
+        alpha_vantage = AlphaVantageAPI(app.config['ALPHA_VANTAGE_API_KEY'])
+        cache.set('alpha_vantage', alpha_vantage)
+        
+        schwab_api = SchwabAPI(
+            client_id=app.config['SCHWAB_CLIENT_ID'],
+            client_secret=app.config['SCHWAB_CLIENT_SECRET'],
+            redirect_uri=app.config['SCHWAB_REDIRECT_URI'],
+            auth_url=app.config['SCHWAB_AUTH_URL'],
+            token_url=app.config['SCHWAB_TOKEN_URL'],
+            scopes=app.config['SCHWAB_SCOPES'],
+            api_base_url=app.config['SCHWAB_API_BASE_URL']
+        )
+        cache.set('schwab_api', schwab_api)
+        
+        data_manager = DataManager(db, alpha_vantage)
+        cache.set('data_manager', data_manager)
+        
+        volume_analysis = VolumeAnalysisService(data_manager)
+        cache.set('volume_analysis', volume_analysis)
+        
+        strategy_tester = StrategyTester(data_manager)
+        cache.set('strategy_tester', strategy_tester)
+    
+    # Register blueprints
+    from schwab_trader.routes import auth, main, positions, market_analysis
+    app.register_blueprint(auth.bp)
+    app.register_blueprint(main.bp)
+    app.register_blueprint(positions.bp)
+    app.register_blueprint(market_analysis.bp)
     
     return app

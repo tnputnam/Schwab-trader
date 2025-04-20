@@ -129,7 +129,7 @@ while true; do
         log "No changes detected"
     fi
     
-    # Wait 10 minutes
-    log "Waiting 10 minutes before next check..."
-    sleep 600
+    # Wait 1 hour (3600 seconds)
+    log "Waiting 1 hour before next check..."
+    sleep 3600
 done 

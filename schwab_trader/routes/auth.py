@@ -1,6 +1,6 @@
 """Authentication routes for the Schwab Trader application."""
 from flask import Blueprint, redirect, url_for, session, request, jsonify, current_app, render_template, flash
-from flask_login import login_user, logout_user, current_user
+from flask_login import login_user, logout_user, current_user, login_required
 from schwab_trader.utils.error_utils import (
     handle_errors, AuthenticationError, ValidationError,
     handle_api_error
@@ -13,9 +13,12 @@ from schwab_trader.services.market_data_service import MarketDataService
 from schwab_trader.services.schwab_service import get_schwab_oauth
 from schwab_trader.utils.auth import get_auth_url, get_token, refresh_token, is_authenticated
 from schwab_trader.forms.auth import LoginForm
+import requests
+from urllib.parse import urlencode
+import logging
 
+logger = logging.getLogger(__name__)
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
-logger = get_logger(__name__)
 
 def get_auth_service():
     """Get an instance of AuthService."""
@@ -23,44 +26,89 @@ def get_auth_service():
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    """Handle user login."""
+    """Redirect to Schwab OAuth2 authorization page."""
     if current_user.is_authenticated:
         return redirect(url_for('analysis.dashboard'))
     
-    form = LoginForm()
-    if form.validate_on_submit():
-        user = User.query.filter_by(username=form.username.data).first()
-        if user is None or not user.check_password(form.password.data):
-            flash('Invalid username or password', 'error')
-            return render_template('auth/login.html', form=form), 401
-        
-        login_user(user, remember=form.remember_me.data)
-        session['schwab_token'] = {'access_token': 'demo_token'}  # For demo purposes
-        
-        next_page = request.args.get('next')
-        if not next_page or not next_page.startswith('/'):
-            next_page = url_for('analysis.dashboard')
-        return redirect(next_page)
-    
-    return render_template('auth/login.html', form=form)
+    # Generate OAuth2 authorization URL
+    auth_url = current_app.config['SCHWAB_AUTH_URL']
+    params = {
+        'client_id': current_app.config['SCHWAB_CLIENT_ID'],
+        'redirect_uri': current_app.config['SCHWAB_REDIRECT_URI'],
+        'response_type': 'code',
+        'scope': ' '.join(current_app.config['SCHWAB_SCOPES']),
+        'state': session.get('state', '')  # Add CSRF protection
+    }
+    auth_url = f"{auth_url}?{urlencode(params)}"
+    return redirect(auth_url)
 
 @auth_bp.route('/callback')
 @handle_errors
 def callback():
-    """Handle OAuth callback."""
+    """Handle OAuth2 callback from Schwab."""
+    error = request.args.get('error')
+    if error:
+        logger.error(f"OAuth2 error: {error}")
+        return redirect(url_for('root.index'))
+    
     code = request.args.get('code')
     if not code:
-        return jsonify({'error': 'No authorization code provided'}), 400
+        logger.error("No authorization code received")
+        return redirect(url_for('root.index'))
     
-    token = get_token(code)
-    session['schwab_token'] = token
-    return redirect(url_for('main.index'))
+    # Exchange authorization code for access token
+    token_url = current_app.config['SCHWAB_TOKEN_URL']
+    data = {
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': current_app.config['SCHWAB_REDIRECT_URI'],
+        'client_id': current_app.config['SCHWAB_CLIENT_ID'],
+        'client_secret': current_app.config['SCHWAB_CLIENT_SECRET']
+    }
+    
+    try:
+        response = requests.post(token_url, data=data)
+        response.raise_for_status()
+        token_data = response.json()
+        
+        # Store tokens in session
+        session['access_token'] = token_data['access_token']
+        session['refresh_token'] = token_data.get('refresh_token')
+        session['token_type'] = token_data['token_type']
+        session['expires_in'] = token_data['expires_in']
+        
+        # Get user info from Schwab API
+        user_info = get_schwab_user_info(token_data['access_token'])
+        
+        # Create or update user in database
+        user = User.query.filter_by(schwab_id=user_info['id']).first()
+        if not user:
+            user = User(
+                username=user_info.get('username', ''),
+                email=user_info.get('email', ''),
+                schwab_id=user_info['id']
+            )
+            db.session.add(user)
+        else:
+            user.username = user_info.get('username', user.username)
+            user.email = user_info.get('email', user.email)
+        
+        db.session.commit()
+        login_user(user)
+        
+        return redirect(url_for('root.index'))
+    
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error exchanging code for token: {str(e)}")
+        return redirect(url_for('root.index'))
 
 @auth_bp.route('/logout')
+@login_required
 def logout():
-    """Handle user logout."""
-    session.pop('schwab_token', None)
-    return redirect(url_for('main.index'))
+    """Logout user and clear session."""
+    logout_user()
+    session.clear()
+    return redirect(url_for('root.index'))
 
 @auth_bp.route('/refresh')
 @handle_errors
@@ -188,4 +236,22 @@ def schwab_auth():
         return jsonify({
             'status': 'error',
             'message': str(e)
-        }), 500 
+        }), 500
+
+def get_schwab_user_info(access_token):
+    """Get user information from Schwab API."""
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Accept': 'application/json'
+    }
+    
+    try:
+        response = requests.get(
+            f"{current_app.config['SCHWAB_API_BASE_URL']}/user",
+            headers=headers
+        )
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error getting user info: {str(e)}")
+        return {'id': 'unknown'} 

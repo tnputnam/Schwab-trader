@@ -7,17 +7,33 @@ from typing import Dict, Any, Optional, List, Union
 import json
 from datetime import datetime, timedelta
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
 # Setup logger
 logger = setup_logger('config')
 
 class Config:
-    # Base configuration
-    SECRET_KEY = os.getenv('SECRET_KEY', 'dev')
+    # Flask configuration
+    SECRET_KEY = os.environ.get('SECRET_KEY', 'dev_secret_key')
+    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///instance/schwab_trader.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    SQLALCHEMY_DATABASE_URI = os.getenv('DATABASE_URL', 'sqlite:///data/schwab_trader.db')
+    
+    # Cache configuration
+    CACHE_TYPE = 'simple'
+    CACHE_DEFAULT_TIMEOUT = 3600
+    
+    # Schwab API configuration
+    SCHWAB_CLIENT_ID = os.environ.get('SCHWAB_CLIENT_ID')
+    SCHWAB_CLIENT_SECRET = os.environ.get('SCHWAB_CLIENT_SECRET')
+    SCHWAB_REDIRECT_URI = os.environ.get('SCHWAB_REDIRECT_URI')
+    SCHWAB_AUTH_URL = os.environ.get('SCHWAB_AUTH_URL', 'https://api.schwabapi.com/v1/oauth/authorize')
+    SCHWAB_TOKEN_URL = os.environ.get('SCHWAB_TOKEN_URL', 'https://api.schwabapi.com/v1/oauth/token')
+    SCHWAB_SCOPES = os.environ.get('SCHWAB_SCOPES', 'read_accounts trade read_positions')
+    SCHWAB_API_BASE_URL = os.environ.get('SCHWAB_API_BASE_URL', 'https://api.schwabapi.com/v1')
+    
+    # Alpha Vantage configuration
+    ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY')
     
     # Flask-Login configuration
     SESSION_COOKIE_SECURE = True
@@ -34,17 +50,6 @@ class Config:
     SESSION_FILE_DIR = os.getenv('SESSION_FILE_DIR', 'sessions')
     SESSION_PERMANENT = os.getenv('SESSION_PERMANENT', 'true').lower() == 'true'
     PERMANENT_SESSION_LIFETIME = timedelta(days=1)
-    
-    # API configuration
-    SCHWAB_API_KEY = os.getenv('SCHWAB_API_KEY')
-    SCHWAB_API_SECRET = os.getenv('SCHWAB_API_SECRET')
-    SCHWAB_API_BASE_URL = os.getenv('SCHWAB_API_BASE_URL', 'https://api.schwab.com')
-    SCHWAB_REDIRECT_URI = os.getenv('SCHWAB_REDIRECT_URI', 'http://localhost:5000/auth/callback')
-    ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
-    
-    # Cache configuration
-    CACHE_TYPE = os.getenv('CACHE_TYPE', 'simple')
-    CACHE_DEFAULT_TIMEOUT = int(os.getenv('CACHE_DEFAULT_TIMEOUT', '300'))
     
     # Rate limiting
     RATELIMIT_DEFAULT = os.getenv('RATELIMIT_DEFAULT', '200 per day')
@@ -96,7 +101,11 @@ class Config:
         'STRATEGY_TEST_START_DATE': {'format': '%Y-%m-%d', 'type': 'date'},
         'STRATEGY_TEST_END_DATE': {'format': '%Y-%m-%d', 'type': 'date'},
         'NEWS_SOURCES': {'type': 'json_array'},
-        'SCHWAB_API_BASE_URL': {'type': 'url'}
+        'SCHWAB_API_BASE_URL': {'type': 'url'},
+        'SCHWAB_AUTH_URL': {'type': 'url'},
+        'SCHWAB_TOKEN_URL': {'type': 'url'},
+        'SCHWAB_REDIRECT_URI': {'type': 'url'},
+        'SCHWAB_SCOPES': {'type': 'list'}
     }
 
     @classmethod
@@ -120,6 +129,9 @@ class Config:
         elif rule['type'] == 'url':
             if not value.startswith(('http://', 'https://')):
                 return f"Invalid URL format for {key}"
+        elif rule['type'] == 'list':
+            if not isinstance(value, list):
+                return f"{key} must be a list"
 
         return None
 
@@ -158,6 +170,21 @@ class Config:
                     "Start date must be before end date"
                 )
 
+        # Validate required Schwab API settings
+        required_schwab_settings = [
+            'SCHWAB_CLIENT_ID',
+            'SCHWAB_CLIENT_SECRET',
+            'SCHWAB_AUTH_URL',
+            'SCHWAB_TOKEN_URL',
+            'SCHWAB_REDIRECT_URI',
+            'SCHWAB_API_BASE_URL',
+            'SCHWAB_SCOPES'
+        ]
+        
+        for setting in required_schwab_settings:
+            if not getattr(cls, setting):
+                errors.setdefault('SCHWAB_API', []).append(f"Missing required setting: {setting}")
+
         return errors
 
     @classmethod
@@ -179,6 +206,20 @@ class Config:
             for key, error_list in errors.items():
                 for error in error_list:
                     logger.warning(f"{key}: {error}")
+
+    @classmethod
+    def check_schwab_config(cls):
+        """Check if all required Schwab configuration is present."""
+        required = [
+            'SCHWAB_CLIENT_ID',
+            'SCHWAB_CLIENT_SECRET',
+            'SCHWAB_REDIRECT_URI',
+            'SCHWAB_AUTH_URL',
+            'SCHWAB_TOKEN_URL',
+            'SCHWAB_SCOPES',
+            'SCHWAB_API_BASE_URL'
+        ]
+        return [var for var in required if not getattr(cls, var)]
 
 class DevelopmentConfig(Config):
     DEBUG = True

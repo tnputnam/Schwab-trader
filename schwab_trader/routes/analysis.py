@@ -19,31 +19,12 @@ analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 logger = LoggingService('analysis').logger
 
 def get_services():
-    """Get initialized services within application context."""
+    """Get services from the current application context."""
     services = {
-        'volume_analysis': None,
-        'strategy_tester': None,
-        'schwab_market': None
+        'volume_analysis': current_app.volume_analysis,
+        'strategy_tester': current_app.strategy_tester,
+        'schwab_market': current_app.schwab_market
     }
-    
-    try:
-        services['volume_analysis'] = VolumeAnalysisService()
-        logger.info("Volume Analysis Service initialized")
-    except Exception as e:
-        logger.error(f"Error initializing Volume Analysis Service: {str(e)}")
-        
-    try:
-        services['strategy_tester'] = StrategyTester()
-        logger.info("Strategy Tester Service initialized")
-    except Exception as e:
-        logger.error(f"Error initializing Strategy Tester: {str(e)}")
-        
-    try:
-        services['schwab_market'] = SchwabMarketAPI()
-        logger.info("Schwab Market API initialized")
-    except Exception as e:
-        logger.error(f"Error initializing Schwab Market API: {str(e)}")
-    
     return services
 
 def get_demo_data():
@@ -74,31 +55,16 @@ def dashboard():
         # Only try to get real data if user is authenticated
         if current_user.is_authenticated:
             try:
-                # Initialize services within application context
-                services = {
-                    'volume_analysis': None,
-                    'strategy_tester': None,
-                    'schwab_market': None
-                }
+                # Get services from application context
+                services = get_services()
                 
-                # Try to initialize each service
-                try:
-                    services['volume_analysis'] = VolumeAnalysisService()
+                # Check which services are available
+                if services['volume_analysis']:
                     available_services.append('volume_analysis')
-                except Exception as e:
-                    logger.error(f"Error initializing Volume Analysis Service: {str(e)}")
-                
-                try:
-                    services['strategy_tester'] = StrategyTester()
+                if services['strategy_tester']:
                     available_services.append('strategy_tester')
-                except Exception as e:
-                    logger.error(f"Error initializing Strategy Tester: {str(e)}")
-                
-                try:
-                    services['schwab_market'] = SchwabMarketAPI()
+                if services['schwab_market']:
                     available_services.append('schwab_market')
-                except Exception as e:
-                    logger.error(f"Error initializing Schwab Market API: {str(e)}")
                 
                 if available_services:
                     demo_mode = False
@@ -106,7 +72,7 @@ def dashboard():
                     stock_data = {}
                     
                     # Try to get market status if service is available
-                    if 'schwab_market' in available_services:
+                    if services['schwab_market']:
                         try:
                             market_status = services['schwab_market'].get_market_status()
                         except Exception as e:
@@ -116,7 +82,7 @@ def dashboard():
                     # Get basic stock data for default symbols
                     for symbol in default_symbols:
                         try:
-                            if 'schwab_market' in available_services:
+                            if services['schwab_market']:
                                 data = services['schwab_market'].get_latest_data(symbol)
                                 if data:
                                     stock_data[symbol] = data
@@ -125,7 +91,7 @@ def dashboard():
                             error_messages.append(f"Unable to fetch data for {symbol}")
                     
                     # Get volume analysis if service is available
-                    if 'volume_analysis' in available_services:
+                    if services['volume_analysis']:
                         try:
                             for symbol in stock_data:
                                 alerts = services['volume_analysis'].get_volume_alerts(symbol)
@@ -136,8 +102,8 @@ def dashboard():
                 else:
                     flash("Market analysis services are currently unavailable. Using demo data.", "warning")
             except Exception as e:
-                logger.error(f"Error initializing services: {str(e)}")
-                error_messages.append("Error initializing market analysis services")
+                logger.error(f"Error accessing services: {str(e)}")
+                error_messages.append("Error accessing market analysis services")
         else:
             flash("Please log in to access real-time market data. Showing demo data.", "info")
         
@@ -169,14 +135,9 @@ def dashboard():
 def get_market_status():
     """Get current market status from Schwab API."""
     try:
-        services = {
-            'schwab_market': None
-        }
+        services = get_services()
         
-        try:
-            services['schwab_market'] = SchwabMarketAPI()
-        except Exception as e:
-            logger.error(f"Error initializing Schwab Market API: {str(e)}")
+        if not services['schwab_market']:
             return jsonify({
                 'status': 'error',
                 'message': 'Market data service unavailable'
