@@ -9,6 +9,7 @@ from schwab_trader.utils.logging_utils import get_logger
 from schwab_trader.services.auth_service import AuthService
 from schwab_trader.models.user import User
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
+from schwab_trader.services.market_data_service import MarketDataService
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 logger = get_logger(__name__)
@@ -109,4 +110,24 @@ def check_auth():
             'email': current_user.email if current_user.is_authenticated else None,
             'name': current_user.name if current_user.is_authenticated else None
         }
-    }) 
+    })
+
+@bp.route('/bypass', methods=['POST'])
+def toggle_bypass():
+    """Toggle the Schwab bypass mode."""
+    try:
+        bypass = request.json.get('bypass', False)
+        market_data_service = MarketDataService()
+        market_data_service.toggle_bypass(bypass)
+        
+        return jsonify({
+            'status': 'success',
+            'message': f"Schwab bypass {'enabled' if bypass else 'disabled'}",
+            'bypassed': bypass
+        })
+    except Exception as e:
+        logger.error(f"Error toggling bypass: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500 

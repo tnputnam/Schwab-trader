@@ -19,6 +19,16 @@
                         </ol>
                     </div>
                     
+                    <div class="alert alert-warning">
+                        <h4 class="alert-heading">Temporary Bypass:</h4>
+                        <p>If you're having issues with Schwab authentication, you can temporarily bypass it to use Alpha Vantage and yfinance data instead.</p>
+                        <div class="text-center mt-2">
+                            <button id="bypassToggle" class="btn btn-warning">
+                                <span id="bypassStatus">Schwab Bypass: Off</span>
+                            </button>
+                        </div>
+                    </div>
+                    
                     <div class="text-center mt-4">
                         <div class="mb-3">
                             <button id="authButton" class="btn btn-primary btn-lg">
@@ -27,7 +37,7 @@
                         </div>
                         <div>
                             <button id="directLoginButton" class="btn btn-secondary btn-lg">
-                                Open Schwab Login (Firefox)
+                                Open Schwab Login (Chrome)
                             </button>
                         </div>
                     </div>
@@ -58,6 +68,54 @@ document.getElementById('authButton').addEventListener('click', async function()
 document.getElementById('directLoginButton').addEventListener('click', function() {
     // Open Schwab login page directly in a new tab
     window.open('https://sws-gateway.schwab.com/ui/host/#/login-one-step', '_blank');
+});
+
+// Add bypass toggle functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Check initial bypass status
+    fetch('/auth/bypass')
+        .then(response => response.json())
+        .then(data => {
+            updateBypassStatus(data.bypassed);
+        });
+
+    // Add click handler for bypass toggle
+    document.getElementById('bypassToggle').addEventListener('click', function() {
+        const currentStatus = this.querySelector('#bypassStatus').textContent.includes('On');
+        fetch('/auth/bypass', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bypass: !currentStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                updateBypassStatus(data.bypassed);
+                if (data.bypassed) {
+                    window.location.href = "{{ url_for('analysis.index') }}";
+                }
+            } else {
+                alert('Error toggling bypass: ' + data.message);
+            }
+        });
+    });
+
+    function updateBypassStatus(isBypassed) {
+        const statusElement = document.getElementById('bypassStatus');
+        const button = document.getElementById('bypassToggle');
+        
+        if (isBypassed) {
+            statusElement.textContent = 'Schwab Bypass: On';
+            button.classList.remove('btn-warning');
+            button.classList.add('btn-success');
+        } else {
+            statusElement.textContent = 'Schwab Bypass: Off';
+            button.classList.remove('btn-success');
+            button.classList.add('btn-warning');
+        }
+    }
 });
 </script>
 {% endblock %} 
