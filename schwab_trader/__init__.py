@@ -15,7 +15,10 @@ logger = setup_logger('schwab_trader')
 
 def create_app(test_config=None):
     """Create and configure the Flask application."""
-    app = Flask(__name__)
+    app = Flask(__name__,
+                static_folder='static',
+                static_url_path='/static',
+                template_folder='templates')
     
     # Load configuration
     if test_config is None:
