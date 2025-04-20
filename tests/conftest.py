@@ -7,6 +7,9 @@ from flask_login import LoginManager
 from schwab_trader import create_app, db
 from schwab_trader.models import User
 from unittest.mock import MagicMock
+import os
+import tempfile
+from schwab_trader.services.market_data_service import MarketDataService
 
 class TestConfig:
     TESTING = True
@@ -20,37 +23,50 @@ class TestConfig:
 @pytest.fixture(scope='session')
 def app():
     """Create and configure a new app instance for each test session."""
-    test_config = {
+    # Create a temporary database
+    db_fd, db_path = tempfile.mkstemp()
+    
+    app = create_app({
         'TESTING': True,
+        'SQLALCHEMY_DATABASE_URI': f'sqlite:///{db_path}',
         'WTF_CSRF_ENABLED': False,
-        'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
-        'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'SECRET_KEY': 'test-secret-key',
-        'ALPHA_VANTAGE_API_KEY': 'test_key'
-    }
+        'SCHWAB_CLIENT_ID': 'test_client_id',
+        'SCHWAB_CLIENT_SECRET': 'test_client_secret',
+        'SCHWAB_REDIRECT_URI': 'http://localhost:5000/auth/callback',
+        'SCHWAB_AUTH_URL': 'https://api.schwabapi.com/v1/oauth/authorize',
+        'SCHWAB_TOKEN_URL': 'https://api.schwabapi.com/v1/oauth/token',
+        'SCHWAB_SCOPES': 'read_accounts trade read_positions',
+        'SCHWAB_API_BASE_URL': 'https://api.schwabapi.com/v1',
+        'ALPHA_VANTAGE_API_KEY': 'test_api_key',
+        'SECRET_KEY': 'test-secret-key'
+    })
     
-    app = create_app(test_config)
-    
-    # Initialize login manager
-    login_manager = LoginManager()
-    login_manager.init_app(app)
-    
-    @login_manager.user_loader
-    def load_user(user_id):
-        return User.query.get(int(user_id))
-    
-    # Create all tables
+    # Create the database and load test data
     with app.app_context():
         db.create_all()
-        yield app
-        db.session.remove()
-        db.drop_all()
+    
+    yield app
+    
+    # Clean up
+    os.close(db_fd)
+    os.unlink(db_path)
 
 @pytest.fixture(scope='function')
 def session(app):
     """Create a new database session for a test."""
     with app.app_context():
+        # Clear all tables before each test
+        for table in reversed(db.metadata.sorted_tables):
+            db.session.execute(table.delete())
+        db.session.commit()
+        
         yield db.session
+        
+        # Clean up after test
+        db.session.rollback()
+        for table in reversed(db.metadata.sorted_tables):
+            db.session.execute(table.delete())
+        db.session.commit()
 
 @pytest.fixture
 def client(app):
@@ -59,6 +75,7 @@ def client(app):
 
 @pytest.fixture
 def runner(app):
+    """A test runner for the app's Click commands."""
     return app.test_cli_runner()
 
 @pytest.fixture
@@ -73,6 +90,7 @@ def test_user(session):
         email='test@example.com',
         name='Test User'
     )
+    user.set_password('password')  # Set a password for the test user
     session.add(user)
     session.commit()
     return user
@@ -101,3 +119,16 @@ def mock_analysis_service(app):
             'volume_trend': 'increasing'
         }
         return service
+
+@pytest.fixture
+def market_data_service(app):
+    """A test market data service."""
+    with app.app_context():
+        service = MarketDataService()
+        yield service
+
+@pytest.fixture
+def live_server(app, request):
+    """Create a live server for Selenium tests."""
+    server = request.getfixturevalue('live_server')
+    return server

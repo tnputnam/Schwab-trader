@@ -98,13 +98,27 @@ def check_auth():
         }
     })
 
-@auth_bp.route('/bypass', methods=['POST'])
+@auth_bp.route('/bypass', methods=['GET', 'POST'])
 def toggle_bypass():
     """Toggle the Schwab bypass mode."""
     try:
+        if request.method == 'GET':
+            # Check current bypass status
+            bypassed = session.get('schwab_bypassed', False)
+            return jsonify({
+                'status': 'success',
+                'bypassed': bypassed
+            })
+        
+        # Handle POST request
         bypass = request.json.get('bypass', False)
         market_data_service = MarketDataService()
         market_data_service.toggle_bypass(bypass)
+        session['schwab_bypassed'] = bypass
+        
+        if bypass:
+            # If enabling bypass, redirect to Schwab OAuth
+            return redirect(url_for('auth.schwab_auth'))
         
         return jsonify({
             'status': 'success',

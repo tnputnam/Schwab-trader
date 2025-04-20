@@ -151,13 +151,45 @@
                     },
                     body: JSON.stringify({ bypass: !currentStatus })
                 })
+                .then(response => {
+                    if (response.redirected) {
+                        window.location.href = response.url;
+                    } else {
+                        return response.json();
+                    }
+                })
+                .then(data => {
+                    if (data && data.status === 'success') {
+                        updateBypassStatus(data.bypassed);
+                    } else if (data) {
+                        alert('Error toggling bypass: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error toggling bypass. Please try again.');
+                });
+            });
+
+            // Add click handler for force bypass off
+            document.getElementById('forceBypassOff').addEventListener('click', function() {
+                fetch('/auth/force_bypass_off', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        updateBypassStatus(data.bypassed);
+                        updateBypassStatus(false);
                     } else {
-                        alert('Error toggling bypass: ' + data.message);
+                        alert('Error forcing bypass off: ' + data.message);
                     }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('Error forcing bypass off. Please try again.');
                 });
             });
 
