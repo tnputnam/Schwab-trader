@@ -1,6 +1,6 @@
 """Flask application factory for Schwab Trader."""
 import os
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_caching import Cache
 from schwab_trader.database import init_db, db
 from schwab_trader.utils.logging_utils import setup_logger
@@ -22,9 +22,23 @@ def create_app(test_config=None):
     
     # Load configuration
     if test_config is None:
-        app.config.from_object('schwab_trader.config.Config')
+        # Use development config by default
+        app.config.from_object('schwab_trader.config.DevelopmentConfig')
     else:
         app.config.update(test_config)
+    
+    # Enable debug mode
+    app.debug = True
+    
+    # Debug route for static files
+    @app.route('/static/<path:filename>')
+    def serve_static(filename):
+        logger.debug(f"Serving static file: {filename}")
+        try:
+            return send_from_directory(app.static_folder, filename)
+        except Exception as e:
+            logger.error(f"Error serving static file {filename}: {str(e)}")
+            return str(e), 404
     
     # Ensure instance folder exists
     try:

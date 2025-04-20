@@ -37,9 +37,14 @@ class LoggingService:
         """Log an info message."""
         self.logger.info(message)
 
-    def error(self, message):
-        """Log an error message."""
-        self.logger.error(message)
+    def error(self, message, exc_info=None):
+        """Log an error message.
+        
+        Args:
+            message (str): The error message to log
+            exc_info (bool, optional): Whether to include exception info. Defaults to None.
+        """
+        self.logger.error(message, exc_info=exc_info)
 
     def warning(self, message):
         """Log a warning message."""
