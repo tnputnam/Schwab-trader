@@ -1,4 +1,5 @@
 from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, Response
+from flask_login import login_required
 import logging
 from datetime import datetime, timedelta
 from schwab_trader.services.schwab_api import SchwabAPI
@@ -16,21 +17,52 @@ analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 
 # Configure logging
 logger = LoggingService('analysis').logger
-volume_analysis = VolumeAnalysisService()
-strategy_tester = StrategyTester()
-schwab_market = SchwabMarketAPI()
+
+# Initialize services with error handling
+try:
+    volume_analysis = VolumeAnalysisService()
+    strategy_tester = StrategyTester()
+    schwab_market = SchwabMarketAPI()
+    services_initialized = True
+except Exception as e:
+    logger.error(f"Error initializing services: {str(e)}")
+    services_initialized = False
+    volume_analysis = None
+    strategy_tester = None
+    schwab_market = None
 
 @analysis_bp.route('/')
+@login_required
 def index():
     """Root analysis page - redirects to the analysis dashboard."""
     return redirect(url_for('analysis.dashboard'))
 
 @analysis_bp.route('/dashboard')
+@login_required
 def dashboard():
     """Render the analysis dashboard."""
-    return render_template('analysis_dashboard.html')
+    try:
+        # Initialize services with error handling
+        try:
+            market_status = schwab_market.get_market_status()
+            services_available = True
+        except Exception as e:
+            logger.error(f"Error initializing market service: {str(e)}")
+            market_status = None
+            services_available = False
+
+        return render_template('analysis_dashboard.html', 
+                             market_status=market_status,
+                             services_available=services_available)
+    except Exception as e:
+        logger.error(f"Error in dashboard route: {str(e)}")
+        flash(f"Error loading dashboard: {str(e)}", "error")
+        return render_template('analysis_dashboard.html', 
+                             market_status=None,
+                             services_available=False)
 
 @analysis_bp.route('/dashboard/api/market-status')
+@login_required
 def get_market_status():
     """Get current market status from Schwab API."""
     try:
@@ -47,6 +79,7 @@ def get_market_status():
         }), 500
 
 @analysis_bp.route('/dashboard/api/market-data')
+@login_required
 def get_market_data():
     """Get market data for analysis."""
     try:
@@ -70,6 +103,7 @@ def get_market_data():
             start_date = end_date - timedelta(days=30)  # Default to 1 month
 
         # Get data using DataManager
+        from schwab_trader.services.data_manager import DataManager
         data_manager = DataManager()
         data = data_manager.get_historical_data(
             symbol,
@@ -564,4 +598,12 @@ def test_strategy():
         
     except Exception as e:
         logger.error(f"Error testing strategy: {str(e)}")
-        return jsonify({'error': str(e)}), 500 
+        return jsonify({'error': str(e)}), 500
+
+def calculate_rsi(prices, period=14):
+    """Calculate Relative Strength Index."""
+    delta = prices.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs)) 

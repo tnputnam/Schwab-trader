@@ -6,6 +6,7 @@ from flask_caching import Cache
 from flask_login import LoginManager
 from schwab_trader import create_app, db
 from schwab_trader.models import User
+from unittest.mock import MagicMock
 
 class TestConfig:
     TESTING = True
@@ -75,3 +76,28 @@ def test_user(session):
     session.add(user)
     session.commit()
     return user
+
+@pytest.fixture
+def mock_market_data():
+    """Fixture to provide mock market data for tests."""
+    return {
+        'symbol': 'AAPL',
+        'price': 150.00,
+        'volume': 1000000,
+        'change': 2.5,
+        'market_cap': 2500000000000,
+        'pe_ratio': 25.5,
+        'dividend_yield': 0.65
+    }
+
+@pytest.fixture
+def mock_analysis_service(app):
+    """Fixture to provide a mock analysis service."""
+    with app.app_context():
+        service = MagicMock()
+        service.get_market_status.return_value = True
+        service.get_volume_analysis.return_value = {
+            'average_volume': 1000000,
+            'volume_trend': 'increasing'
+        }
+        return service

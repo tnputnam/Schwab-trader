@@ -248,11 +248,37 @@
         font-size: 0.8rem;
         color: #6c757d;
     }
+
+    .service-status {
+        padding: 10px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        background-color: #f8f9fa;
+        border-left: 4px solid #6c757d;
+    }
+
+    .service-status.warning {
+        background-color: #fff3cd;
+        border-left-color: #ffc107;
+    }
+
+    .service-status.error {
+        background-color: #f8d7da;
+        border-left-color: #dc3545;
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
+    {% if not services_available %}
+    <div class="service-status warning">
+        <h4><i class="bi bi-exclamation-triangle"></i> Service Status</h4>
+        <p>Some market analysis services are currently unavailable. Basic functionality may be limited.</p>
+        <p>Please check the logs for more information or try refreshing the page.</p>
+    </div>
+    {% endif %}
+
     <div class="control-panel">
         <h2>Market Analysis Dashboard</h2>
         <div class="control-grid">
@@ -282,6 +308,7 @@
     </div>
 
     <div class="stock-grid">
+        {% if services_available %}
         <div class="stock-card">
             <div class="stock-header">
                 <h3 class="stock-title">Market Status</h3>
@@ -318,6 +345,12 @@
                 </div>
             </div>
         </div>
+        {% else %}
+        <div class="stock-card">
+            <h3>Service Unavailable</h3>
+            <p>Stock analysis features are currently unavailable. Please try again later.</p>
+        </div>
+        {% endif %}
     </div>
 
     <div class="chart-container">

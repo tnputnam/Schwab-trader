@@ -10,6 +10,8 @@ from flask_socketio import SocketIO
 from flask_caching import Cache
 import os
 
+from schwab_trader.utils.filters import register_filters
+
 # Initialize extensions
 db = SQLAlchemy()
 migrate = Migrate()
@@ -32,7 +34,16 @@ def create_app(test_config=None):
         app.config.from_object('schwab_trader.config')
     else:
         # Load the test config if passed in
-        app.config.update(test_config)
+        if test_config == 'testing':
+            app.config.update({
+                'TESTING': True,
+                'WTF_CSRF_ENABLED': False,
+                'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
+                'SQLALCHEMY_TRACK_MODIFICATIONS': False,
+                'SECRET_KEY': 'test-secret-key'
+            })
+        else:
+            app.config.update(test_config)
     
     # Ensure the instance folder exists
     try:
@@ -46,6 +57,13 @@ def create_app(test_config=None):
     socketio.init_app(app)
     cache.init_app(app)
     login_manager.init_app(app)
+    
+    # Configure login
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message_category = 'info'
+    
+    # Register custom filters
+    register_filters(app)
     
     # Import and register blueprints
     from schwab_trader.routes.api import api_bp
@@ -61,11 +79,11 @@ def create_app(test_config=None):
     from schwab_trader.routes.compare import bp as compare_bp
     
     app.register_blueprint(api_bp)
-    app.register_blueprint(auth_bp)
+    app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(root_bp)
-    app.register_blueprint(portfolio_bp)
-    app.register_blueprint(trading_bp)
-    app.register_blueprint(analysis_bp)
+    app.register_blueprint(portfolio_bp, url_prefix='/portfolio')
+    app.register_blueprint(trading_bp, url_prefix='/trading')
+    app.register_blueprint(analysis_bp, url_prefix='/analysis')
     app.register_blueprint(news_bp)
     app.register_blueprint(strategies_bp)
     app.register_blueprint(watchlist_bp)

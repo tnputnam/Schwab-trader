@@ -12,10 +12,10 @@ def index():
         # Check if user is authenticated
         if 'schwab_token' in session:
             logger.info("User is authenticated, redirecting to analysis dashboard")
-            return redirect('/analysis/dashboard')
+            return redirect(url_for('analysis.dashboard'))
         
         logger.info("Rendering index page for unauthenticated user")
-        return render_template('index.html')
+        return render_template('index.html', page_title="Welcome to Schwab Trader")
     except Exception as e:
         logger.error(f"Error in index route: {str(e)}", exc_info=True)
         current_app.logger.error(f"Template error: {str(e)}", exc_info=True)

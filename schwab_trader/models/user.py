@@ -4,6 +4,7 @@ from flask_login import UserMixin
 from flask_sqlalchemy import SQLAlchemy
 from schwab_trader.utils.error_utils import DatabaseError
 from schwab_trader.utils.logging_utils import get_logger
+from werkzeug.security import generate_password_hash, check_password_hash
 
 logger = get_logger(__name__)
 db = SQLAlchemy()
@@ -64,4 +65,15 @@ class User(UserMixin, db.Model):
             'name': self.name,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        } 
+        }
+    
+    def set_password(self, password):
+        """Set password."""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """Check password."""
+        return check_password_hash(self.password_hash, password)
+    
+    def __repr__(self):
+        return f'<User {self.username}>' 

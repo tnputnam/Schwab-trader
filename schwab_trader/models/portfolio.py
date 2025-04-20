@@ -1,14 +1,14 @@
 """Portfolio model for Schwab Trader."""
 from datetime import datetime
-from schwab_trader.models.user import db
+from schwab_trader.models import db
 
 class Portfolio(db.Model):
     """Portfolio model."""
     __tablename__ = 'portfolios'
     
     id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    name = db.Column(db.String(80), nullable=False)
     description = db.Column(db.String(200))
     total_value = db.Column(db.Float, nullable=False, default=0.0)
     cash_value = db.Column(db.Float, nullable=False, default=0.0)
@@ -20,9 +20,16 @@ class Portfolio(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
+    user = db.relationship('User', backref=db.backref('portfolios', lazy=True))
     positions = db.relationship('Position', backref='portfolio', lazy=True)
     
+    def __init__(self, name, user):
+        """Initialize portfolio."""
+        self.name = name
+        self.user = user
+    
     def __repr__(self):
+        """Represent portfolio as string."""
         return f'<Portfolio {self.name}>'
     
     def to_dict(self):
