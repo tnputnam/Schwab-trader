@@ -1,6 +1,6 @@
 import os
 from schwab_trader import create_app, db
-from schwab_trader.utils.alpha_vantage_api import AlphaVantageAPI
+from schwab_trader.utils.alpha_vantage import AlphaVantageAPI
 from schwab_trader.utils.schwab_api import SchwabAPI
 from schwab_trader.utils.logger import setup_logger
 

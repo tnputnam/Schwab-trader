@@ -2,6 +2,8 @@ import unittest
 from datetime import datetime, timedelta
 from schwab_trader.services.yfinance import YFinanceAPI
 import time
+from unittest.mock import patch, MagicMock
+import pandas as pd
 
 class TestYFinanceAPI(unittest.TestCase):
     def setUp(self):
@@ -15,6 +17,15 @@ class TestYFinanceAPI(unittest.TestCase):
         # Test date range
         self.end_date = datetime.now()
         self.start_date = self.end_date - timedelta(days=30)
+        
+        # Create mock data
+        self.mock_data = pd.DataFrame({
+            'Open': [150.0, 151.0],
+            'High': [155.0, 156.0],
+            'Low': [149.0, 150.0],
+            'Close': [153.0, 154.0],
+            'Volume': [1000000, 1100000]
+        }, index=pd.date_range(start=self.start_date, periods=2))
 
     def validate_price_data(self, data):
         """Validate that price data meets our requirements"""
@@ -42,8 +53,14 @@ class TestYFinanceAPI(unittest.TestCase):
                 
         return True
 
-    def test_get_historical_data(self):
+    @patch('yfinance.Ticker')
+    def test_get_historical_data(self, mock_ticker):
         """Test getting historical data"""
+        # Configure mock
+        mock_instance = MagicMock()
+        mock_instance.history.return_value = self.mock_data
+        mock_ticker.return_value = mock_instance
+        
         for symbol in self.valid_symbols:
             data = self.api.get_historical_data(
                 symbol=symbol,
@@ -54,6 +71,7 @@ class TestYFinanceAPI(unittest.TestCase):
             self.assertGreater(len(data), 0)
             
         # Test invalid symbol
+        mock_instance.history.return_value = pd.DataFrame()  # Empty DataFrame for invalid symbol
         data = self.api.get_historical_data(
             symbol=self.invalid_symbol,
             start_date=self.start_date,
@@ -76,8 +94,14 @@ class TestYFinanceAPI(unittest.TestCase):
         # Should take at least 60 seconds (30 calls per minute)
         self.assertGreater(end_time - start_time, 60)
 
-    def test_caching(self):
+    @patch('yfinance.Ticker')
+    def test_caching(self, mock_ticker):
         """Test caching functionality"""
+        # Configure mock
+        mock_instance = MagicMock()
+        mock_instance.history.return_value = self.mock_data
+        mock_ticker.return_value = mock_instance
+        
         # First request (should hit API)
         start_time = time.time()
         data1 = self.api.get_historical_data(
@@ -100,8 +124,14 @@ class TestYFinanceAPI(unittest.TestCase):
         self.assertLess(cache_time, api_time)
         self.assertEqual(data1, data2)
 
-    def test_retry_logic(self):
+    @patch('yfinance.Ticker')
+    def test_retry_logic(self, mock_ticker):
         """Test retry logic with invalid symbol"""
+        # Configure mock to raise an exception
+        mock_instance = MagicMock()
+        mock_instance.history.side_effect = Exception("API Error")
+        mock_ticker.return_value = mock_instance
+        
         start_time = time.time()
         data = self.api.get_historical_data(
             symbol=self.invalid_symbol,

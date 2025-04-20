@@ -14,6 +14,7 @@ class TestConfig:
     SECRET_KEY = 'test-secret-key'
     CACHE_TYPE = 'simple'
     CACHE_DEFAULT_TIMEOUT = 300
+    ALPHA_VANTAGE_API_KEY = 'test_key'
 
 @pytest.fixture(scope='session')
 def app():
@@ -23,7 +24,8 @@ def app():
         'WTF_CSRF_ENABLED': False,
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'SECRET_KEY': 'test-secret-key'
+        'SECRET_KEY': 'test-secret-key',
+        'ALPHA_VANTAGE_API_KEY': 'test_key'
     }
     
     app = create_app(test_config)
@@ -67,7 +69,8 @@ def test_user(session):
     """Create a test user."""
     user = User(
         username='testuser',
-        password='testpass'
+        email='test@example.com',
+        name='Test User'
     )
     session.add(user)
     session.commit()
