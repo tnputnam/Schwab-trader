@@ -12,7 +12,7 @@ def index():
         # Check if user is authenticated
         if 'schwab_token' in session:
             logger.info("User is authenticated, redirecting to analysis dashboard")
-            return redirect(url_for('analysis.dashboard'))
+            return redirect('/analysis/dashboard')
         
         logger.info("Rendering index page for unauthenticated user")
         return render_template('index.html')
