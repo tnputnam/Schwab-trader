@@ -37,6 +37,7 @@ class NewsError(Exception):
 
 def handle_errors(f):
     """Decorator to handle different types of errors."""
+    @wraps(f)
     def wrapper(*args, **kwargs):
         try:
             return f(*args, **kwargs)
