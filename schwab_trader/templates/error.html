@@ -1,17 +1,21 @@
 {% extends "base.html" %}
 
-{% block title %}Error - {{ error.code }}{% endblock %}
+{% block title %}Error{% endblock %}
 
 {% block content %}
 <div class="error-container">
     <div class="error-card">
-        <h1 class="error-title">{{ error.code }}</h1>
-        <p class="error-message">{{ error.message }}</p>
-        {% if error.details %}
-        <div class="error-details">
-            <h2>Details</h2>
-            <pre>{{ error.details }}</pre>
-        </div>
+        <h1 class="error-title">Error</h1>
+        {% if error %}
+            <p class="error-message">{{ error.message }}</p>
+            {% if error.details %}
+            <div class="error-details">
+                <h2>Details</h2>
+                <pre>{{ error.details }}</pre>
+            </div>
+            {% endif %}
+        {% else %}
+            <p class="error-message">{{ error_message }}</p>
         {% endif %}
         <div class="error-actions">
             <a href="{{ url_for('root.index') }}" class="btn btn-primary">Return Home</a>
