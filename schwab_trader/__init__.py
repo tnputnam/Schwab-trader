@@ -82,8 +82,21 @@ def create_app(test_config=None):
     def load_user(user_id):
         return User.query.get(int(user_id))
     
-    # Create database tables
+    # Initialize services within application context
     with app.app_context():
+        # Create database tables
         db.create_all()
+        
+        # Initialize services
+        from schwab_trader.services.volume_analysis import VolumeAnalysisService
+        from schwab_trader.services.strategy_tester import StrategyTester
+        from schwab_trader.services.schwab_market import SchwabMarketAPI
+        
+        try:
+            app.volume_analysis = VolumeAnalysisService()
+            app.strategy_tester = StrategyTester()
+            app.schwab_market = SchwabMarketAPI()
+        except Exception as e:
+            app.logger.warning(f"Could not initialize some services: {str(e)}")
     
     return app
