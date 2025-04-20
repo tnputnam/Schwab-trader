@@ -11,14 +11,14 @@ logger.addHandler(handler)
 logger.setLevel(logging.INFO)
 
 # Import blueprints
-from . import root, news, strategies, compare, portfolio, analysis, alerts, watchlist
+from . import root, news, strategies, compare, portfolio, analysis, alerts, watchlist, analysis_dashboard
 from .auth import bp as auth_bp
 from .root import root_bp
 from .analysis import analysis_bp
 from .trading import trading_bp
 from .portfolio import portfolio_bp
 
-__all__ = ['root', 'news', 'strategies', 'compare', 'portfolio', 'analysis', 'alerts', 'watchlist', 'auth_bp']
+__all__ = ['root', 'news', 'strategies', 'compare', 'portfolio', 'analysis', 'alerts', 'watchlist', 'auth_bp', 'analysis_dashboard']
 
 def init_app(app):
     """Initialize routes for the application."""
@@ -26,4 +26,5 @@ def init_app(app):
     app.register_blueprint(analysis_bp)
     app.register_blueprint(trading_bp)
     app.register_blueprint(portfolio_bp)
-    app.register_blueprint(auth_bp) 
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(analysis_dashboard.analysis_dashboard_bp, url_prefix='/analysis/dashboard') 
