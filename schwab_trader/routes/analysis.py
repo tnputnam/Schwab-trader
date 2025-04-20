@@ -16,6 +16,11 @@ logger = LoggingService('analysis').logger
 volume_analysis = VolumeAnalysisService()
 strategy_tester = StrategyTester()
 
+@analysis_bp.route('/')
+def index():
+    """Root analysis page - redirects to the analysis dashboard."""
+    return redirect(url_for('analysis_dashboard.index'))
+
 def get_alpha_vantage():
     """Get Alpha Vantage API instance or None if not configured."""
     try:

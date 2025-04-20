@@ -27,6 +27,7 @@ import asyncio
 from typing import List
 from types import SimpleNamespace
 from dotenv import load_dotenv
+from schwab_trader.routes.root import root_bp
 
 # Load environment variables
 load_dotenv()
@@ -218,6 +219,9 @@ async def monitor_symbols(symbols: List[str]):
         except Exception as e:
             logger.error(f"Error monitoring symbols: {str(e)}")
             await asyncio.sleep(60)  # Wait before retrying
+
+# Register blueprints
+app.register_blueprint(root_bp)
 
 @app.route('/')
 def index():
