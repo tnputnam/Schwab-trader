@@ -14,9 +14,14 @@ class YFinanceAPI:
         self.retry_delay = retry_delay
         self.last_request_time = 0
         self.min_request_interval = 0.5  # Minimum time between requests in seconds
+        self._cache = {}  # Initialize cache dictionary
         
         # Configure yfinance to use a proxy if needed
         yf.set_tz_cache_location("yfinance_cache")
+
+    def _get_cache_key(self, symbol: str, start_date: datetime, end_date: datetime) -> str:
+        """Generate a unique cache key for the given parameters"""
+        return f"{symbol}_{start_date.strftime('%Y-%m-%d')}_{end_date.strftime('%Y-%m-%d')}"
 
     def _wait_for_rate_limit(self):
         """Ensure we don't exceed rate limits by waiting between requests"""
@@ -28,7 +33,7 @@ class YFinanceAPI:
 
     def get_historical_data(self, symbol: str, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """
-        Get historical price data for a symbol from Yahoo Finance with retries
+        Get historical price data for a symbol from Yahoo Finance with retries and caching
         
         Args:
             symbol: Stock symbol
@@ -38,6 +43,12 @@ class YFinanceAPI:
         Returns:
             List of dictionaries containing historical price data
         """
+        # Check cache first
+        cache_key = self._get_cache_key(symbol, start_date, end_date)
+        if cache_key in self._cache:
+            self.logger.info(f"Retrieved cached data for {symbol}")
+            return self._cache[cache_key]
+            
         retries = 0
         while retries < self.max_retries:
             try:
@@ -90,6 +101,8 @@ class YFinanceAPI:
                 
                 if data:
                     self.logger.info(f"Retrieved {len(data)} valid data points from Yahoo Finance for {symbol}")
+                    # Cache the results
+                    self._cache[cache_key] = data
                     return data
                 else:
                     self.logger.warning(f"No valid data points found for {symbol}, attempt {retries + 1}/{self.max_retries}")
