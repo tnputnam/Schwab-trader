@@ -30,6 +30,7 @@ class SchwabAPI:
             # This is where you would typically set up OAuth2 client
             # and other necessary components
             self._initialized = True
+            app.schwab = self
             logger.info("SchwabAPI initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing SchwabAPI: {str(e)}")

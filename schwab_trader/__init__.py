@@ -33,6 +33,6 @@ def create_app(config=None):
     from .routes.analysis_dashboard import analysis_dashboard_bp
     
     app.register_blueprint(root_bp)
-    app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis-dashboard')
+    app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis/dashboard')
     
     return app

@@ -29,6 +29,7 @@ class AlphaVantageAPI:
         try:
             self.ts = TimeSeries(key=self.api_key, output_format='pandas')
             self.ti = TechIndicators(key=self.api_key, output_format='pandas')
+            app.alpha_vantage = self
             logger.info("AlphaVantageAPI initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing AlphaVantageAPI: {str(e)}")

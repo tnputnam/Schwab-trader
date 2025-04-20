@@ -54,6 +54,10 @@ def init_app(app):
             return redirect(url_for('manual_auth'))
         return redirect(url_for('analysis_dashboard.index'))
 
+    # Register blueprints
+    app.register_blueprint(root_bp)
+    app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis/dashboard')
+
 if __name__ == '__main__':
     # Print all registered routes
     print("\nRegistered Routes:")
