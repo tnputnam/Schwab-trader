@@ -117,13 +117,17 @@ def toggle_bypass():
         session['schwab_bypassed'] = bypass
         
         if bypass:
-            # If enabling bypass, redirect to Schwab OAuth
-            return redirect(url_for('auth.schwab_auth'))
+            # If enabling bypass, return success without redirect
+            return jsonify({
+                'status': 'success',
+                'message': 'Schwab bypass enabled',
+                'bypassed': True
+            })
         
         return jsonify({
             'status': 'success',
-            'message': f"Schwab bypass {'enabled' if bypass else 'disabled'}",
-            'bypassed': bypass
+            'message': 'Schwab bypass disabled',
+            'bypassed': False
         })
     except Exception as e:
         logger.error(f"Error toggling bypass: {str(e)}")

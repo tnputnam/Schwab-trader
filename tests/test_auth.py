@@ -7,17 +7,17 @@ def test_login_success(client, test_user):
     """Test successful login."""
     response = client.post(url_for('auth.login'), data={
         'username': 'testuser',
-        'password': 'testpass',
+        'password': 'password',
         'remember_me': False
     })
-    assert response.status_code == 200
-    assert b'Login successful' in response.data
+    assert response.status_code == 302
+    assert response.headers['Location'] == url_for('root.index')
 
 def test_login_invalid_username(client, test_user):
     """Test login with invalid username."""
     response = client.post(url_for('auth.login'), data={
         'username': 'wronguser',
-        'password': 'testpass',
+        'password': 'password',
         'remember_me': False
     })
     assert response.status_code == 401
@@ -42,6 +42,9 @@ def test_login_form_validation(client):
 
 def test_bypass_status_get(client):
     """Test getting the bypass status."""
+    with client.session_transaction() as sess:
+        sess['schwab_bypassed'] = False
+    
     response = client.get('/auth/bypass')
     assert response.status_code == 200
     data = response.get_json()
@@ -52,15 +55,22 @@ def test_bypass_status_get(client):
 
 def test_bypass_toggle_on(client):
     """Test enabling the bypass."""
+    with client.session_transaction() as sess:
+        sess['_fresh'] = True
+    
     response = client.post('/auth/bypass', json={'bypass': True})
-    assert response.status_code == 302  # Should redirect to Schwab auth
-    assert 'schwab_bypassed' in session
-    assert session['schwab_bypassed'] is True
+    assert response.status_code == 302
+    
+    with client.session_transaction() as sess:
+        assert 'schwab_bypassed' in sess
+        assert sess['schwab_bypassed'] is True
 
 def test_bypass_toggle_off(client):
     """Test disabling the bypass."""
     # First enable bypass
-    client.post('/auth/bypass', json={'bypass': True})
+    with client.session_transaction() as sess:
+        sess['_fresh'] = True
+        sess['schwab_bypassed'] = True
     
     # Then disable it
     response = client.post('/auth/bypass', json={'bypass': False})
@@ -68,13 +78,17 @@ def test_bypass_toggle_off(client):
     data = response.get_json()
     assert data['status'] == 'success'
     assert data['bypassed'] is False
-    assert 'schwab_bypassed' in session
-    assert session['schwab_bypassed'] is False
+    
+    with client.session_transaction() as sess:
+        assert 'schwab_bypassed' in sess
+        assert sess['schwab_bypassed'] is False
 
 def test_force_bypass_off(client):
     """Test forcing bypass off."""
     # First enable bypass
-    client.post('/auth/bypass', json={'bypass': True})
+    with client.session_transaction() as sess:
+        sess['_fresh'] = True
+        sess['schwab_bypassed'] = True
     
     # Then force it off
     response = client.post('/auth/force_bypass_off')
@@ -82,11 +96,16 @@ def test_force_bypass_off(client):
     data = response.get_json()
     assert data['status'] == 'success'
     assert data['bypassed'] is False
-    assert 'schwab_bypassed' in session
-    assert session['schwab_bypassed'] is False
+    
+    with client.session_transaction() as sess:
+        assert 'schwab_bypassed' in sess
+        assert sess['schwab_bypassed'] is False
 
 def test_bypass_with_invalid_data(client):
     """Test bypass with invalid data."""
+    with client.session_transaction() as sess:
+        sess['_fresh'] = True
+    
     response = client.post('/auth/bypass', json={})
     assert response.status_code == 200
     data = response.get_json()
@@ -100,8 +119,11 @@ def test_bypass_with_market_data_service_error(client, monkeypatch):
     
     monkeypatch.setattr(MarketDataService, 'toggle_bypass', mock_toggle_bypass)
     
+    with client.session_transaction() as sess:
+        sess['_fresh'] = True
+    
     response = client.post('/auth/bypass', json={'bypass': True})
     assert response.status_code == 500
     data = response.get_json()
     assert data['status'] == 'error'
-    assert 'message' in data 
+    assert 'message' in data

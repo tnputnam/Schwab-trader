@@ -83,12 +83,7 @@
                 </ul>
                 <div class="navbar-nav">
                     <div class="nav-item">
-                        <button id="bypassToggle" class="btn btn-sm btn-warning">
-                            <span id="bypassStatus">Schwab Bypass: Off</span>
-                        </button>
-                        <button id="forceBypassOff" class="btn btn-sm btn-danger ms-2">
-                            Force Bypass Off
-                        </button>
+                        <button id="bypassToggle" class="btn btn-sm btn-secondary">Schwab Bypass: Off</button>
                     </div>
                 </div>
             </div>
@@ -123,89 +118,47 @@
     <!-- Common JavaScript -->
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
     <script>
-        // Set active nav link based on current URL
         document.addEventListener('DOMContentLoaded', function() {
-            const currentPath = window.location.pathname;
-            const navLinks = document.querySelectorAll('.nav-link');
-            
-            navLinks.forEach(link => {
-                if (link.getAttribute('href') === currentPath) {
-                    link.classList.add('active');
-                }
-            });
+            const bypassToggle = document.getElementById('bypassToggle');
+            if (!bypassToggle) return;
 
-            // Check initial bypass status
+            // Get initial bypass status
             fetch('/auth/bypass')
                 .then(response => response.json())
                 .then(data => {
-                    updateBypassStatus(data.bypassed);
-                });
+                    updateBypassButton(data.bypassed);
+                })
+                .catch(error => console.error('Error fetching bypass status:', error));
 
-            // Add click handler for bypass toggle
-            document.getElementById('bypassToggle').addEventListener('click', function() {
-                const currentStatus = this.querySelector('#bypassStatus').textContent.includes('On');
+            bypassToggle.addEventListener('click', function() {
+                const currentState = bypassToggle.textContent.includes('Off');
+                
                 fetch('/auth/bypass', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ bypass: !currentStatus })
-                })
-                .then(response => {
-                    if (response.redirected) {
-                        window.location.href = response.url;
-                    } else {
-                        return response.json();
-                    }
-                })
-                .then(data => {
-                    if (data && data.status === 'success') {
-                        updateBypassStatus(data.bypassed);
-                    } else if (data) {
-                        alert('Error toggling bypass: ' + data.message);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error toggling bypass. Please try again.');
-                });
-            });
-
-            // Add click handler for force bypass off
-            document.getElementById('forceBypassOff').addEventListener('click', function() {
-                fetch('/auth/force_bypass_off', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+                    body: JSON.stringify({ bypass: currentState })
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.status === 'success') {
-                        updateBypassStatus(false);
+                        updateBypassButton(data.bypassed);
+                        if (data.bypassed) {
+                            // Redirect to Schwab auth if bypass is enabled
+                            window.location.href = '/auth/schwab';
+                        }
                     } else {
-                        alert('Error forcing bypass off: ' + data.message);
+                        console.error('Error:', data.message);
                     }
                 })
-                .catch(error => {
-                    console.error('Error:', error);
-                    alert('Error forcing bypass off. Please try again.');
-                });
+                .catch(error => console.error('Error toggling bypass:', error));
             });
 
-            function updateBypassStatus(isBypassed) {
-                const statusElement = document.getElementById('bypassStatus');
-                const button = document.getElementById('bypassToggle');
-                
-                if (isBypassed) {
-                    statusElement.textContent = 'Schwab Bypass: On';
-                    button.classList.remove('btn-warning');
-                    button.classList.add('btn-success');
-                } else {
-                    statusElement.textContent = 'Schwab Bypass: Off';
-                    button.classList.remove('btn-success');
-                    button.classList.add('btn-warning');
-                }
+            function updateBypassButton(bypassed) {
+                bypassToggle.textContent = `Schwab Bypass: ${bypassed ? 'On' : 'Off'}`;
+                bypassToggle.classList.toggle('btn-success', bypassed);
+                bypassToggle.classList.toggle('btn-secondary', !bypassed);
             }
         });
     </script>
