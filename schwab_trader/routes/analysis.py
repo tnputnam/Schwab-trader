@@ -1,5 +1,5 @@
-from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, Response
-from flask_login import login_required
+from flask import Blueprint, render_template, session, redirect, url_for, request, jsonify, flash, Response, current_app
+from flask_login import login_required, current_user
 import logging
 from datetime import datetime, timedelta
 from schwab_trader.services.schwab_api import SchwabAPI
@@ -18,90 +18,150 @@ analysis_bp = Blueprint('analysis', __name__, url_prefix='/analysis')
 # Configure logging
 logger = LoggingService('analysis').logger
 
-# Initialize services with error handling
-try:
-    volume_analysis = VolumeAnalysisService()
-    strategy_tester = StrategyTester()
-    schwab_market = SchwabMarketAPI()
-    services_initialized = True
-except Exception as e:
-    logger.error(f"Error initializing services: {str(e)}")
-    services_initialized = False
-    volume_analysis = None
-    strategy_tester = None
-    schwab_market = None
+def get_services():
+    """Get initialized services within application context."""
+    services = {
+        'volume_analysis': None,
+        'strategy_tester': None,
+        'schwab_market': None
+    }
+    
+    try:
+        services['volume_analysis'] = VolumeAnalysisService()
+        logger.info("Volume Analysis Service initialized")
+    except Exception as e:
+        logger.error(f"Error initializing Volume Analysis Service: {str(e)}")
+        
+    try:
+        services['strategy_tester'] = StrategyTester()
+        logger.info("Strategy Tester Service initialized")
+    except Exception as e:
+        logger.error(f"Error initializing Strategy Tester: {str(e)}")
+        
+    try:
+        services['schwab_market'] = SchwabMarketAPI()
+        logger.info("Schwab Market API initialized")
+    except Exception as e:
+        logger.error(f"Error initializing Schwab Market API: {str(e)}")
+    
+    return services
+
+def get_demo_data():
+    """Get demo data for unauthenticated users or when services are unavailable."""
+    return {
+        'AAPL': {'price': 150.0, 'change': 2.5, 'volume': 1000000},
+        'MSFT': {'price': 300.0, 'change': -1.0, 'volume': 800000},
+        'GOOGL': {'price': 2800.0, 'change': 5.0, 'volume': 500000}
+    }
 
 @analysis_bp.route('/')
-@login_required
 def index():
     """Root analysis page - redirects to the analysis dashboard."""
     return redirect(url_for('analysis.dashboard'))
 
 @analysis_bp.route('/dashboard')
-@login_required
 def dashboard():
     """Render the analysis dashboard."""
     try:
-        # Initialize market status and default data
+        # Initialize basic data
         market_status = None
-        default_symbols = ['AAPL', 'MSFT', 'GOOGL']
-        stock_data = {}
-        error_messages = []
-        
-        # Check if services are initialized
-        if not services_initialized:
-            flash("Some market analysis services are unavailable. Limited functionality may be available.", "warning")
-        
-        # Try to get market status if service is available
-        if schwab_market:
-            try:
-                market_status = schwab_market.get_market_status()
-            except Exception as e:
-                logger.error(f"Error getting market status: {str(e)}")
-                error_messages.append("Unable to fetch market status")
-        
-        # Get basic stock data for default symbols
-        for symbol in default_symbols:
-            try:
-                if schwab_market:
-                    data = schwab_market.get_latest_data(symbol)
-                    if data:
-                        stock_data[symbol] = data
-            except Exception as e:
-                logger.error(f"Error fetching data for {symbol}: {str(e)}")
-                error_messages.append(f"Unable to fetch data for {symbol}")
-        
-        # Get volume analysis if service is available
+        stock_data = get_demo_data()
         volume_alerts = []
-        if volume_analysis:
+        error_messages = []
+        available_services = []
+        demo_mode = True
+
+        # Only try to get real data if user is authenticated
+        if current_user.is_authenticated:
             try:
-                for symbol in stock_data:
-                    if symbol in stock_data:
-                        alerts = volume_analysis.get_volume_alerts(symbol)
-                        volume_alerts.extend(alerts)
+                # Initialize services within application context
+                services = {
+                    'volume_analysis': None,
+                    'strategy_tester': None,
+                    'schwab_market': None
+                }
+                
+                # Try to initialize each service
+                try:
+                    services['volume_analysis'] = VolumeAnalysisService()
+                    available_services.append('volume_analysis')
+                except Exception as e:
+                    logger.error(f"Error initializing Volume Analysis Service: {str(e)}")
+                
+                try:
+                    services['strategy_tester'] = StrategyTester()
+                    available_services.append('strategy_tester')
+                except Exception as e:
+                    logger.error(f"Error initializing Strategy Tester: {str(e)}")
+                
+                try:
+                    services['schwab_market'] = SchwabMarketAPI()
+                    available_services.append('schwab_market')
+                except Exception as e:
+                    logger.error(f"Error initializing Schwab Market API: {str(e)}")
+                
+                if available_services:
+                    demo_mode = False
+                    default_symbols = ['AAPL', 'MSFT', 'GOOGL']
+                    stock_data = {}
+                    
+                    # Try to get market status if service is available
+                    if 'schwab_market' in available_services:
+                        try:
+                            market_status = services['schwab_market'].get_market_status()
+                        except Exception as e:
+                            logger.error(f"Error getting market status: {str(e)}")
+                            error_messages.append("Unable to fetch market status")
+                    
+                    # Get basic stock data for default symbols
+                    for symbol in default_symbols:
+                        try:
+                            if 'schwab_market' in available_services:
+                                data = services['schwab_market'].get_latest_data(symbol)
+                                if data:
+                                    stock_data[symbol] = data
+                        except Exception as e:
+                            logger.error(f"Error fetching data for {symbol}: {str(e)}")
+                            error_messages.append(f"Unable to fetch data for {symbol}")
+                    
+                    # Get volume analysis if service is available
+                    if 'volume_analysis' in available_services:
+                        try:
+                            for symbol in stock_data:
+                                alerts = services['volume_analysis'].get_volume_alerts(symbol)
+                                volume_alerts.extend(alerts)
+                        except Exception as e:
+                            logger.error(f"Error getting volume alerts: {str(e)}")
+                            error_messages.append("Unable to fetch volume analysis")
+                else:
+                    flash("Market analysis services are currently unavailable. Using demo data.", "warning")
             except Exception as e:
-                logger.error(f"Error getting volume alerts: {str(e)}")
-                error_messages.append("Unable to fetch volume analysis")
+                logger.error(f"Error initializing services: {str(e)}")
+                error_messages.append("Error initializing market analysis services")
+        else:
+            flash("Please log in to access real-time market data. Showing demo data.", "info")
         
         return render_template(
             'analysis_dashboard.html',
             market_status=market_status,
-            stock_data=stock_data,
+            stock_data=stock_data if stock_data else get_demo_data(),
             volume_alerts=volume_alerts,
             error_messages=error_messages,
-            services_available=services_initialized
+            available_services=available_services,
+            demo_mode=demo_mode
         )
         
     except Exception as e:
         logger.error(f"Error in dashboard route: {str(e)}")
-        flash("An error occurred while loading the dashboard. Please try again later.", "error")
+        flash("An error occurred while loading the dashboard. Using demo mode.", "error")
         return render_template(
             'analysis_dashboard.html',
             market_status=None,
-            stock_data={},
+            stock_data=get_demo_data(),
             volume_alerts=[],
             error_messages=[str(e)],
-            services_available=False
+            available_services=[],
+            demo_mode=True
         )
 
 @analysis_bp.route('/dashboard/api/market-status')
@@ -109,7 +169,20 @@ def dashboard():
 def get_market_status():
     """Get current market status from Schwab API."""
     try:
-        status = schwab_market.get_market_status()
+        services = {
+            'schwab_market': None
+        }
+        
+        try:
+            services['schwab_market'] = SchwabMarketAPI()
+        except Exception as e:
+            logger.error(f"Error initializing Schwab Market API: {str(e)}")
+            return jsonify({
+                'status': 'error',
+                'message': 'Market data service unavailable'
+            }), 503
+            
+        status = services['schwab_market'].get_market_status()
         return jsonify({
             'status': 'success',
             'data': status
@@ -208,7 +281,7 @@ def stream_data():
         try:
             while True:
                 # Get latest market data
-                data = schwab_market.get_latest_data()
+                data = services['schwab_market'].get_latest_data()
                 yield f"data: {json.dumps(data)}\n\n"
                 time.sleep(1)  # Adjust frequency as needed
         except Exception as e:
@@ -441,10 +514,10 @@ def volume_analysis():
                     volumes = sma.tolist()
                 
                 # Update volume data and get analysis
-                analysis = volume_analysis.update_volume_data(symbol, volumes[-1])
+                analysis = services['volume_analysis'].update_volume_data(symbol, volumes[-1])
                 
                 # Get volume alerts
-                alerts = volume_analysis.get_volume_alerts(symbol)
+                alerts = services['volume_analysis'].get_volume_alerts(symbol)
                 volume_alerts.extend(alerts)
                 
                 # Prepare data for template
@@ -529,10 +602,10 @@ def api_volume_analysis(symbol):
         volumes = [float(day['volume']) for day in historical_data]
         
         # Update volume data and get analysis
-        analysis = volume_analysis.update_volume_data(symbol, volumes[-1])
+        analysis = services['volume_analysis'].update_volume_data(symbol, volumes[-1])
         
         # Get volume alerts
-        alerts = volume_analysis.get_volume_alerts(symbol)
+        alerts = services['volume_analysis'].get_volume_alerts(symbol)
         
         response = {
             'symbol': symbol,
@@ -597,13 +670,13 @@ def test_strategy():
         
         # Get strategy function based on type
         if strategy_type == 'volume':
-            strategy_func = volume_analysis.analyze_volume_pattern
+            strategy_func = services['volume_analysis'].analyze_volume_pattern
         elif strategy_type == 'technical':
-            strategy_func = strategy_tester.calculate_indicators
+            strategy_func = services['strategy_tester'].calculate_indicators
         else:  # combined
             def combined_strategy(data, timestamp):
-                volume_signal = volume_analysis.analyze_volume_pattern(data, timestamp)
-                technical_signal = strategy_tester.calculate_indicators(data)
+                volume_signal = services['volume_analysis'].analyze_volume_pattern(data, timestamp)
+                technical_signal = services['strategy_tester'].calculate_indicators(data)
                 return {
                     'signal': 'BUY' if volume_signal['signal'] == 'BUY' and technical_signal['signal'] == 'BUY' else 'SELL',
                     'confidence': (volume_signal['confidence'] + technical_signal['confidence']) / 2
@@ -611,7 +684,7 @@ def test_strategy():
             strategy_func = combined_strategy
         
         # Run strategy test
-        results = strategy_tester.run_strategy(
+        results = services['strategy_tester'].run_strategy(
             symbol=symbol,
             start_date=start_date,
             end_date=end_date,

@@ -19,6 +19,47 @@
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
 
+    .status-banner {
+        padding: 10px 20px;
+        margin-bottom: 20px;
+        border-radius: 4px;
+        font-weight: 500;
+    }
+
+    .status-banner.demo {
+        background-color: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeeba;
+    }
+
+    .status-banner.error {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+
+    .service-status {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+
+    .service-indicator {
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 0.9rem;
+    }
+
+    .service-indicator.available {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .service-indicator.unavailable {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+
     .control-grid {
         display: grid;
         grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -248,70 +289,97 @@
         font-size: 0.8rem;
         color: #6c757d;
     }
-
-    .service-status {
-        padding: 10px;
-        margin-bottom: 20px;
-        border-radius: 4px;
-        background-color: #f8f9fa;
-        border-left: 4px solid #6c757d;
-    }
-
-    .service-status.warning {
-        background-color: #fff3cd;
-        border-left-color: #ffc107;
-    }
-
-    .service-status.error {
-        background-color: #f8d7da;
-        border-left-color: #dc3545;
-    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="dashboard-container">
-    <!-- Market Status Section -->
-    <div class="control-panel">
-        <h2>Market Status</h2>
-        {% if market_status %}
-            <div class="market-status {{ 'market-open' if market_status.is_open else 'market-closed' }}">
-                <i class="bi {{ 'bi-check-circle-fill' if market_status.is_open else 'bi-x-circle-fill' }}"></i>
-                Market is {{ 'Open' if market_status.is_open else 'Closed' }}
-            </div>
-        {% else %}
-            {{ components.error_message("Market status unavailable") }}
-        {% endif %}
+    {% if demo_mode %}
+    <div class="status-banner demo">
+        <i class="fas fa-info-circle"></i> Running in demo mode. Some features may be limited.
     </div>
+    {% endif %}
 
-    <!-- Error Messages -->
     {% if error_messages %}
-    <div class="error-section">
+    <div class="status-banner error">
         {% for error in error_messages %}
-            {{ components.error_message(error) }}
+        <div><i class="fas fa-exclamation-circle"></i> {{ error }}</div>
         {% endfor %}
     </div>
     {% endif %}
 
-    <!-- Stock Grid -->
-    <div class="stock-grid">
-        {% if stock_data %}
-            {% for symbol, data in stock_data.items() %}
-                {{ components.stock_card(data) }}
-            {% endfor %}
-        {% else %}
-            {% if not services_available %}
-                {{ components.error_message("Market analysis services are currently unavailable") }}
-            {% else %}
-                {{ components.loading_message() }}
-            {% endif %}
+    <div class="control-panel">
+        <h2>Service Status</h2>
+        <div class="service-status">
+            <div class="service-indicator {% if 'schwab_market' in available_services %}available{% else %}unavailable{% endif %}">
+                Market Data: {% if 'schwab_market' in available_services %}Available{% else %}Unavailable{% endif %}
+            </div>
+            <div class="service-indicator {% if 'volume_analysis' in available_services %}available{% else %}unavailable{% endif %}">
+                Volume Analysis: {% if 'volume_analysis' in available_services %}Available{% else %}Unavailable{% endif %}
+            </div>
+            <div class="service-indicator {% if 'strategy_tester' in available_services %}available{% else %}unavailable{% endif %}">
+                Strategy Testing: {% if 'strategy_tester' in available_services %}Available{% else %}Unavailable{% endif %}
+            </div>
+        </div>
+
+        {% if market_status %}
+        <div class="market-status">
+            <h3>Market Status</h3>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Market State</div>
+                    <div class="metric-value">{{ market_status.state }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Trading Day</div>
+                    <div class="metric-value">{{ market_status.trading_date }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Next Open</div>
+                    <div class="metric-value">{{ market_status.next_open }}</div>
+                </div>
+            </div>
+        </div>
         {% endif %}
     </div>
 
-    <!-- Volume Alerts -->
-    {% if volume_alerts %}
+    <div class="stock-grid">
+        {% for symbol, data in stock_data.items() %}
+        <div class="stock-card">
+            <div class="stock-header">
+                <div class="stock-title">{{ symbol }}</div>
+                {% if data.signal %}
+                <div class="stock-signal signal-{{ data.signal.lower() }}">{{ data.signal }}</div>
+                {% endif %}
+            </div>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-label">Price</div>
+                    <div class="metric-value">${{ "%.2f"|format(data.price) }}</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Change</div>
+                    <div class="metric-value {% if data.change > 0 %}text-success{% elif data.change < 0 %}text-danger{% endif %}">
+                        {{ "%.2f"|format(data.change) }}%
+                    </div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-label">Volume</div>
+                    <div class="metric-value">{{ "{:,}".format(data.volume) }}</div>
+                </div>
+            </div>
+            {% if 'volume_analysis' in available_services %}
+            <div class="chart-container" id="chart-{{ symbol }}">
+                <!-- Chart will be loaded here -->
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if 'volume_analysis' in available_services and volume_alerts %}
     <div class="alerts-section">
-        <h2>Volume Alerts</h2>
+        <h3>Volume Alerts</h3>
         {% for alert in volume_alerts %}
         <div class="alert-card">
             <div class="alert-time">{{ alert.timestamp }}</div>
@@ -321,17 +389,15 @@
     </div>
     {% endif %}
 
-    <!-- Market Data Stream -->
-    <div class="stream-section">
-        <h2>Live Market Data</h2>
-        <div class="stream-controls">
-            <button class="stream-button start-stream" onclick="startStream()">Start Stream</button>
-            <button class="stream-button stop-stream" onclick="stopStream()">Stop Stream</button>
+    {% if 'strategy_tester' in available_services %}
+    <div class="comparison-section">
+        <h3>Strategy Comparison</h3>
+        <div class="comparison-chart" id="strategy-comparison">
+            <!-- Strategy comparison chart will be loaded here -->
         </div>
-        <div id="dataStream" class="data-stream"></div>
     </div>
+    {% endif %}
 </div>
-
 {% endblock %}
 
 {% block extra_js %}
@@ -402,5 +468,25 @@ window.addEventListener('beforeunload', function() {
         eventSource.close();
     }
 });
+
+{% if not demo_mode %}
+// Only load real-time data if not in demo mode
+document.addEventListener('DOMContentLoaded', function() {
+    {% if 'schwab_market' in available_services %}
+    // Initialize market data updates
+    initializeMarketDataStream();
+    {% endif %}
+
+    {% if 'volume_analysis' in available_services %}
+    // Initialize volume analysis charts
+    initializeVolumeCharts();
+    {% endif %}
+
+    {% if 'strategy_tester' in available_services %}
+    // Initialize strategy comparison
+    initializeStrategyComparison();
+    {% endif %}
+});
+{% endif %}
 </script>
 {% endblock %} 
