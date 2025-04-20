@@ -5,7 +5,7 @@ from schwab_trader.services.data_manager import DataManager
 from schwab_trader.services.schwab_market import SchwabMarketAPI
 from schwab_trader.utils.logger import setup_logger
 
-analysis_dashboard_bp = Blueprint('analysis_dashboard', __name__, url_prefix='/analysis')
+analysis_dashboard_bp = Blueprint('analysis_dashboard', __name__, url_prefix='/analysis/dashboard')
 logger = setup_logger('analysis_dashboard')
 
 @analysis_dashboard_bp.route('/')

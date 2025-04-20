@@ -19,7 +19,7 @@ def login():
     """Login page."""
     try:
         if 'schwab_token' in session:
-            return redirect(url_for('analysis.index'))
+            return redirect(url_for('analysis_dashboard.index'))
         return render_template('login.html')
     except Exception as e:
         logger.error(f"Error in login route: {str(e)}")

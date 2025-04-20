@@ -155,7 +155,7 @@ def schwab_callback():
             accounts = schwab.get_accounts()
             if accounts:
                 session['schwab_accounts'] = accounts
-                return redirect(url_for('analysis.index'))
+                return redirect(url_for('analysis_dashboard.index'))
             else:
                 return jsonify({
                     'status': 'error',
@@ -231,14 +231,14 @@ def index():
 @app.route('/login')
 def login():
     """Automatically redirect to analysis dashboard"""
-    return redirect(url_for('analysis.index'))
+    return redirect(url_for('analysis_dashboard.index'))
 
 @app.route('/analysis')
 def analysis():
     """Display the analysis dashboard page"""
     if 'schwab_token' not in session:
         return redirect(url_for('manual_auth'))
-    return render_template('analysis_dashboard.html')
+    return redirect(url_for('analysis_dashboard.index'))
 
 @app.route('/trading')
 def trading():

@@ -94,7 +94,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.status === 'success') {
                 updateBypassStatus(data.bypassed);
                 if (data.bypassed) {
-                    window.location.href = "{{ url_for('analysis.index') }}";
+                    window.location.href = "{{ url_for('analysis_dashboard.index') }}";
                 }
             } else {
                 alert('Error toggling bypass: ' + data.message);
