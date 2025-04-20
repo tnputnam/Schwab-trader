@@ -36,12 +36,28 @@ def create_app(test_config=None):
     
     # Import and register blueprints
     from schwab_trader.routes.api import api_bp
-    from schwab_trader.routes.auth import auth_bp
-    from schwab_trader.routes.main import main_bp
+    from schwab_trader.routes.auth import bp as auth_bp
+    from schwab_trader.routes.root import root_bp
+    from schwab_trader.routes.portfolio import portfolio_bp
+    from schwab_trader.routes.trading import trading_bp
+    from schwab_trader.routes.analysis import analysis_bp
+    from schwab_trader.routes.news import news_bp
+    from schwab_trader.routes.strategies import strategies_bp
+    from schwab_trader.routes.watchlist import watchlist_bp
+    from schwab_trader.routes.alerts import alerts_bp
+    from schwab_trader.routes.compare import compare_bp
     
     app.register_blueprint(api_bp)
     app.register_blueprint(auth_bp)
-    app.register_blueprint(main_bp)
+    app.register_blueprint(root_bp)
+    app.register_blueprint(portfolio_bp)
+    app.register_blueprint(trading_bp)
+    app.register_blueprint(analysis_bp)
+    app.register_blueprint(news_bp)
+    app.register_blueprint(strategies_bp)
+    app.register_blueprint(watchlist_bp)
+    app.register_blueprint(alerts_bp)
+    app.register_blueprint(compare_bp)
     
     # Import models for migrations
     from schwab_trader.models import User, Portfolio, Position, Alert

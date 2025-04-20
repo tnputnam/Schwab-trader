@@ -1,9 +1,9 @@
-from flask import Flask, request, session, redirect, url_for, jsonify
+from flask import Flask, request, session, redirect, url_for, jsonify, render_template
 from schwab_trader.routes.root import root_bp
-from schwab_trader.routes.analysis_dashboard import analysis_dashboard_bp
 from schwab_trader.routes.analysis import analysis_bp
 from schwab_trader.routes.auth import bp as auth_bp
 from schwab_trader.utils.logger import setup_logger
+from schwab_trader.services.schwab_service import get_schwab_oauth
 
 logger = setup_logger('auth_app')
 
@@ -24,7 +24,7 @@ def init_app(app):
                 accounts = schwab.get_accounts()
                 if accounts:
                     session['schwab_accounts'] = accounts
-                    return redirect(url_for('analysis_dashboard.index'))
+                    return redirect(url_for('analysis.index'))
                 else:
                     return jsonify({
                         'status': 'error',
@@ -44,19 +44,22 @@ def init_app(app):
 
     @app.route('/login')
     def login():
-        """Automatically redirect to analysis dashboard"""
-        return redirect(url_for('analysis_dashboard.index'))
+        """Login page."""
+        if 'schwab_token' in session:
+            return redirect(url_for('analysis.index'))
+        return render_template('login.html')
 
     @app.route('/analysis')
     def analysis():
         """Display the analysis dashboard page"""
         if 'schwab_token' not in session:
-            return redirect(url_for('manual_auth'))
-        return redirect(url_for('analysis_dashboard.index'))
+            return redirect(url_for('login'))
+        return redirect(url_for('analysis.index'))
 
     # Register blueprints
     app.register_blueprint(root_bp)
-    app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis/dashboard')
+    app.register_blueprint(analysis_bp, url_prefix='/analysis')
+    app.register_blueprint(auth_bp, url_prefix='/auth')
 
 if __name__ == '__main__':
     # Print all registered routes

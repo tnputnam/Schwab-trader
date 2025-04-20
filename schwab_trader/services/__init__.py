@@ -1,4 +1,4 @@
-"""Services package for Schwab Trader application."""
+"""Services package for Schwab Trader."""
 
 from .auth import get_schwab_token
 from .schwab_market import get_schwab_market

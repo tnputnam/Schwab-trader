@@ -10,6 +10,7 @@ from schwab_trader.services.auth_service import AuthService
 from schwab_trader.models.user import User
 from schwab_trader.utils.schwab_oauth import SchwabOAuth
 from schwab_trader.services.market_data_service import MarketDataService
+from schwab_trader.services.schwab_service import get_schwab_oauth
 
 bp = Blueprint('auth', __name__, url_prefix='/auth')
 logger = get_logger(__name__)
@@ -147,6 +148,24 @@ def force_bypass_off():
         })
     except Exception as e:
         logger.error(f"Error forcing bypass off: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
+        }), 500
+
+@bp.route('/schwab')
+def schwab_auth():
+    """Initiate Schwab OAuth flow."""
+    try:
+        client = get_schwab_oauth()
+        auth_url = client.prepare_request_uri(
+            current_app.config['SCHWAB_AUTH_URL'],
+            redirect_uri=current_app.config['SCHWAB_REDIRECT_URI'],
+            scope=['trading', 'accounts']
+        )
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Error initiating Schwab auth: {str(e)}")
         return jsonify({
             'status': 'error',
             'message': str(e)

@@ -65,38 +65,53 @@ load_env() {
     fi
 }
 
+# Function to install the package in development mode
+install_package() {
+    log_message "Installing package in development mode..."
+    if [ -f "setup.py" ]; then
+        pip install -e .
+        if [ $? -ne 0 ]; then
+            log_message "Error: Failed to install package in development mode" "ERROR"
+            return 1
+        fi
+        log_message "Package installed successfully"
+    else
+        log_message "Error: setup.py not found" "ERROR"
+        return 1
+    fi
+}
+
 # Function to start the application
 start_application() {
-    local port=$1
-    local env=$2
+    local env_mode=$1
+    local port=$2
     
-    log_message "Starting application in $env mode on port $port"
+    log_message "Starting application in $env_mode mode on port $port..."
     
     # Activate virtual environment
     if [ -d "venv" ]; then
         source venv/bin/activate
+    elif [ -d "schwab-trading-env" ]; then
+        source schwab-trading-env/bin/activate
     else
-        log_message "Error: Virtual environment not found"
+        log_message "Error: Virtual environment not found" "ERROR"
         return 1
     fi
     
-    # Load environment variables
-    if ! load_env; then
-        return 1
-    fi
+    # Install package in development mode
+    install_package
     
     # Set Flask environment variables
-    export FLASK_APP=auth_app.py
-    export FLASK_ENV=development
+    export FLASK_APP=wsgi.py
+    export FLASK_ENV=$env_mode
     export FLASK_DEBUG=1
     
-    # Start the application using wsgi.py
-    python wsgi.py &
-    
-    # Store the process ID
-    echo $! > .flask.pid
-    
-    log_message "Application started with PID $(cat .flask.pid)"
+    # Start the application
+    if [ "$env_mode" == "development" ]; then
+        flask run --port=$port
+    else
+        gunicorn --bind 0.0.0.0:$port wsgi:app
+    fi
 }
 
 # Main script
@@ -121,7 +136,7 @@ main() {
     fi
     
     # Start the application
-    start_application $PORT $ENV
+    start_application $ENV $PORT
     
     if [ $? -eq 0 ]; then
         log_message "Application started successfully"
