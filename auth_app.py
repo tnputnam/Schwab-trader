@@ -28,6 +28,7 @@ from typing import List
 from types import SimpleNamespace
 from dotenv import load_dotenv
 from schwab_trader.routes.root import root_bp
+from schwab_trader.routes.analysis_dashboard import analysis_dashboard_bp
 
 # Load environment variables
 load_dotenv()
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 # Debug print environment variables
 logger.debug("Environment Variables:")
-for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URL', 
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
             'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
     value = os.getenv(key)
     logger.debug(f"{key}: {value}")
@@ -51,30 +52,28 @@ app = Flask(__name__,
 )
 CORS(app)
 
+# Register blueprints
+app.register_blueprint(root_bp)
+app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis-dashboard')
+
 # Load configuration from environment variables
 config = {
     'SECRET_KEY': os.getenv('FLASK_SECRET_KEY', 'dev_key_123'),
     'SCHWAB_CLIENT_ID': os.getenv('SCHWAB_CLIENT_ID'),
     'SCHWAB_CLIENT_SECRET': os.getenv('SCHWAB_CLIENT_SECRET'),
-    'SCHWAB_REDIRECT_URL': os.getenv('SCHWAB_REDIRECT_URL'),
+    'SCHWAB_REDIRECT_URI': os.getenv('SCHWAB_REDIRECT_URI'),
     'SCHWAB_AUTH_URL': os.getenv('SCHWAB_AUTH_URL'),
     'SCHWAB_TOKEN_URL': os.getenv('SCHWAB_TOKEN_URL'),
     'SCHWAB_SCOPES': os.getenv('SCHWAB_SCOPES'),
     'SCHWAB_API_BASE_URL': os.getenv('SCHWAB_API_BASE_URL', 'https://api.schwabapi.com/v1')
 }
 
-# Debug print Flask config before update
-logger.debug("\nFlask Configuration (before update):")
-for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URL', 
-            'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
-    logger.debug(f"{key}: {app.config.get(key)}")
-
 # Update Flask config
 app.config.update(config)
 
 # Debug print Flask config after update
-logger.debug("\nFlask Configuration (after update):")
-for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URL', 
+logger.debug("\nFlask Configuration:")
+for key in ['SCHWAB_CLIENT_ID', 'SCHWAB_CLIENT_SECRET', 'SCHWAB_REDIRECT_URI', 
             'SCHWAB_AUTH_URL', 'SCHWAB_TOKEN_URL', 'SCHWAB_SCOPES', 'SCHWAB_API_BASE_URL']:
     logger.debug(f"{key}: {app.config.get(key)}")
 
