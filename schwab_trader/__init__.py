@@ -5,6 +5,7 @@ from flask_caching import Cache
 from schwab_trader.database import init_db, db
 from schwab_trader.utils.logging_utils import setup_logger
 from schwab_trader.utils.error_utils import AppError, handle_error
+from schwab_trader.auth_app import init_app as init_auth_app
 
 # Initialize extensions
 cache = Cache()
@@ -48,6 +49,9 @@ def create_app(test_config=None):
     app.register_blueprint(watchlist.bp)
     app.register_blueprint(auth.bp)
     app.register_blueprint(analysis_dashboard.analysis_dashboard_bp, url_prefix='/analysis/dashboard')
+    
+    # Initialize auth routes
+    init_auth_app(app)
     
     # Register error handlers
     @app.errorhandler(AppError)
