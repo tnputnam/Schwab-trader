@@ -48,7 +48,7 @@ def create_app(test_config=None):
     app.register_blueprint(alerts.bp)
     app.register_blueprint(watchlist.bp)
     app.register_blueprint(auth.bp)
-    app.register_blueprint(analysis_dashboard.bp, url_prefix='/analysis/dashboard')
+    app.register_blueprint(analysis_dashboard.analysis_dashboard_bp, url_prefix='/analysis/dashboard')
     
     # Register error handlers
     @app.errorhandler(AppError)
