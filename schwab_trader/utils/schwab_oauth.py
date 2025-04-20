@@ -32,9 +32,10 @@ class SchwabOAuth:
     def __init__(self):
         """Initialize the OAuth client."""
         self._validate_config()
-        self.client_id = current_app.config['SCHWAB_CLIENT_ID']
-        self.client_secret = current_app.config['SCHWAB_CLIENT_SECRET']
-        self.redirect_uri = current_app.config['SCHWAB_REDIRECT_URL']
+        self.client_id = current_app.config['SCHWAB_API_KEY']
+        self.client_secret = current_app.config['SCHWAB_API_SECRET']
+        self.redirect_uri = current_app.config['SCHWAB_REDIRECT_URI']
+        self.base_url = current_app.config['SCHWAB_API_BASE_URL']
         self.auth_url = current_app.config['SCHWAB_AUTH_URL']
         self.token_url = current_app.config['SCHWAB_TOKEN_URL']
         self.scopes = current_app.config['SCHWAB_SCOPES']
@@ -50,9 +51,9 @@ class SchwabOAuth:
     def _validate_config(self):
         """Validate the OAuth configuration."""
         required_config = [
-            'SCHWAB_CLIENT_ID',
-            'SCHWAB_CLIENT_SECRET',
-            'SCHWAB_REDIRECT_URL',
+            'SCHWAB_API_KEY',
+            'SCHWAB_API_SECRET',
+            'SCHWAB_REDIRECT_URI',
             'SCHWAB_AUTH_URL',
             'SCHWAB_TOKEN_URL',
             'SCHWAB_SCOPES'
@@ -164,7 +165,7 @@ class SchwabOAuth:
             raise TokenError("No valid OAuth session")
             
         try:
-            response = oauth.get(f"{current_app.config['SCHWAB_API_BASE_URL']}/accounts")
+            response = oauth.get(f"{self.base_url}/accounts")
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -183,7 +184,7 @@ class SchwabOAuth:
             return None
             
         try:
-            response = oauth.get(f"{current_app.config['SCHWAB_API_BASE_URL']}/accounts/{account_id}/positions")
+            response = oauth.get(f"{self.base_url}/accounts/{account_id}/positions")
             response.raise_for_status()
             return response.json()
         except Exception as e:
@@ -198,7 +199,7 @@ class SchwabOAuth:
             
         try:
             response = oauth.post(
-                f"{current_app.config['SCHWAB_API_BASE_URL']}/accounts/{account_id}/orders",
+                f"{self.base_url}/accounts/{account_id}/orders",
                 json=order_data
             )
             response.raise_for_status()

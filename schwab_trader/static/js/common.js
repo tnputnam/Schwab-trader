@@ -260,4 +260,33 @@ document.addEventListener('DOMContentLoaded', function() {
     setupAutoRefresh();
     setupBypassToggle();
     checkAPIStatus();
+    
+    // Add event listener for force bypass off button
+    const forceBypassOffButton = document.getElementById('forceBypassOff');
+    if (forceBypassOffButton) {
+        forceBypassOffButton.addEventListener('click', function() {
+            fetch('/auth/force_bypass_off', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    updateBypassStatus(false);
+                    showToast('Schwab bypass disabled');
+                    // Reload the page after a short delay
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 1000);
+                } else {
+                    showToast('Error disabling bypass: ' + data.message, 'error');
+                }
+            })
+            .catch(error => {
+                showToast('Error disabling bypass', 'error');
+            });
+        });
+    }
 }); 
