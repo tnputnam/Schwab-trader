@@ -71,7 +71,6 @@ class SchwabOAuth:
             logger.debug("Creating OAuth2Session")
             logger.debug(f"Client ID: {self.client_id}")
             logger.debug(f"Redirect URL: {self.redirect_uri}")
-            logger.debug(f"Scopes: {self.scopes}")
             
             # Ensure redirect URL includes /auth/callback
             if not self.redirect_uri.endswith('/auth/callback'):
@@ -83,6 +82,12 @@ class SchwabOAuth:
                 self.scopes = self.scopes.split()
                 logger.debug(f"Updated scopes: {self.scopes}")
             
+            # Add additional scopes if not already present
+            required_scopes = ['read_accounts', 'trade', 'read_positions']
+            for scope in required_scopes:
+                if scope not in self.scopes:
+                    self.scopes.append(scope)
+            
             oauth = OAuth2Session(
                 self.client_id,
                 redirect_uri=self.redirect_uri,
@@ -93,7 +98,8 @@ class SchwabOAuth:
             authorization_url, state = oauth.authorization_url(
                 self.auth_url,
                 access_type="offline",
-                include_granted_scopes="true"
+                include_granted_scopes="true",
+                prompt="consent"  # Force consent screen
             )
             
             logger.debug(f"Generated authorization URL: {authorization_url}")

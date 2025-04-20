@@ -143,34 +143,49 @@ def manual_auth():
 def schwab_callback():
     """Handle the OAuth callback from Schwab."""
     try:
+        # Validate state parameter
+        if 'state' not in request.args:
+            logger.error("No state parameter in callback")
+            return render_template('error.html', error_message="Missing state parameter in callback")
+            
+        if 'oauth_state' not in session:
+            logger.error("No state stored in session")
+            return render_template('error.html', error_message="Missing state in session")
+            
+        if request.args['state'] != session['oauth_state']:
+            logger.error("State mismatch")
+            return render_template('error.html', error_message="State mismatch in callback")
+            
+        # Clear the state from session
+        session.pop('oauth_state', None)
+        
+        # Get token
         schwab = get_schwab_oauth()
         token = schwab.fetch_token(request.url)
         
-        if token:
-            # Store the token in the session
-            session['schwab_token'] = token
+        if not token:
+            logger.error("Failed to get token")
+            return render_template('error.html', error_message="Failed to get access token")
             
+        # Store the token in the session
+        session['schwab_token'] = token
+        
+        try:
             # Get user's accounts
             accounts = schwab.get_accounts()
             if accounts:
                 session['schwab_accounts'] = accounts
                 return redirect(url_for('analysis_dashboard.index'))
             else:
-                return jsonify({
-                    'status': 'error',
-                    'message': 'Failed to get accounts'
-                }), 500
-        else:
-            return jsonify({
-                'status': 'error',
-                'message': 'Failed to get token'
-            }), 500
+                logger.error("Failed to get accounts")
+                return render_template('error.html', error_message="Failed to get account information")
+        except Exception as e:
+            logger.error(f"Error getting accounts: {str(e)}")
+            return render_template('error.html', error_message=f"Error getting account information: {str(e)}")
+            
     except Exception as e:
         logger.error(f"Error in Schwab callback: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'message': str(e)
-        }), 500
+        return render_template('error.html', error_message=f"Error during authentication: {str(e)}")
 
 @app.route('/auth/logout')
 def schwab_logout():
@@ -218,9 +233,6 @@ async def monitor_symbols(symbols: List[str]):
         except Exception as e:
             logger.error(f"Error monitoring symbols: {str(e)}")
             await asyncio.sleep(60)  # Wait before retrying
-
-# Register blueprints
-app.register_blueprint(root_bp)
 
 @app.route('/login')
 def login():
