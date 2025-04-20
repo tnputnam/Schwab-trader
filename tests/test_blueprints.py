@@ -10,7 +10,8 @@ def app():
         'WTF_CSRF_ENABLED': False,
         'SQLALCHEMY_DATABASE_URI': 'sqlite:///:memory:',
         'SQLALCHEMY_TRACK_MODIFICATIONS': False,
-        'SECRET_KEY': 'test'
+        'SECRET_KEY': 'test',
+        'SERVER_NAME': 'localhost.localdomain'
     }
     app = create_app(test_config)
     return app

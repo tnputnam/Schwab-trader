@@ -43,7 +43,7 @@ def create_app(test_config=None):
     app.register_blueprint(strategies.bp)
     app.register_blueprint(compare.bp)
     app.register_blueprint(portfolio.portfolio_bp)
-    app.register_blueprint(analysis.bp, url_prefix='/analysis')
+    app.register_blueprint(analysis.analysis_bp, url_prefix='/analysis')
     app.register_blueprint(alerts.bp)
     app.register_blueprint(watchlist.bp)
     app.register_blueprint(auth.bp)

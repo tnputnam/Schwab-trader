@@ -8,7 +8,7 @@ from schwab_trader.utils.logger import setup_logger
 analysis_dashboard_bp = Blueprint('analysis_dashboard', __name__)
 logger = setup_logger('analysis_dashboard')
 
-@analysis_dashboard_bp.route('/')
+@analysis_dashboard_bp.route('/', endpoint='index')
 def index():
     """Render the analysis dashboard."""
     return render_template('analysis_dashboard.html')
