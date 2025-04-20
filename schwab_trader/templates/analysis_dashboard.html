@@ -271,223 +271,136 @@
 
 {% block content %}
 <div class="dashboard-container">
-    {% if not services_available %}
-    <div class="service-status warning">
-        <h4><i class="bi bi-exclamation-triangle"></i> Service Status</h4>
-        <p>Some market analysis services are currently unavailable. Basic functionality may be limited.</p>
-        <p>Please check the logs for more information or try refreshing the page.</p>
-    </div>
-    {% endif %}
-
+    <!-- Market Status Section -->
     <div class="control-panel">
-        <h2>Market Analysis Dashboard</h2>
-        <div class="control-grid">
-            <div class="form-group">
-                <label for="symbol">Symbol</label>
-                <input type="text" id="symbol" class="form-control" placeholder="e.g., AAPL">
+        <h2>Market Status</h2>
+        {% if market_status %}
+            <div class="market-status {{ 'market-open' if market_status.is_open else 'market-closed' }}">
+                <i class="bi {{ 'bi-check-circle-fill' if market_status.is_open else 'bi-x-circle-fill' }}"></i>
+                Market is {{ 'Open' if market_status.is_open else 'Closed' }}
             </div>
-            <div class="form-group">
-                <label for="timeframe">Timeframe</label>
-                <select id="timeframe" class="form-control">
-                    <option value="1d">1 Day</option>
-                    <option value="1w">1 Week</option>
-                    <option value="1m">1 Month</option>
-                    <option value="3m">3 Months</option>
-                    <option value="1y">1 Year</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="dataType">Data Type</label>
-                <select id="dataType" class="form-control">
-                    <option value="price">Price</option>
-                    <option value="technical">Technical</option>
-                </select>
-            </div>
-        </div>
-        <button id="loadData" class="btn btn-primary">Load Data</button>
-    </div>
-
-    <div class="stock-grid">
-        {% if services_available %}
-        <div class="stock-card">
-            <div class="stock-header">
-                <h3 class="stock-title">Market Status</h3>
-                <span id="marketStatus" class="stock-signal">Loading...</span>
-            </div>
-            <div class="metrics-grid">
-                <div class="metric-card">
-                    <div class="metric-label">Last Update</div>
-                    <div id="lastUpdate" class="metric-value">-</div>
-                </div>
-                <div class="metric-card">
-                    <div class="metric-label">Market State</div>
-                    <div id="marketState" class="metric-value">-</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="stock-card">
-            <div class="stock-header">
-                <h3 class="stock-title">Technical Analysis</h3>
-            </div>
-            <div class="technical-indicators">
-                <div class="indicator-card">
-                    <div class="indicator-label">RSI (14)</div>
-                    <div id="rsiValue" class="metric-value">-</div>
-                </div>
-                <div class="indicator-card">
-                    <div class="indicator-label">SMA (20)</div>
-                    <div id="sma20Value" class="metric-value">-</div>
-                </div>
-                <div class="indicator-card">
-                    <div class="indicator-label">SMA (50)</div>
-                    <div id="sma50Value" class="metric-value">-</div>
-                </div>
-            </div>
-        </div>
         {% else %}
-        <div class="stock-card">
-            <h3>Service Unavailable</h3>
-            <p>Stock analysis features are currently unavailable. Please try again later.</p>
-        </div>
+            {{ components.error_message("Market status unavailable") }}
         {% endif %}
     </div>
 
-    <div class="chart-container">
-        <canvas id="priceChart"></canvas>
+    <!-- Error Messages -->
+    {% if error_messages %}
+    <div class="error-section">
+        {% for error in error_messages %}
+            {{ components.error_message(error) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Stock Grid -->
+    <div class="stock-grid">
+        {% if stock_data %}
+            {% for symbol, data in stock_data.items() %}
+                {{ components.stock_card(data) }}
+            {% endfor %}
+        {% else %}
+            {% if not services_available %}
+                {{ components.error_message("Market analysis services are currently unavailable") }}
+            {% else %}
+                {{ components.loading_message() }}
+            {% endif %}
+        {% endif %}
     </div>
 
+    <!-- Volume Alerts -->
+    {% if volume_alerts %}
     <div class="alerts-section">
-        <h3>Market Alerts</h3>
-        <div id="alertsContainer"></div>
-    </div>
-
-    <div class="stream-section">
-        <h3>Real-time Data Stream</h3>
-        <div class="stream-controls">
-            <button id="startStream" class="stream-button start-stream">Start Stream</button>
-            <button id="stopStream" class="stream-button stop-stream">Stop Stream</button>
-            <button id="clearStream" class="stream-button clear-stream">Clear</button>
+        <h2>Volume Alerts</h2>
+        {% for alert in volume_alerts %}
+        <div class="alert-card">
+            <div class="alert-time">{{ alert.timestamp }}</div>
+            <div class="alert-message">{{ alert.message }}</div>
         </div>
-        <div class="data-stream" id="dataStream"></div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Market Data Stream -->
+    <div class="stream-section">
+        <h2>Live Market Data</h2>
+        <div class="stream-controls">
+            <button class="stream-button start-stream" onclick="startStream()">Start Stream</button>
+            <button class="stream-button stop-stream" onclick="stopStream()">Stop Stream</button>
+        </div>
+        <div id="dataStream" class="data-stream"></div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    let priceChart = null;
-    let dataStream = null;
+let eventSource;
 
-    // Initialize market status
-    function updateMarketStatus() {
-        fetch('/analysis/dashboard/api/market-status')
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    document.getElementById('marketStatus').textContent = data.data.state;
-                    document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString();
-                    document.getElementById('marketState').textContent = data.data.state;
-                }
-            })
-            .catch(error => console.error('Error fetching market status:', error));
+function startStream() {
+    if (eventSource) {
+        eventSource.close();
     }
+    
+    eventSource = new EventSource("{{ url_for('analysis.stream_data') }}");
+    
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        updateStreamData(data);
+    };
+    
+    eventSource.onerror = function() {
+        console.error("EventSource failed");
+        eventSource.close();
+    };
+}
 
-    // Load market data
-    function loadMarketData() {
-        const symbol = document.getElementById('symbol').value || 'AAPL';
-        const timeframe = document.getElementById('timeframe').value;
-        const dataType = document.getElementById('dataType').value;
-
-        fetch(`/analysis/dashboard/api/market-data?symbol=${symbol}&timeframe=${timeframe}&type=${dataType}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.status === 'success') {
-                    updateChart(data.data);
-                    updateTechnicalIndicators(data.data);
-                }
-            })
-            .catch(error => console.error('Error fetching market data:', error));
+function stopStream() {
+    if (eventSource) {
+        eventSource.close();
+        eventSource = null;
     }
+}
 
-    // Update chart
-    function updateChart(data) {
-        const ctx = document.getElementById('priceChart').getContext('2d');
-        
-        if (priceChart) {
-            priceChart.destroy();
-        }
-
-        priceChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: data.dates,
-                datasets: [{
-                    label: 'Price',
-                    data: data.prices,
-                    borderColor: 'rgb(75, 192, 192)',
-                    tension: 0.1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false
-            }
-        });
-    }
-
-    // Update technical indicators
-    function updateTechnicalIndicators(data) {
-        if (data.rsi) {
-            document.getElementById('rsiValue').textContent = data.rsi[data.rsi.length - 1].toFixed(2);
-        }
-        if (data.sma_20) {
-            document.getElementById('sma20Value').textContent = data.sma_20[data.sma_20.length - 1].toFixed(2);
-        }
-        if (data.sma_50) {
-            document.getElementById('sma50Value').textContent = data.sma_50[data.sma_50.length - 1].toFixed(2);
-        }
-    }
-
-    // Initialize data stream
-    function startDataStream() {
-        if (dataStream) {
-            dataStream.close();
-        }
-
-        dataStream = new EventSource('/analysis/dashboard/stream-data');
-        dataStream.onmessage = function(event) {
-            const data = JSON.parse(event.data);
-            const streamContainer = document.getElementById('dataStream');
-            const dataPoint = document.createElement('div');
-            dataPoint.className = 'data-point';
-            dataPoint.innerHTML = `
-                <div class="data-label">Time</div>
-                <div class="data-value">${new Date(data.timestamp).toLocaleTimeString()}</div>
-                <div class="data-label">Symbol</div>
-                <div class="data-value">${data.symbol}</div>
-                <div class="data-label">Price</div>
-                <div class="data-value">${data.price}</div>
+function updateStreamData(data) {
+    const streamContainer = document.getElementById('dataStream');
+    const dataPoint = document.createElement('div');
+    dataPoint.className = 'data-point';
+    
+    // Add timestamp
+    const timestamp = new Date().toLocaleTimeString();
+    dataPoint.innerHTML = `
+        <div>
+            <span class="data-label">Time:</span>
+            <span class="data-value">${timestamp}</span>
+        </div>
+    `;
+    
+    // Add data points
+    for (const [key, value] of Object.entries(data)) {
+        if (key !== 'error') {
+            dataPoint.innerHTML += `
+                <div>
+                    <span class="data-label">${key}:</span>
+                    <span class="data-value">${value}</span>
+                </div>
             `;
-            streamContainer.insertBefore(dataPoint, streamContainer.firstChild);
-        };
-    }
-
-    // Event listeners
-    document.getElementById('loadData').addEventListener('click', loadMarketData);
-    document.getElementById('startStream').addEventListener('click', startDataStream);
-    document.getElementById('stopStream').addEventListener('click', () => {
-        if (dataStream) {
-            dataStream.close();
-            dataStream = null;
         }
-    });
-    document.getElementById('clearStream').addEventListener('click', () => {
-        document.getElementById('dataStream').innerHTML = '';
-    });
+    }
+    
+    // Add to container and limit entries
+    streamContainer.insertBefore(dataPoint, streamContainer.firstChild);
+    if (streamContainer.children.length > 50) {
+        streamContainer.removeChild(streamContainer.lastChild);
+    }
+}
 
-    // Initial load
-    updateMarketStatus();
-    setInterval(updateMarketStatus, 60000); // Update every minute
+// Clean up EventSource when leaving the page
+window.addEventListener('beforeunload', function() {
+    if (eventSource) {
+        eventSource.close();
+    }
+});
 </script>
 {% endblock %} 

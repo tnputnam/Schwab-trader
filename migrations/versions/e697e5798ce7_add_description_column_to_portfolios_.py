@@ -1,7 +1,7 @@
 """Add description column to portfolios table
 
 Revision ID: e697e5798ce7
-Revises: 
+Revises: create_tables
 Create Date: 2025-04-17 16:40:30.091032
 
 """
@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'e697e5798ce7'
-down_revision = None
+down_revision = 'create_tables'
 branch_labels = None
 depends_on = None
 

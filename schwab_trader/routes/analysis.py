@@ -42,24 +42,67 @@ def index():
 def dashboard():
     """Render the analysis dashboard."""
     try:
-        # Initialize services with error handling
-        try:
-            market_status = schwab_market.get_market_status()
-            services_available = True
-        except Exception as e:
-            logger.error(f"Error initializing market service: {str(e)}")
-            market_status = None
-            services_available = False
-
-        return render_template('analysis_dashboard.html', 
-                             market_status=market_status,
-                             services_available=services_available)
+        # Initialize market status and default data
+        market_status = None
+        default_symbols = ['AAPL', 'MSFT', 'GOOGL']
+        stock_data = {}
+        error_messages = []
+        
+        # Check if services are initialized
+        if not services_initialized:
+            flash("Some market analysis services are unavailable. Limited functionality may be available.", "warning")
+        
+        # Try to get market status if service is available
+        if schwab_market:
+            try:
+                market_status = schwab_market.get_market_status()
+            except Exception as e:
+                logger.error(f"Error getting market status: {str(e)}")
+                error_messages.append("Unable to fetch market status")
+        
+        # Get basic stock data for default symbols
+        for symbol in default_symbols:
+            try:
+                if schwab_market:
+                    data = schwab_market.get_latest_data(symbol)
+                    if data:
+                        stock_data[symbol] = data
+            except Exception as e:
+                logger.error(f"Error fetching data for {symbol}: {str(e)}")
+                error_messages.append(f"Unable to fetch data for {symbol}")
+        
+        # Get volume analysis if service is available
+        volume_alerts = []
+        if volume_analysis:
+            try:
+                for symbol in stock_data:
+                    if symbol in stock_data:
+                        alerts = volume_analysis.get_volume_alerts(symbol)
+                        volume_alerts.extend(alerts)
+            except Exception as e:
+                logger.error(f"Error getting volume alerts: {str(e)}")
+                error_messages.append("Unable to fetch volume analysis")
+        
+        return render_template(
+            'analysis_dashboard.html',
+            market_status=market_status,
+            stock_data=stock_data,
+            volume_alerts=volume_alerts,
+            error_messages=error_messages,
+            services_available=services_initialized
+        )
+        
     except Exception as e:
         logger.error(f"Error in dashboard route: {str(e)}")
-        flash(f"Error loading dashboard: {str(e)}", "error")
-        return render_template('analysis_dashboard.html', 
-                             market_status=None,
-                             services_available=False)
+        flash("An error occurred while loading the dashboard. Please try again later.", "error")
+        return render_template(
+            'analysis_dashboard.html',
+            market_status=None,
+            stock_data={},
+            volume_alerts=[],
+            error_messages=[str(e)],
+            services_available=False
+        )
 
 @analysis_bp.route('/dashboard/api/market-status')
 @login_required
