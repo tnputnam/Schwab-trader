@@ -1,0 +1,129 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>Market News</h1>
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Latest Market News</h5>
+                </div>
+                <div class="card-body">
+                    <div id="market-news">
+                        <!-- Market news will be loaded here dynamically -->
+                        <p class="text-muted">Loading market news...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">Top Headlines</h5>
+                </div>
+                <div class="card-body">
+                    <div id="headlines">
+                        <!-- Headlines will be loaded here dynamically -->
+                        <p class="text-muted">Loading headlines...</p>
+                    </div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="card-title mb-0">News Search</h5>
+                </div>
+                <div class="card-body">
+                    <form id="news-search-form">
+                        <div class="mb-3">
+                            <input type="text" class="form-control" id="search-query" placeholder="Search news...">
+                        </div>
+                        <button type="submit" class="btn btn-primary">Search</button>
+                    </form>
+                    <div id="search-results" class="mt-3">
+                        <!-- Search results will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Load market news
+    fetch('/news/market')
+        .then(response => response.json())
+        .then(data => {
+            const newsContainer = document.getElementById('market-news');
+            if (data.news && data.news.length > 0) {
+                newsContainer.innerHTML = data.news.map(item => `
+                    <div class="news-item mb-3">
+                        <h5>${item.title}</h5>
+                        <p class="text-muted">${item.date}</p>
+                        <p>${item.summary}</p>
+                        <a href="${item.url}" target="_blank" class="btn btn-sm btn-outline-primary">Read More</a>
+                    </div>
+                `).join('');
+            } else {
+                newsContainer.innerHTML = '<p class="text-muted">No market news available.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading market news:', error);
+            document.getElementById('market-news').innerHTML = '<p class="text-danger">Error loading market news.</p>';
+        });
+
+    // Load headlines
+    fetch('/news/headlines')
+        .then(response => response.json())
+        .then(data => {
+            const headlinesContainer = document.getElementById('headlines');
+            if (data.headlines && data.headlines.length > 0) {
+                headlinesContainer.innerHTML = data.headlines.map(headline => `
+                    <div class="headline-item mb-2">
+                        <a href="${headline.url}" target="_blank">${headline.title}</a>
+                        <small class="text-muted d-block">${headline.date}</small>
+                    </div>
+                `).join('');
+            } else {
+                headlinesContainer.innerHTML = '<p class="text-muted">No headlines available.</p>';
+            }
+        })
+        .catch(error => {
+            console.error('Error loading headlines:', error);
+            document.getElementById('headlines').innerHTML = '<p class="text-danger">Error loading headlines.</p>';
+        });
+
+    // Handle news search
+    document.getElementById('news-search-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const query = document.getElementById('search-query').value;
+        const resultsContainer = document.getElementById('search-results');
+        
+        resultsContainer.innerHTML = '<p class="text-muted">Searching...</p>';
+        
+        fetch(`/news/search?q=${encodeURIComponent(query)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.results && data.results.length > 0) {
+                    resultsContainer.innerHTML = data.results.map(result => `
+                        <div class="search-result mb-2">
+                            <a href="${result.url}" target="_blank">${result.title}</a>
+                            <small class="text-muted d-block">${result.date}</small>
+                        </div>
+                    `).join('');
+                } else {
+                    resultsContainer.innerHTML = '<p class="text-muted">No results found.</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error searching news:', error);
+                resultsContainer.innerHTML = '<p class="text-danger">Error searching news.</p>';
+            });
+    });
+});
+</script>
+{% endblock %}
+{% endblock %} 

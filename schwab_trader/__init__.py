@@ -31,8 +31,12 @@ def create_app(config=None):
     # Register blueprints
     from .routes.root import root_bp
     from .routes.analysis_dashboard import analysis_dashboard_bp
+    from .routes.news import news_bp
+    from .routes.data import data_bp
     
     app.register_blueprint(root_bp)
     app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis/dashboard')
+    app.register_blueprint(news_bp)
+    app.register_blueprint(data_bp)
     
     return app

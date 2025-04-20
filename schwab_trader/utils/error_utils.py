@@ -130,6 +130,15 @@ class ConfigurationError(AppError):
             details=details
         )
 
+class RateLimitError(AppError):
+    """Error raised when API rate limits are exceeded."""
+    def __init__(self, message: str):
+        super().__init__(
+            message=message,
+            status_code=429,
+            code="RATE_LIMIT_ERROR"
+        )
+
 def handle_error(error: Exception) -> tuple:
     """Global error handler for the application."""
     if isinstance(error, AppError):

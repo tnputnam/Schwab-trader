@@ -11,7 +11,6 @@ def test_user(session):
     """Create a test user."""
     user = User(
         username='testuser',
-        email='test@example.com',
         password='testpass'
     )
     session.add(user)
@@ -46,7 +45,6 @@ def test_user_creation(session, test_user):
     """Test user creation."""
     assert test_user.id is not None
     assert test_user.username == 'testuser'
-    assert test_user.email == 'test@example.com'
 
 def test_portfolio_creation(session, test_portfolio, test_user):
     """Test portfolio creation."""

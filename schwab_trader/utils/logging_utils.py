@@ -48,5 +48,35 @@ def setup_logger(name: str, level: Optional[str] = None) -> logging.Logger:
 logger = setup_logger('schwab_trader')
 
 def get_logger(name: str) -> logging.Logger:
-    """Get a logger with the specified name."""
-    return logging.getLogger(name) 
+    """Get a configured logger instance."""
+    logger = logging.getLogger(name)
+    
+    if not logger.handlers:
+        # Create logs directory if it doesn't exist
+        if not os.path.exists('logs'):
+            os.makedirs('logs')
+            
+        # Set up file handler
+        file_handler = RotatingFileHandler(
+            'logs/app.log',
+            maxBytes=1024 * 1024,  # 1MB
+            backupCount=10
+        )
+        file_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s [in %(pathname)s:%(lineno)d]'
+        ))
+        
+        # Set up console handler
+        console_handler = logging.StreamHandler()
+        console_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s: %(message)s'
+        ))
+        
+        # Add handlers to logger
+        logger.addHandler(file_handler)
+        logger.addHandler(console_handler)
+        
+        # Set log level
+        logger.setLevel(logging.INFO)
+    
+    return logger 

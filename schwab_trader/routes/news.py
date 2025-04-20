@@ -1,3 +1,4 @@
+"""News blueprint for Schwab Trader."""
 from flask import Blueprint, render_template, jsonify, current_app, request
 import logging
 from datetime import datetime
@@ -18,9 +19,10 @@ from schwab_trader.services.news_service import NewsService
 from schwab_trader.services.auth_service import AuthService
 from flask_login import login_required, current_user
 from schwab_trader.services.logging_service import LoggingService
+from schwab_trader.utils.logger import setup_logger
 
-bp = Blueprint('news', __name__, url_prefix='/news')
-logger = LoggingService('news').logger
+news_bp = Blueprint('news', __name__, url_prefix='/news')
+logger = setup_logger('news')
 
 # Initialize rate limiter
 limiter = Limiter(
@@ -112,15 +114,16 @@ def get_access_token():
         return "development_token"
     return current_user.access_token
 
-@bp.route('/')
-@login_required
-@handle_errors
-def news_feed():
-    """Display the news feed page."""
-    logger.info('Accessing news feed page')
-    return render_template('news.html')
+@news_bp.route('/')
+def index():
+    """Render the news dashboard."""
+    try:
+        return render_template('news/index.html')
+    except Exception as e:
+        logger.error(f"Error in news route: {str(e)}")
+        return render_template('error.html', error_message=str(e))
 
-@bp.route('/market', methods=['GET'])
+@news_bp.route('/market', methods=['GET'])
 @login_required
 def get_market_news():
     """Get market news."""
@@ -136,7 +139,7 @@ def get_market_news():
         logger.error(f"Error in get_market_news: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@bp.route('/headlines', methods=['GET'])
+@news_bp.route('/headlines', methods=['GET'])
 @login_required
 def get_business_headlines():
     """Get business headlines."""
@@ -152,7 +155,7 @@ def get_business_headlines():
         logger.error(f"Error in get_business_headlines: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@bp.route('/search', methods=['GET'])
+@news_bp.route('/search', methods=['GET'])
 @login_required
 def search_news():
     """Search news articles."""
@@ -178,7 +181,7 @@ def search_news():
         logger.error(f"Error in search_news: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-@bp.route('/test_api')
+@news_bp.route('/test_api')
 @login_required
 @handle_errors
 def test_api():
