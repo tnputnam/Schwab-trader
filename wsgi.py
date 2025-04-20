@@ -1,8 +1,9 @@
-from schwab_trader import create_app
+from schwab_trader import create_app, db
 from schwab_trader.utils.alpha_vantage_api import AlphaVantageAPI
 from schwab_trader.utils.schwab_api import SchwabAPI
 import os
 
+# Create the Flask application instance
 app = create_app({
     'SECRET_KEY': os.getenv('SECRET_KEY', 'dev'),
     'ALPHA_VANTAGE_API_KEY': os.getenv('ALPHA_VANTAGE_API_KEY'),
@@ -12,10 +13,19 @@ app = create_app({
     'SQLALCHEMY_TRACK_MODIFICATIONS': False
 })
 
-# Initialize APIs with app context
+# Initialize APIs within application context
 with app.app_context():
-    alpha_vantage = AlphaVantageAPI(app)
-    schwab = SchwabAPI(app)
+    # Create database tables
+    db.create_all()
+    
+    # Initialize APIs as Flask extensions
+    alpha_vantage = AlphaVantageAPI()
+    alpha_vantage.init_app(app)
+    app.alpha_vantage = alpha_vantage
+    
+    schwab = SchwabAPI()
+    schwab.init_app(app)
+    app.schwab = schwab
 
 if __name__ == '__main__':
     app.run(debug=True) 

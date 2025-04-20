@@ -1,19 +1,22 @@
 import os
 import logging
+from flask import current_app
 from schwab_trader.utils.logger import setup_logger
 
 logger = setup_logger('schwab_api')
 
 class SchwabAPI:
-    def __init__(self, app=None):
+    def __init__(self):
+        """Initialize the API without app context"""
         self.api_key = None
         self.api_secret = None
-        
-        if app is not None:
-            self.init_app(app)
+        self._initialized = False
     
     def init_app(self, app):
         """Initialize the API with Flask app context"""
+        if self._initialized:
+            return
+            
         self.api_key = app.config.get('SCHWAB_API_KEY')
         self.api_secret = app.config.get('SCHWAB_API_SECRET')
         
@@ -24,6 +27,9 @@ class SchwabAPI:
         logger.info("Initializing SchwabAPI...")
         try:
             # Initialize Schwab API client here
+            # This is where you would typically set up OAuth2 client
+            # and other necessary components
+            self._initialized = True
             logger.info("SchwabAPI initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing SchwabAPI: {str(e)}")
@@ -31,6 +37,10 @@ class SchwabAPI:
     
     def get_market_data(self, symbol):
         """Get market data for a symbol"""
+        if not self._initialized:
+            logger.error("SchwabAPI not initialized")
+            return None
+            
         try:
             # Implement market data retrieval
             return None
@@ -40,6 +50,10 @@ class SchwabAPI:
     
     def place_order(self, symbol, quantity, order_type):
         """Place an order"""
+        if not self._initialized:
+            logger.error("SchwabAPI not initialized")
+            return None
+            
         try:
             # Implement order placement
             return None
