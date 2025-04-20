@@ -7,6 +7,7 @@ from flask_socketio import SocketIO
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
+from schwab_trader.routes.api import api_bp
 
 # Initialize Flask extensions
 db = SQLAlchemy()
@@ -17,7 +18,9 @@ def create_app(config=None):
     app = Flask(__name__)
     
     # Apply configuration
-    if config:
+    if config is None:
+        app.config.from_object('schwab_trader.config.Config')
+    else:
         app.config.update(config)
     
     # Enable CORS
@@ -33,10 +36,10 @@ def create_app(config=None):
     from .routes.analysis_dashboard import analysis_dashboard_bp
     from .routes.news import news_bp
     from .routes.data import data_bp
-    
     app.register_blueprint(root_bp)
     app.register_blueprint(analysis_dashboard_bp, url_prefix='/analysis/dashboard')
     app.register_blueprint(news_bp)
     app.register_blueprint(data_bp)
+    app.register_blueprint(api_bp)
     
     return app

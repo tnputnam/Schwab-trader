@@ -30,6 +30,52 @@
     <div class="container mt-4">
         <h1>Welcome to Schwab Trader</h1>
         <p>Your comprehensive trading platform for managing your portfolio and executing trades.</p>
+        
+        <!-- API Control Section -->
+        <div class="card mt-4">
+            <div class="card-header">
+                <h5 class="mb-0">API Connections</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Schwab API -->
+                    <div class="col-md-4">
+                        <div class="api-control">
+                            <h6>Schwab API</h6>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="status-indicator me-2" id="schwab-status"></div>
+                                <span id="schwab-status-text">Checking...</span>
+                            </div>
+                            <button class="btn btn-primary" id="schwab-toggle">Connect</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Alpha Vantage API -->
+                    <div class="col-md-4">
+                        <div class="api-control">
+                            <h6>Alpha Vantage API</h6>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="status-indicator me-2" id="alpha-vantage-status"></div>
+                                <span id="alpha-vantage-status-text">Checking...</span>
+                            </div>
+                            <button class="btn btn-primary" id="alpha-vantage-toggle">Connect</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Yahoo Finance API -->
+                    <div class="col-md-4">
+                        <div class="api-control">
+                            <h6>Yahoo Finance API</h6>
+                            <div class="d-flex align-items-center mb-2">
+                                <div class="status-indicator me-2" id="yfinance-status"></div>
+                                <span id="yfinance-status-text">Checking...</span>
+                            </div>
+                            <button class="btn btn-primary" id="yfinance-toggle">Connect</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
