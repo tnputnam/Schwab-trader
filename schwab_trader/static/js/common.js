@@ -202,9 +202,62 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Initialize common functionality
-document.addEventListener('DOMContentLoaded', () => {
-    checkAPIStatus();
+// Bypass Toggle
+function setupBypassToggle() {
+    const bypassToggle = document.getElementById('bypassToggle');
+    if (!bypassToggle) return;
+
+    // Check initial bypass status
+    fetch('/auth/bypass')
+        .then(response => response.json())
+        .then(data => {
+            updateBypassStatus(data.bypassed);
+        });
+
+    // Add click handler for bypass toggle
+    bypassToggle.addEventListener('click', function() {
+        const currentStatus = this.querySelector('#bypassStatus').textContent.includes('On');
+        fetch('/auth/bypass', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ bypass: !currentStatus })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                updateBypassStatus(data.bypassed);
+                showToast(`Schwab bypass ${data.bypassed ? 'enabled' : 'disabled'}`);
+            } else {
+                showToast('Error toggling bypass: ' + data.message, 'error');
+            }
+        })
+        .catch(error => {
+            showToast('Error toggling bypass', 'error');
+        });
+    });
+
+    function updateBypassStatus(isBypassed) {
+        const statusElement = document.getElementById('bypassStatus');
+        const button = document.getElementById('bypassToggle');
+        
+        if (isBypassed) {
+            statusElement.textContent = 'Schwab Bypass: On';
+            button.classList.remove('btn-warning');
+            button.classList.add('btn-success');
+        } else {
+            statusElement.textContent = 'Schwab Bypass: Off';
+            button.classList.remove('btn-success');
+            button.classList.add('btn-warning');
+        }
+    }
+}
+
+// Initialize all functionality when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
     setupTabNavigation();
     setupAutoRefresh();
+    setupBypassToggle();
+    checkAPIStatus();
 }); 

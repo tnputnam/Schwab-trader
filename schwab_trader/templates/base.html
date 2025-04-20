@@ -75,13 +75,16 @@
                         <a class="nav-link" href="{{ url_for('analysis') }}">Analysis</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{{ url_for('news.news_feed') }}">News</a>
+                        <a class="nav-link" href="{{ url_for('news') }}">News</a>
                     </li>
                 </ul>
                 <div class="navbar-nav">
                     <div class="nav-item">
                         <button id="bypassToggle" class="btn btn-sm btn-warning">
                             <span id="bypassStatus">Schwab Bypass: Off</span>
+                        </button>
+                        <button id="forceBypassOff" class="btn btn-sm btn-danger ms-2">
+                            Force Bypass Off
                         </button>
                     </div>
                 </div>

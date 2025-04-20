@@ -39,6 +39,7 @@ class Config:
     SCHWAB_API_KEY = os.getenv('SCHWAB_API_KEY')
     SCHWAB_API_SECRET = os.getenv('SCHWAB_API_SECRET')
     SCHWAB_API_BASE_URL = os.getenv('SCHWAB_API_BASE_URL', 'https://api.schwab.com')
+    SCHWAB_REDIRECT_URL = os.getenv('SCHWAB_REDIRECT_URL', 'http://localhost:5000/auth/callback')
     ALPHA_VANTAGE_API_KEY = os.getenv('ALPHA_VANTAGE_API_KEY')
     
     # Cache configuration

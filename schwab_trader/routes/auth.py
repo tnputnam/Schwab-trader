@@ -130,4 +130,24 @@ def toggle_bypass():
         return jsonify({
             'status': 'error',
             'message': str(e)
+        }), 500
+
+@bp.route('/force_bypass_off', methods=['POST'])
+def force_bypass_off():
+    """Force the Schwab bypass mode to be turned off."""
+    try:
+        market_data_service = MarketDataService()
+        market_data_service.toggle_bypass(False)
+        session['schwab_bypassed'] = False
+        
+        return jsonify({
+            'status': 'success',
+            'message': 'Schwab bypass disabled',
+            'bypassed': False
+        })
+    except Exception as e:
+        logger.error(f"Error forcing bypass off: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'message': str(e)
         }), 500 
